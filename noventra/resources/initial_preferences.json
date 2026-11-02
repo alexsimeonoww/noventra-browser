@@ -1,0 +1,11 @@
+{
+  "browser": {
+    "theme": {
+      "color_scheme2": 0,
+      "is_grayscale2": true
+    }
+  },
+  "session": {
+    "restore_on_startup": 1
+  }
+}

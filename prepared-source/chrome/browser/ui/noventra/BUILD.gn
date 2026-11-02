@@ -1,0 +1,36 @@
+# Copyright 2026 The Noventra Authors. All rights reserved.
+import("//testing/test.gni")
+
+# Codec regressions run without linking a browser or reading a profile.
+test("portable_transfer_codec_unittests") {
+  sources = [
+    "portable_transfer_codec.cc",
+    "portable_transfer_codec_unittest.cc",
+  ]
+  deps = [
+    "//base",
+    "//base/test:run_all_unittests",
+    "//base/test:test_support",
+    "//crypto",
+    "//testing/gtest",
+  ]
+}
+
+# A fresh process exercises the default thread allowlist and explicit opt-in
+# without mutating the recorder's cached policy.
+executable("lock_metrics_policy_probe") {
+  testonly = true
+  sources = [ "lock_metrics_policy_probe.cc" ]
+  deps = [ "//base" ]
+}
+
+executable("internal_urls_probe") {
+  testonly = true
+  sources = [ "internal_urls_probe.cc" ]
+  deps = [
+    "//base",
+    "//base:i18n",
+    "//components/url_formatter",
+    "//url",
+  ]
+}

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>local.noventra.browser</id>
+  <launchable type="desktop-id">noventra-browser.desktop</launchable>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-only</project_license>
+  <name>Noventra</name>
+  <summary>Local build of the Noventra web browser</summary>
+  <description>
+    <p>Noventra is a web browser derived from Helium and Chromium.
+    This package is an unsigned local Linux build.</p>
+    <p>Helium and Chromium authors retain their upstream credits and licenses.
+    Bundled provenance records identify the supplied source snapshot.</p>
+  </description>
+  <categories>
+    <category>Network</category>
+    <category>WebBrowser</category>
+  </categories>
+</component>

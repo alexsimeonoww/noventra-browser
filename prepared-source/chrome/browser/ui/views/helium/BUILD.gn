@@ -1,0 +1,17 @@
+# Copyright 2026 The Noventra Authors
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# Native frame appearance is shared by independent Views leaf targets. Its
+# implementation remains in //chrome/browser/ui:ui; depend on this interface
+# to include the declarations without making those leaves depend on all UI.
+source_set("native_frame_materials") {
+  public = [ "native_frame_materials.h" ]
+  public_deps = [ "//skia:skia_core_public_headers" ]
+}
+
+# These radius declarations are also consumed by independent frame leaves.
+# Their platform implementations remain linked by //chrome/browser/ui:ui.
+source_set("frame_corner_radius") {
+  public = [ "frame_corner_radius.h" ]
+}

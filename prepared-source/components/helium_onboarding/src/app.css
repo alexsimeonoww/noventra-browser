@@ -1,0 +1,4 @@
+:root { font-family: 'Instrument Sans Variable', system-ui, sans-serif; color-scheme: light dark; }
+body { margin: 0; min-width: 320px; background: var(--color-primary-background, #fafafb); }
+button, input, select { font: inherit; }
+* { box-sizing: border-box; }

@@ -1,0 +1,1229 @@
+--- a/chrome/browser/importer/profile_writer.cc
++++ b/chrome/browser/importer/profile_writer.cc
+@@ -27,6 +27,7 @@
+ #include "components/autofill/core/browser/webdata/autofill_webdata_service.h"
+ #include "components/bookmarks/browser/bookmark_model.h"
+ #include "components/bookmarks/browser/bookmark_node.h"
++#include "components/bookmarks/common/bookmark_bar_visibility_state.h"
+ #include "components/bookmarks/common/bookmark_pref_names.h"
+ #include "components/favicon/core/favicon_service.h"
+ #include "components/history/core/browser/history_service.h"
+@@ -221,9 +222,25 @@
+ 
+   model->EndExtensiveChanges();
+ 
+-  // If the user was previously using a toolbar, we should show the bar.
+-  if (import_to_top_level && !add_all_to_top_level)
+-    ShowBookmarkBar(profile_);
++  if (import_to_top_level && !add_all_to_top_level) {
++    PrefService* pref_service = profile_->GetPrefs();
++    if (pref_service->GetInteger(prefs::kHeliumLayout) == 2) {
++      // Vertical tabs already provide a bookmark library. Keep its untouched
++      // NTP-only default hidden, while preserving explicit visibility choices.
++      const PrefService::Preference* visibility = pref_service->FindPreference(
++          bookmarks::prefs::kBookmarkBarVisibilityState);
++      if (!pref_service->GetBoolean(bookmarks::prefs::kShowBookmarkBar) &&
++          visibility && visibility->IsDefaultValue() &&
++          visibility->IsUserModifiable()) {
++        pref_service->SetInteger(
++            bookmarks::prefs::kBookmarkBarVisibilityState,
++            static_cast<int>(bookmarks::BookmarkBarVisibilityState::kAlwaysHide));
++      }
++    } else {
++      // Preserve the other layouts' existing toolbar-import behavior.
++      ShowBookmarkBar(profile_);
++    }
++  }
+ }
+ 
+ void ProfileWriter::AddFavicons(
+--- a/chrome/browser/resources/settings/appearance_page/appearance_page.css
++++ b/chrome/browser/resources/settings/appearance_page/appearance_page.css
+@@ -737,3 +737,55 @@
+   cursor: default;
+   opacity: .6;
+ }
++
++/* Keep everyday controls visible and secondary choices within named groups. */
++.settings-options > summary,
++.settings-help > summary {
++  cursor: pointer;
++  font-weight: 500;
++}
++
++.settings-options > summary:focus-visible,
++.settings-help > summary:focus-visible {
++  outline: 2px solid var(--cr-focus-outline-color);
++  outline-offset: 3px;
++}
++
++.settings-options > .cr-row,
++.settings-options > .list-frame {
++  padding-inline: 0;
++}
++
++#noventraAutoHide #noventraBarVisibility {
++  border-top: 0;
++  padding: 0;
++}
++
++.settings-help {
++  margin-top: 12px;
++}
++
++.settings-help p {
++  color: var(--cr-secondary-text-color);
++  line-height: 1.5;
++  margin-block: 10px;
++}
++
++.settings-group-heading {
++  font-size: 13px;
++  font-weight: 500;
++  margin: 0;
++  padding: 16px var(--cr-section-padding) 8px;
++}
++
++.settings-options .settings-group-heading {
++  padding-inline: 0;
++}
++
++.settings-options:not([open]) {
++  padding-block: 16px;
++}
++
++.settings-options + .settings-options {
++  border-top: var(--cr-separator-line);
++}
+--- a/chrome/browser/resources/settings/appearance_page/appearance_page.html.ts
++++ b/chrome/browser/resources/settings/appearance_page/appearance_page.html.ts
+@@ -20,10 +20,10 @@
+       <noventra-transfer></noventra-transfer>
+       <details id="noventraDataAdvanced" class="space-details"
+           ?open="${this.noventraSearchMode}" @toggle="${this.onWorkspaceSyncToggle_}">
+-        <summary>Advanced: workspace settings only</summary>
++        <summary>Advanced: space and layout settings</summary>
+         <p>For an existing settings file or your own sync server. To move your browser to another PC, use Encrypted file or Direct transfer above.</p>
+       <details id="noventraWorkspaceBackup" class="space-details" ?open="${this.noventraSearchMode}">
+-        <summary>Workspace settings file (JSON)</summary>
++        <summary>Space and layout settings file (JSON)</summary>
+         <p>Save space names, order, archive state, domain rules and your saved layout. Tabs, logins, cookies, passwords and site data are not included. This is a settings file, not automatic device sync.</p>
+         <div class="noventra-workspace-tool-row">
+           <cr-button id="noventraExportSettings" @click="${this.onExportWorkspaceSettingsClick_}"
+@@ -53,7 +53,7 @@
+       <div id="noventraWorkspaceToolsError" role="alert" class="cr-row"
+           ?hidden="${!this.noventraToolsError_}">${this.noventraToolsError_}</div>
+       <details id="noventraWorkspaceSync" class="space-details" ?open="${this.noventraSearchMode}" @toggle="${this.onWorkspaceSyncToggle_}">
+-        <summary>Self-hosted workspace settings sync</summary>
++        <summary>Self-hosted space and layout sync</summary>
+         <p>Sync space names, order, archive state and your saved layout through a server you control. Changes travel encrypted. Tabs, logins, cookies, passwords, history and domain rules stay on this device.</p>
+         <div ?hidden="${this.noventraSync_.configured}">
+           <label class="noventra-tool-field">Set up sync
+@@ -154,11 +154,11 @@
+           @noventra-layout-request-visibility="${this.onNoventraLayoutRequestVisibility_}">
+       </noventra-layout-editor>
+       <div id="noventraSidebarPreferences" class="sidebar-preferences">
+-        <div class="customize-heading"><h2>Sidebar</h2>
+-          <p>These choices save immediately. Your layout draft stays separate.</p></div>
++        <div class="customize-heading"><h2>Sidebar preferences</h2>
++          <p>Changes save immediately.</p></div>
+         <div class="cr-row">
+           <div class="flex"><div>Tab density</div>
+-            <div class="secondary">Compact keeps the current spacing. Comfortable gives tabs more room.</div></div>
++            <div class="secondary">Choose compact tabs or more space between them.</div></div>
+           <settings-dropdown-menu id="noventraTabDensity"
+               pref-key="noventra.browser.tab_density" label="Tab density"
+               .menuOptions="${this.noventraDensityOptions_}">
+@@ -166,19 +166,20 @@
+         </div>
+         <div class="cr-row">
+           <div class="flex"><div>Open bookmarks in</div>
+-            <div class="secondary">The popup floats over the page. The side panel stays open beside it.</div></div>
++            <div class="secondary">Choose a floating popup or a panel beside the page.</div></div>
+           <settings-dropdown-menu id="noventraBookmarkOpening"
+               pref-key="noventra.browser.bookmark_opening" label="Open bookmarks in"
+               .menuOptions="${this.noventraBookmarkOpeningOptions_}">
+           </settings-dropdown-menu>
+         </div>
+       </div>
++      <details id="noventraAutoHide" class="space-details settings-options"
++          ?open="${this.noventraSearchMode}">
++        <summary id="noventraBarVisibilityHeading">Auto-hide browser controls</summary>
+       <div id="noventraBarVisibility" tabindex="-1"
+           aria-labelledby="noventraBarVisibilityHeading"
+           aria-busy="${this.noventraBarVisibilityPending_}">
+-        <h2 id="noventraBarVisibilityHeading">Automatically hide browser bars</h2>
+-        <p>Keep the browser controls visible, or make more room for the page.
+-          These choices save immediately, separately from your layout draft.</p>
++        <p>Choose which controls appear at the window edge. Changes save immediately.</p>
+         <div class="bar-visibility-presets" role="group"
+             aria-label="Bar visibility presets">
+           ${this.noventraBarVisibilityChoices_.map(choice => html`
+@@ -214,11 +215,12 @@
+           </select>
+         </div>
+         </details>
+-        <p>Hidden bars appear when you move to the window edge. This keeps the controls in your layout.</p>
++
+         <p id="noventraBarVisibilityStatus" role="status">${this.noventraBarVisibilityStatus_()}</p>
+         <p id="noventraBarVisibilityError" role="alert"
+             ?hidden="${!this.noventraBarVisibilityError_}">${this.noventraBarVisibilityError_}</p>
+       </div>
++      </details>
+     </section>
+     <section id="customizeAppearance" class="customize-section" tabindex="-1"
+         aria-labelledby="appearanceHeading" ?hidden="${this.isNoventraSectionHidden_('customizeAppearance')}">
+@@ -372,6 +374,34 @@
+ </if>
+     </details>
+     <div class="cr-row">
++      <a href="chrome://new-tab-page/?customize=shortcuts" target="_blank">
++        New tab background and shortcuts
++      </a>
++    </div>
++    <details id="noventraTabAppearance" class="space-details settings-options"
++        ?open="${this.noventraSearchMode}">
++      <summary>Tab icons and address bar</summary>
++    <settings-toggle-button id="noventraTabLetters" class="hr"
++        pref-key="noventra.browser.tab_letters"
++        label="Use letters instead of site icons"
++        sub-label="Pinned sites always keep their site icons.">
++    </settings-toggle-button>
++    <div class="list-frame indented-toggles">
++      <settings-toggle-button class="hr"
++          pref-key="helium.browser.minimal_location_bar"
++          label="$i18n{minimalLocationBar}">
++      </settings-toggle-button>
++      <settings-toggle-button class="hr"
++          pref-key="helium.browser.show_progress_bar"
++          label="$i18n{showProgressBar}">
++      </settings-toggle-button>
++    </div>
++    </details>
++    <details id="noventraPageDisplay" class="space-details settings-options"
++        ?open="${this.noventraSearchMode || this.noventraPageDisplayOpen_}"
++        @toggle="${this.onNoventraPageDisplayToggle_}">
++      <summary>Page text and zoom</summary>
++    <div class="cr-row">
+       <div class="flex cr-padded-text" aria-hidden="true">
+         $i18n{fontSize}
+       </div>
+@@ -405,38 +435,15 @@
+           label="$i18n{showZoomIndicator}">
+       </settings-toggle-button>
+     </div>
+-    <h3 class="cr-row">Tabs and address bar</h3>
+-    <div class="cr-row">
+-      <a href="chrome://new-tab-page/?customize=shortcuts" target="_blank">
+-        New tab background and shortcuts
+-      </a>
+-    </div>
+-    <settings-toggle-button id="noventraTabLetters" class="hr"
+-        pref-key="noventra.browser.tab_letters"
+-        label="Use letters instead of site icons"
+-        sub-label="Pinned sites always keep their site icons.">
+-    </settings-toggle-button>
+-    <div class="list-frame indented-toggles">
+-      <settings-toggle-button class="hr"
+-          pref-key="helium.browser.minimal_location_bar"
+-          label="$i18n{minimalLocationBar}">
+-      </settings-toggle-button>
+-      <settings-toggle-button class="hr"
+-          pref-key="helium.browser.show_progress_bar"
+-          label="$i18n{showProgressBar}">
+-      </settings-toggle-button>
+-    </div>
+-    <settings-toggle-button
+-        pref-key="helium.browser.rounded_frame"
+-        label="$i18n{roundedFrame}">
+-    </settings-toggle-button>
+-    <details class="space-details" ?open="${this.noventraSearchMode}">
+-      <summary>Bookmarks bar and native window style</summary>
++    </details>
++    <details id="noventraBookmarkBarSettings" class="space-details settings-options" ?open="${this.noventraSearchMode}">
++      <summary>Horizontal bookmarks bar</summary>
+     ${!this.ntpSimplificationBookmarksBarEnabled_ ? html`
+       <settings-toggle-button id="showBookmarksBar"
+           ?hidden="${!this.pageVisibility_.bookmarksBar}"
+           pref-key="bookmark_bar.show_on_all_tabs"
+-          label="$i18n{showBookmarksBar}">
++          label="Show horizontal bookmarks bar"
++          sub-label="Separate from the Bookmarks button in your sidebar.">
+       </settings-toggle-button>
+     ` : ''}
+     ${this.ntpSimplificationBookmarksBarEnabled_ ? html`
+@@ -453,21 +460,6 @@
+       </div>
+     ` : ''}
+ 
+-    <if expr="is_macosx">
+-      ${this.showGlassEffectEnabled_ ? html`
+-        <div class="cr-row hr">
+-          <div class="flex cr-padded-text" aria-hidden="true">
+-            $i18n{glassEffect}
+-          </div>
+-          <settings-dropdown-menu id="glassEffect"
+-              label="$i18n{glassEffect}"
+-              pref-key="glass_frame.enabled"
+-              .menuOptions="${this.glassEffectOptions_}"
+-              @settings-control-change="${this.onGlassFrameSettingsControlChange_}">
+-          </settings-dropdown-menu>
+-        </div>
+-      ` : ''}
+-    </if>
+ 
+     <settings-toggle-button class="hr" id="showSavedTabGroups"
+         pref-key="bookmark_bar.show_tab_groups"
+@@ -475,18 +467,10 @@
+         ?hidden="${this.showOrganizerPanelEnabled_}">
+     </settings-toggle-button>
+ 
+-<if expr="is_linux">
+-    <div class="hr" ?hidden="${!this.pageVisibility_.bookmarksBar}"></div>
+-    <settings-toggle-button
+-        ?hidden="${!this.showCustomChromeFrame_}"
+-        pref-key="browser.custom_chrome_frame"
+-        label="$i18n{showWindowDecorations}"
+-        inverted>
+-    </settings-toggle-button>
+-</if>
+     </details>
+-    <details class="space-details" ?open="${this.noventraSearchMode}">
+-      <summary>Side panel position</summary>
++    <details id="noventraToolsPanelPosition" class="space-details settings-options" ?open="${this.noventraSearchMode}">
++      <summary>Tools panel position</summary>
++      <p>Choose where bookmarks and other tool panels open. Arrange your tab sidebar in Layout.</p>
+     <div class="cr-row">$i18n{sidePanelPosition}</div>
+     <div class="list-frame indented-rows">
+       <div class="cr-row continuation">
+@@ -520,15 +504,52 @@
+ 
+     </div>
+     </details>
++    <details id="noventraNativeWindow" class="space-details settings-options"
++        ?open="${this.noventraSearchMode}">
++      <summary>Window style</summary>
++    <settings-toggle-button
++        pref-key="helium.browser.rounded_frame"
++        label="$i18n{roundedFrame}">
++    </settings-toggle-button>
++    <if expr="is_macosx">
++      ${this.showGlassEffectEnabled_ ? html`
++        <div class="cr-row hr">
++          <div class="flex cr-padded-text" aria-hidden="true">
++            $i18n{glassEffect}
++          </div>
++          <settings-dropdown-menu id="glassEffect"
++              label="$i18n{glassEffect}"
++              pref-key="glass_frame.enabled"
++              .menuOptions="${this.glassEffectOptions_}"
++              @settings-control-change="${this.onGlassFrameSettingsControlChange_}">
++          </settings-dropdown-menu>
++        </div>
++      ` : ''}
++    </if>
++<if expr="is_linux">
++    <div class="hr" ?hidden="${!this.pageVisibility_.bookmarksBar}"></div>
++    <settings-toggle-button
++        ?hidden="${!this.showCustomChromeFrame_}"
++        pref-key="browser.custom_chrome_frame"
++        label="$i18n{showWindowDecorations}"
++        inverted>
++    </settings-toggle-button>
++</if>
++    </details>
+     </section>
+     <section id="customizeSpaces" class="customize-section" tabindex="-1"
+         aria-labelledby="spacesHeading" ?hidden="${this.isNoventraSectionHidden_('customizeSpaces')}">
+     <div id="noventraSpaces" aria-busy="${this.noventraSpacesPending_}">
+       <div class="customize-heading">
+         <h2 id="spacesHeading">Spaces</h2>
+-        <p>A Space groups tabs and keeps its website accounts separate, with its own cookies, logins and site storage.</p>
+-        <p>Drag the sidebar icons to reorder spaces, or use the arrows below. Names save when you finish editing. Colors, icons and themes save immediately on this device.</p>
+-        <p id="noventraSpaceThemeHint">Use browser theme follows your main appearance settings. Choosing another theme applies it to this window while you use that Space. Theme changes affect browser controls, not websites.</p>
++        <p>Keep tabs and website accounts separate for work, personal browsing and more.</p>
++      <details id="noventraAboutSpaces" class="settings-help"
++          ?open="${this.noventraSearchMode}">
++        <summary>About spaces and themes</summary>
++        <p>Each space has its own cookies, website logins and site storage. Names save when you finish editing; colors, icons and themes save immediately.</p>
++        <p>Drag the sidebar buttons or use the arrows below to reorder spaces.</p>
++        <p id="noventraSpaceThemeHint">Use browser theme follows your main appearance settings. Another theme applies to the browser controls while that space is active; websites keep their own appearance.</p>
++      </details>
+       </div>
+       <div id="noventraSpacesVisibility" class="cr-row noventra-space-row"
+           data-state="${this.spaceSwitcherState_()}"
+@@ -552,7 +573,7 @@
+       <div class="cr-row noventra-space-row">
+         <div class="flex noventra-tool-field">
+           <div>Space shortcuts</div>
+-          <div class="secondary">Defaults: Ctrl + Shift + 1–9 switches spaces in sidebar order. Ctrl + Alt + ↑ / ↓ cycles through spaces.</div>
++          <div class="secondary">Choose keys to switch spaces and cycle between them.</div>
+         </div>
+         <a id="noventraSpaceShortcuts" href="chrome://settings/system/shortcuts">Edit shortcuts</a>
+       </div>
+@@ -601,11 +622,11 @@
+             <cr-button data-space="${space.id}" data-action="move-before"
+                 aria-label="Move ${space.name} earlier" title="Move earlier"
+                 ?disabled="${this.noventraSpacesPending_ || index === 0}"
+-                @click="${this.onMoveSpaceClick_}">↑</cr-button>
++                @click="${this.onMoveSpaceClick_}">←</cr-button>
+             <cr-button data-space="${space.id}" data-action="move-after"
+                 aria-label="Move ${space.name} later" title="Move later"
+                 ?disabled="${this.noventraSpacesPending_ || index === this.activeSpaces_().length - 1}"
+-                @click="${this.onMoveSpaceClick_}">↓</cr-button>
++                @click="${this.onMoveSpaceClick_}">→</cr-button>
+             <cr-button data-space="${space.id}" ?disabled="${this.noventraSpacesPending_}"
+                 @click="${this.onSwitchSpaceClick_}">Switch</cr-button>
+             <cr-button data-space="${space.id}" data-action="archive"
+@@ -639,7 +660,7 @@
+       </section>
+       <div id="noventraSpaceStatus" role="status" aria-live="polite"
+           class="cr-row secondary" ?hidden="${!this.noventraSpaceStatus_}">${this.noventraSpaceStatus_}</div>
+-      <details id="noventraWorkspaceRoutes" class="space-details">
++      <details id="noventraWorkspaceRoutes" class="space-details" ?open="${this.noventraSearchMode}">
+         <summary>Open domains in a space</summary>
+         <p>Open matching links from other apps, bookmarks and browser-created tabs in the chosen space. Existing tabs and page links keep their current space. Match the exact hostname; subdomains need their own rule.</p>
+         ${repeat(this.noventraRoutes_, route => route.host, route => html`
+@@ -672,7 +693,7 @@
+           ?hidden="${!this.noventraToolsStatus_}">${this.noventraToolsStatus_}</div>
+       <div id="noventraWorkspaceToolsError" role="alert" class="cr-row"
+           ?hidden="${!this.noventraToolsError_}">${this.noventraToolsError_}</div>
+-      <details class="space-details"><summary>What is shared between spaces?</summary>
++      <details class="space-details" ?open="${this.noventraSearchMode}"><summary>What is shared between spaces?</summary>
+         <p>History, saved passwords, bookmarks, extensions, settings and notification permissions are shared. Web notifications use the space that created them.</p>
+       </details>
+     </div>
+@@ -683,6 +704,7 @@
+         aria-labelledby="behaviorHeading" ?hidden="${this.isNoventraSectionHidden_('customizeBehavior')}">
+       <div class="customize-heading"><h2 id="behaviorHeading">Tabs & browsing</h2>
+         <p>Fine-tune everyday browsing. Changes save immediately.</p></div>
++    <h3 class="settings-group-heading">Tabs</h3>
+     <settings-toggle-button id="newTabNextToActive"
+         pref-key="helium.browser.new_tab_next_to_active"
+         label="$i18n{openNewTabNextToActive}">
+@@ -692,45 +714,24 @@
+         label="Cycle tabs in this space by most recently used"
+         sub-label="Use Ctrl+Tab to return to recent tabs in the current space.">
+     </settings-toggle-button>
+-    <settings-toggle-button class="hr" id="shiftRightClickContextMenu"
+-        pref-key="helium.browser.shift_right_click_context_menu"
+-        label="$i18n{shiftRightClickContextMenu}">
+-    </settings-toggle-button>
+-    <settings-toggle-button class="hr" id="copyPageUrlShortcut"
+-        pref-key="helium.settings.a11y.copy_page_url_shortcut"
+-        label="$i18n{copyPageUrlShortcut}">
+-    </settings-toggle-button>
+-    <settings-toggle-button class="hr" id="verticalCollapseShortcut"
+-        pref-key="helium.settings.behavior.vertical_collapse_shortcut"
+-        label="$i18n{verticalCollapseShortcut}">
+-    </settings-toggle-button>
+-    <settings-toggle-button class="hr" id="autoPinNewTabGroups"
+-        pref-key="auto_pin_new_tab_groups"
+-        label="$i18n{autoPinNewTabGroups}">
+-    </settings-toggle-button>
+     <settings-toggle-button class="hr" id="splitViewDragAndDrop"
+         pref-key="browser.split_view_drag_and_drop_enabled"
+         label="Drag tabs into the page to split the view"
+         sub-label="Drag from the sidebar or top tab bar into the center or an edge of the page.">
+     </settings-toggle-button>
+-    <settings-toggle-button class="hr" id="noventraWindowMirroring"
+-        pref-key="noventra.browser.window_mirroring"
+-        label="Mirror tabs across windows"
+-        sub-label="Share tabs between windows on this PC without opening a second copy of each page.">
+-    </settings-toggle-button>
+-    <details class="space-details"><summary>How window mirroring works</summary>
+-      <p>Window mirroring is off by default. Turn it on to share your tab list between windows on this PC. Each tab has one live page; opening it in another window moves that page there. This does not sync tabs to another device.</p>
+-    </details>
+     <div class="cr-row">
+       <a id="noventraKeyboardShortcuts" href="chrome://settings/system/shortcuts">
+         Keyboard shortcuts
+       </a>
+     </div>
++    <h3 class="settings-group-heading">Links</h3>
+     <settings-toggle-button id="noventraLinkPreview"
+         pref-key="noventra.browser.link_preview"
+         label="Link previews"
+-        sub-label="Take a quick look without leaving your tab. Preview link also stays available in a link’s right-click menu.">
+-    </settings-toggle-button>
++        sub-label="Take a quick look while keeping your current tab open.">
++    </settings-toggle-button>
++    <div id="noventraPreviewOptions"
++        ?hidden="${!this.noventraLinkPreviewPref_?.value && !this.noventraSearchMode}">
+     <div class="cr-row">
+       <div class="flex cr-padded-text" aria-hidden="true">Preview shortcut</div>
+       <settings-dropdown-menu id="noventraPreviewTrigger"
+@@ -746,7 +747,37 @@
+         sub-label="Keep pinned pages open while checking links to other websites."
+         ?disabled="${!this.noventraLinkPreviewPref_?.value}">
+     </settings-toggle-button>
+-    <details><summary>Home page destination</summary>
++    </div>
++    <details id="noventraAdvancedBrowsing" class="space-details settings-options"
++        ?open="${this.noventraSearchMode}">
++      <summary>More browsing options</summary>
++      <h3 class="settings-group-heading">Keyboard and mouse</h3>
++    <settings-toggle-button class="hr" id="shiftRightClickContextMenu"
++        pref-key="helium.browser.shift_right_click_context_menu"
++        label="$i18n{shiftRightClickContextMenu}">
++    </settings-toggle-button>
++    <settings-toggle-button class="hr" id="copyPageUrlShortcut"
++        pref-key="helium.settings.a11y.copy_page_url_shortcut"
++        label="$i18n{copyPageUrlShortcut}">
++    </settings-toggle-button>
++    <settings-toggle-button class="hr" id="verticalCollapseShortcut"
++        pref-key="helium.settings.behavior.vertical_collapse_shortcut"
++        label="$i18n{verticalCollapseShortcut}">
++    </settings-toggle-button>
++    <settings-toggle-button class="hr" id="autoPinNewTabGroups"
++        pref-key="auto_pin_new_tab_groups"
++        label="$i18n{autoPinNewTabGroups}">
++    </settings-toggle-button>
++      <h3 class="settings-group-heading">Windows and page controls</h3>
++    <settings-toggle-button class="hr" id="noventraWindowMirroring"
++        pref-key="noventra.browser.window_mirroring"
++        label="Mirror tabs across windows"
++        sub-label="Share tabs between windows on this PC without opening a second copy of each page.">
++    </settings-toggle-button>
++    <details class="space-details" ?open="${this.noventraSearchMode}"><summary>How window mirroring works</summary>
++      <p>Window mirroring is off by default. Turn it on to share your tab list between windows on this PC. Each tab has one live page; opening it in another window moves that page there. This does not sync tabs to another device.</p>
++    </details>
++    <details id="noventraHomePage" class="settings-options" ?open="${this.noventraSearchMode}"><summary>Home page destination</summary>
+       <div id="home-button-options" class="list-frame"
+           ?hidden="${!this.pageVisibility_.homeButton}">
+         <settings-radio-group pref-key="homepage_is_newtabpage">
+@@ -821,7 +852,7 @@
+         pref-key="browser.confirm_to_quit"
+         label="$i18n{warnBeforeQuitting}">
+     </settings-toggle-button>
+-</if>
++</if>    </details>
+     </section>
+     `}
+   </div>
+--- a/chrome/browser/resources/settings/appearance_page/appearance_page.ts
++++ b/chrome/browser/resources/settings/appearance_page/appearance_page.ts
+@@ -274,6 +274,7 @@
+       noventraSyncError_: {type: String},
+       noventraSection_: {type: String},
+       noventraSearchMode: {type: Boolean},
++      noventraPageDisplayOpen_: {type: Boolean},
+       dataDevicesPage: {type: Boolean},
+       noventraColorsOpen_: {type: Boolean},
+       noventraGlassEnabledPref_: {type: Object},
+@@ -1053,6 +1054,15 @@
+   accessor noventraSearchMode: boolean = false;
+   accessor dataDevicesPage: boolean = false;
+   protected accessor noventraColorsOpen_: boolean = false;
++  protected accessor noventraPageDisplayOpen_: boolean = false;
++
++  protected onNoventraPageDisplayToggle_(event: Event) {
++    if (this.noventraSearchMode) {
++      return;
++    }
++    const details = event.currentTarget as HTMLDetailsElement;
++    this.noventraPageDisplayOpen_ = details.open;
++  }
+ 
+   protected onNoventraColorsToggle_(event: Event) {
+     if (!this.noventraSearchMode) {
+@@ -1072,6 +1082,7 @@
+     }
+     if (newRoute === routes.FONTS || oldRoute === routes.FONTS) {
+       this.noventraSection_ = 'customizeAppearance';
++      this.noventraPageDisplayOpen_ = true;
+       if (newRoute === routes.APPEARANCE) {
+         const router = Router.getInstance();
+         const params = router.getQueryParameters();
+--- a/components/helium_onboarding/src/NoventraOnboarding.svelte
++++ b/components/helium_onboarding/src/NoventraOnboarding.svelte
+@@ -8,54 +8,111 @@
+     import NoventraPasswordManagers from './components/NoventraPasswordManagers.svelte';
+     import { passwordManagers } from './lib/password-managers';
+     import { getBoolean } from './lib/strings';
++    import { SearchEnginesBrowserProxyImpl, ChoiceMadeLocation, type SearchEngine, type SearchEnginesInfo } from './lib/cr/search_engines_browser_proxy';
++    import { DefaultBrowserBrowserProxyImpl, type DefaultBrowserInfo } from './lib/cr/default_browser_browser_proxy';
+     import type { ExtensionStatus } from './lib/browser/extensions';
+     import { addWebUiListener, removeWebUiListener, sendWithPromise } from './lib/cr';
+     import { ImportDataBrowserProxyImpl, ImportDataStatus, type BrowserProfile } from './lib/cr/import_data_browser_proxy';
+ 
+-    const steps = ['Welcome', 'Data', 'Passwords', 'Password manager', 'Ready'];
++    const steps = ['Welcome', 'Data', 'Password manager', 'Ready'];
+     const importer = ImportDataBrowserProxyImpl.getInstance();
+     const showMacImportNotice = getBoolean('showMacImportPermissionNotice');
+     const canImportBrowserPasswords = getBoolean('canImportBrowserPasswords');
+-    const savedStep = Number(sessionStorage.getItem('noventra.setup.step') ?? 0);
++    const searchProxy = SearchEnginesBrowserProxyImpl.getInstance();
++    const defaultProxy = DefaultBrowserBrowserProxyImpl.getInstance();
++    const choiceKey = 'noventra.setup.imports.v1';
++    type DataKind = 'bookmarks' | 'history' | 'passwords';
++    type Choices = Record<DataKind, boolean>;
++    type Completed = Record<number, DataKind[]>;
++    const kinds: DataKind[] = ['bookmarks', 'history', 'passwords'];
++    const kindLabels: Record<DataKind, string> = { bookmarks: 'Bookmarks', history: 'History', passwords: 'Passwords' };
++    const validId = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
++    const validCount = (value: unknown): number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : 0;
++
++    function restoreChoices(): { id?: number; data: Choices; completed: Completed; bookmarks: number; history: number; passwords: number; interrupted: boolean; csv: boolean; restorable: boolean } {
++        const empty = { data: { bookmarks: true, history: true, passwords: true }, completed: {} as Completed, bookmarks: 0, history: 0, passwords: 0, interrupted: false, csv: false, restorable: false };
++        try {
++            const value = JSON.parse(sessionStorage.getItem(choiceKey) ?? 'null');
++            if (!value || value.version !== 1) return empty;
++            const completed: Completed = {};
++            if (value.completed && typeof value.completed === 'object') {
++                for (const [id, imported] of Object.entries(value.completed)) {
++                    if (validId(Number(id)) && Array.isArray(imported)) completed[Number(id)] = kinds.filter(kind => imported.includes(kind));
++                }
++            }
++            return { id: validId(value.id) ? value.id : undefined,
++                data: Object.fromEntries(kinds.map(kind => [kind, value.data?.[kind] === true])) as Choices,
++                completed, bookmarks: validCount(value.bookmarks), history: validCount(value.history), passwords: validCount(value.passwords),
++                interrupted: value.inFlight === true || value.interrupted === true, csv: value.csv === true, restorable: true };
++        } catch { return empty; }
++    }
++
++    const restored = restoreChoices();
++    // Old unversioned step indexes belonged to the previous five-step flow.
++    const savedStep = restored.restorable ? Number(sessionStorage.getItem('noventra.setup.step') ?? 0) : 0;
++    if (!restored.restorable) sessionStorage.removeItem('noventra.setup.step');
+     let step = $state(Number.isInteger(savedStep) && savedStep >= 0 && savedStep < steps.length ? savedStep : 0);
+     let profiles = $state<BrowserProfile[]>([]);
+     let discovery = $state<'initial' | 'loading' | 'loaded' | 'error'>('initial');
+-    let selectedId = $state<number>();
+-    let selectedPasswordId = $state<number>();
++    let selectedId = $state<number | undefined>(restored.id);
++    let selectedData = $state<Choices>(restored.data);
++    let importedProfileData = $state<Completed>(restored.completed);
++    let bookmarkImports = $state(restored.bookmarks);
++    let historyImports = $state(restored.history);
++    let passwordImports = $state(restored.passwords);
++    let passwordOpened = $state(restored.csv);
++    let interruptedImport = $state(restored.interrupted);
++    let importInFlight = $state(false);
+     let status = $state<'idle' | 'choosing' | 'importing' | 'success' | 'error'>('idle');
+-    let bookmarkImports = $state(0);
+-    type DataKind = 'bookmarks' | 'history';
+-    let selectedData = $state({ bookmarks: true, history: true });
+-    let importedProfileData = $state<Record<number, DataKind[]>>({});
+-    let dataImportIssues = $state<Record<string, DataKind[]>>({});
+-    let historyImports = $state(0);
+-    let importingDataKinds = $state<DataKind[]>([]);
+-    let importedPasswordProfileIds = $state<number[]>([]);
+-    let passwordImports = $state(0);
+-    let importKind = $state<'bookmarks' | 'passwords'>('bookmarks');
+-    let importingProfileId: number | undefined;
+-    let passwordOpened = $state(false);
++    let finishing = $state(false);
+     let saving = $state(false);
+     let saveError = $state(false);
++    let importError = $state('');
++    let importProgress = $state('');
++    let fileImportIssue = $state(false);
+     let title = $state<HTMLHeadingElement>();
+     let managerExtensions = $state<ExtensionStatus>({});
+     let managerInstalling = $state(false);
+     let managerLoading = $state(true);
+     let managerCheckFailed = $state(false);
+-    const enabledManagers = $derived(Object.values(passwordManagers)
+-        .filter(info => managerExtensions[info.extensionId])
+-        .map(info => info.title));
+-    const busy = $derived(status === 'importing' || saving || managerInstalling);
++    let defaultsLoading = $state(false);
++    let defaultsLoaded = false;
++    let searchEngines = $state<SearchEngine[]>([]);
++    let selectedSearchEngineId = $state<number>();
++    let searchChanged = $state(false);
++    let searchLoadError = $state(false);
++    let defaultBrowserInfo = $state<DefaultBrowserInfo>();
++    let defaultLoadError = $state(false);
++    let makeDefault = $state(false);
++    let defaultRequestSent = false;
++    let defaultsApplyFailed = $state(false);
++    let discoveryPromise: Promise<void> | undefined;
++    let resolveImport: ((success: boolean) => void) | undefined;
++    let importingKinds: DataKind[] = [];
++    let importingProfileId: number | undefined;
++    const enabledManagers = $derived(Object.values(passwordManagers).filter(info => managerExtensions[info.extensionId]).map(info => info.title));
++    const busy = $derived(finishing || status === 'importing' || saving || managerInstalling);
+     const discoveryBusy = $derived(discovery === 'loading');
+-    const chosenProfile = $derived(discovery === 'loaded' ? profiles.find(p => p.id === selectedId) : undefined);
+-    const chosenPasswordProfile = $derived(discovery === 'loaded' ? profiles.find(p => p.id === selectedPasswordId) : undefined);
+-    const hasIncompleteDataImport = $derived(Object.values(dataImportIssues).some(kinds => kinds.length));
+-    const requestedData = $derived(chosenProfile ? availableData(chosenProfile)
+-        .filter(kind => selectedData[kind] && !importedProfileData[chosenProfile.id]?.includes(kind)) : []);
++    const chosenProfile = $derived(profiles.find(p => p.id === selectedId));
++    const stagedKinds = $derived.by(() => {
++        const id = selectedId;
++        return id === undefined ? [] : kinds.filter(kind => selectedData[kind] && !importedProfileData[id]?.includes(kind));
++    });
++    const stagedDescription = $derived(stagedKinds.map(kind => kindLabels[kind].toLowerCase()).join(', '));
++    const searchManaged = $derived(searchEngines.some(engine => engine.default && engine.isManaged));
++    const sourceLabel = $derived(chosenProfile ? `${chosenProfile.name}${chosenProfile.profileName ? ` · ${chosenProfile.profileName}` : ''}` : 'Selected browser');
++
++    $effect(() => {
++        try {
++            sessionStorage.setItem(choiceKey, JSON.stringify({ version: 1, id: selectedId, data: selectedData,
++                completed: importedProfileData, bookmarks: bookmarkImports, history: historyImports, passwords: passwordImports,
++                inFlight: importInFlight, interrupted: interruptedImport, csv: passwordOpened }));
++        } catch { /* Storage restrictions must not prevent an explicitly requested import. */ }
++    });
+ 
+     function availableData(profile: BrowserProfile): DataKind[] {
+-        return [...(profile.favorites ? ['bookmarks' as const] : []),
+-            ...(profile.history ? ['history' as const] : [])];
++        return [...(profile.favorites ? ['bookmarks' as const] : []), ...(profile.history ? ['history' as const] : []),
++            ...(canImportBrowserPasswords && profile.passwords ? ['passwords' as const] : [])];
+     }
+ 
+     function dataComplete(profile: BrowserProfile) {
+@@ -65,10 +122,8 @@
+ 
+     function selectData(profile: BrowserProfile) {
+         status = 'idle';
+-        selectedData = {
+-            bookmarks: profile.favorites && !importedProfileData[profile.id]?.includes('bookmarks'),
+-            history: profile.history && !importedProfileData[profile.id]?.includes('history'),
+-        };
++        importError = '';
++        selectedData = Object.fromEntries(kinds.map(kind => [kind, availableData(profile).includes(kind) && !importedProfileData[profile.id]?.includes(kind)])) as Choices;
+     }
+ 
+     async function refreshManagerExtensions() {
+@@ -79,9 +134,7 @@
+         } catch (error) {
+             managerCheckFailed = true;
+             throw error;
+-        } finally {
+-            managerLoading = false;
+-        }
++        } finally { managerLoading = false; }
+     }
+ 
+     async function go(next: number) {
+@@ -91,168 +144,246 @@
+         sessionStorage.setItem('noventra.setup.step', String(step));
+         await tick();
+         title?.focus();
+-        if ((step === 1 || step === 2) && discovery === 'initial') {
+-            await refreshBrowserProfiles();
++        if (step === 1 && discovery === 'initial') await refreshBrowserProfiles();
++        if (step === steps.length - 1 && !defaultsLoaded) void loadDefaults();
++    }
++
++    function scanBrowserProfiles(): Promise<void> {
++        if (discoveryPromise) return discoveryPromise;
++        discovery = 'loading';
++        discoveryPromise = importer.initializeImportDialog().then(list => {
++            // The native API appends its separate bookmarks-file entry last.
++            profiles = list.slice(0, -1);
++            discovery = 'loaded';
++        }).catch(() => { discovery = 'error'; }).finally(() => { discoveryPromise = undefined; });
++        return discoveryPromise;
++    }
++
++    function refreshBrowserProfiles() {
++        if (busy) return;
++        status = 'idle';
++        return scanBrowserProfiles();
++    }
++
++    function eligibleEngines(info: SearchEnginesInfo): SearchEngine[] {
++        const seen = new Set<number>();
++        return Object.values(info).flat().filter(engine => {
++            if (seen.has(engine.id) || engine.isStarterPack || engine.isOmniboxExtension || (!engine.default && !engine.canBeDefault)) return false;
++            seen.add(engine.id);
++            return true;
++        });
++    }
++
++    async function loadDefaults() {
++        if (defaultsLoading) return;
++        defaultsLoading = true;
++        const [search, browser] = await Promise.allSettled([searchProxy.getSearchEnginesList(), defaultProxy.requestDefaultBrowserState()]);
++        if (search.status === 'fulfilled') {
++            searchEngines = eligibleEngines(search.value);
++            if (!searchChanged) selectedSearchEngineId = searchEngines.find(engine => engine.default)?.id;
++            searchLoadError = false;
++        } else searchLoadError = true;
++        if (browser.status === 'fulfilled') { defaultBrowserInfo = browser.value; defaultLoadError = false; }
++        else defaultLoadError = true;
++        defaultsLoading = false;
++        defaultsLoaded = true;
++    }
++
++    async function applyDefaults(): Promise<boolean> {
++        defaultsApplyFailed = false;
++        try {
++            if (searchChanged && selectedSearchEngineId !== undefined) {
++                const fresh = eligibleEngines(await searchProxy.getSearchEnginesList());
++                searchEngines = fresh;
++                searchEngines = fresh;
++                const selected = fresh.find(engine => engine.id === selectedSearchEngineId);
++                if (!selected || fresh.some(engine => engine.default && engine.isManaged) || (!selected.default && (!selected.canBeDefault || selected.isManaged))) {
++                    defaultsApplyFailed = true;
++                    importError = 'Your search choice is unavailable. Review Browsing defaults and try again.';
++                    return false;
++                }
++                if (!selected.default) searchProxy.setDefaultSearchEngine(selected.id, ChoiceMadeLocation.OTHER, null);
++                const verified = eligibleEngines(await searchProxy.getSearchEnginesList());
++                searchEngines = verified;
++                if (!verified.some(engine => engine.id === selectedSearchEngineId && engine.default)) {
++                    defaultsApplyFailed = true;
++                    importError = 'The search engine could not be changed. Review Browsing defaults and try again.';
++                    return false;
++                }
++                searchChanged = false;
++            }
++            if (makeDefault && !defaultRequestSent) {
++                const fresh = await defaultProxy.requestDefaultBrowserState();
++                defaultBrowserInfo = fresh;
++                if (!fresh.isDefault) {
++                    if (!fresh.canBeDefault || fresh.isDisabledByPolicy || fresh.isUnknownError) {
++                        defaultsApplyFailed = true;
++                        importError = 'Noventra cannot become the default browser right now. Review Browsing defaults and try again.';
++                        return false;
++                    }
++                    defaultProxy.setAsDefaultBrowser(false);
++                    defaultRequestSent = true;
++                }
++            }
++            return true;
++        } catch {
++            defaultsApplyFailed = true;
++            importError = 'Browsing defaults could not be applied. Review your choices and try again.';
++            return false;
+         }
++    }
++
++    function keepCurrentDefaults() {
++        searchChanged = false;
++        selectedSearchEngineId = searchEngines.find(engine => engine.default)?.id;
++        makeDefault = false;
++        if (defaultsApplyFailed) importError = '';
++        defaultsApplyFailed = false;
++    }
++
++    async function saveCompletion() {
++        saving = true;
++        saveError = false;
++        try {
++            await sendWithPromise('setPref', 'completed_onboarding', true);
++            sessionStorage.removeItem('noventra.setup.step');
++            sessionStorage.removeItem(choiceKey);
++            location.assign('chrome://newtab/');
++        } catch { saveError = true; }
++        finally { saving = false; }
++    }
++
++    async function skipSetup() {
++        if (busy) return;
++        await saveCompletion();
++    }
++
++    async function importJob(profile: BrowserProfile, selected: DataKind[]) {
++        importingProfileId = profile.id;
++        importingKinds = selected;
++        importProgress = `Importing ${selected.map(kind => kindLabels[kind].toLowerCase()).join(' and ')} from ${profile.name}…`;
++        status = 'importing';
++        importInFlight = true;
++        const result = new Promise<boolean>(resolve => { resolveImport = resolve; });
++        try {
++            const types = {
++                import_dialog_bookmarks: selected.includes('bookmarks'), import_dialog_history: selected.includes('history'),
++                import_dialog_saved_passwords: selected.includes('passwords'), import_dialog_search_engine: false,
++                import_dialog_autofill_form_data: false, import_dialog_extensions: false,
++            };
++            importer.importData(profile.index, types);
++        } catch { status = 'error'; resolveImport?.(false); }
++        const success = await result;
++        resolveImport = undefined;
++        importInFlight = false;
++        return success;
+     }
+ 
+     async function finish() {
+         if (busy) return;
+-        saving = true;
++        finishing = true;
+         saveError = false;
+-        try {
+-            await sendWithPromise('setPref', 'completed_onboarding', true);
+-            sessionStorage.removeItem('noventra.setup.step');
+-            location.assign('chrome://newtab/');
+-        } catch {
+-            saveError = true;
+-            saving = false;
++        importError = '';
++        try {
++            if (stagedKinds.length) {
++                importProgress = 'Checking the selected browser…';
++                // Resolve the stable ID again immediately before importing. A
++                // disappeared profile or changed capability is never replaced
++                // with another profile at the same old discovery index.
++                await scanBrowserProfiles();
++                const profile = profiles.find(p => p.id === selectedId);
++                if (discovery !== 'loaded' || !profile || !stagedKinds.every(kind => availableData(profile).includes(kind))) {
++                    importError = 'The selected browser data is unavailable. Go back to Data, refresh and review your choices.';
++                    return;
++                }
++                const data = stagedKinds.filter(kind => kind !== 'passwords');
++                const jobs: DataKind[][] = [...(data.length ? [data] : []), ...(stagedKinds.includes('passwords') ? [['passwords' as const]] : [])];
++                for (const job of jobs) {
++                    if (!await importJob(profile, job)) {
++                        importError = job.includes('passwords')
++                            ? 'Passwords couldn’t be copied. Close the source browser and unlock its credential store, then retry. Completed imports are kept.'
++                            : 'Browser data couldn’t be copied. Some data may already have been copied. Close the source browser, then retry.';
++                        return;
++                    }
++                }
++                interruptedImport = false;
++            }
++            if (!await applyDefaults()) return;
++            await saveCompletion();
++        } finally {
++            finishing = false;
++            importProgress = '';
+         }
+-    }
+-
+-    function importProfile(kind: 'bookmarks' | 'passwords') {
+-        const profile = kind === 'bookmarks' ? chosenProfile : chosenPasswordProfile;
+-        if (busy || discoveryBusy || !profile || (kind === 'bookmarks' ? !requestedData.length :
+-            !profile.passwords || importedPasswordProfileIds.includes(profile.id))) return;
+-        importKind = kind;
+-        importingProfileId = profile.id;
+-        importingDataKinds = kind === 'bookmarks' ? [...requestedData] : [];
+-        status = 'importing';
+-        const types = {
+-            import_dialog_bookmarks: importingDataKinds.includes('bookmarks'),
+-            import_dialog_history: importingDataKinds.includes('history'),
+-            import_dialog_saved_passwords: kind === 'passwords',
+-            import_dialog_search_engine: false,
+-            import_dialog_autofill_form_data: false,
+-            import_dialog_extensions: false,
+-        };
+-        // Discovery indexes can change after a refresh. Resolve the current
+-        // index from the stable native profile ID only when starting an import.
+-        importer.importData(profile.index, types);
+     }
+ 
+     function importFile() {
+         if (busy || discoveryBusy) return;
+         selectedId = undefined;
+-        importKind = 'bookmarks';
+         importingProfileId = undefined;
+-        importingDataKinds = ['bookmarks'];
+-        // Cancellation does not emit a native import event. Stay navigable until
+-        // the handler actually starts processing a selected file.
++        importingKinds = ['bookmarks'];
+         status = 'choosing';
+         importer.importFromBookmarksFile();
+     }
+ 
+     function openPasswords() {
+         if (busy) return;
++        selectedData.passwords = false;
+         window.open('chrome://password-manager/settings?import=true', '_blank', 'noopener');
+         passwordOpened = true;
+     }
+ 
+-    async function refreshBrowserProfiles() {
+-        if (busy || discoveryBusy) return;
+-        discovery = 'loading';
+-        selectedId = undefined;
+-        selectedPasswordId = undefined;
+-        status = 'idle';
+-        importingProfileId = undefined;
+-        try {
+-            const list = await importer.initializeImportDialog();
+-            // The native API appends its bookmarks-file entry last. The file
+-            // card below remains available without allowing profile detection.
+-            // Keep password-only and empty profiles visible. A browser is not
+-            // missing merely because it has no saved bookmarks.
+-            profiles = list.slice(0, -1);
+-            discovery = 'loaded';
+-        } catch {
+-            // Keep the last list visible, but don't import using its stale
+-            // indexes. A successful retry makes its profiles selectable again.
+-            discovery = 'error';
+-        }
+-    }
+-
+-    function openMacImportSettings() {
+-        if (showMacImportNotice) chrome.send('openFilesAndFoldersSettings');
+-    }
+-
++    function openMacImportSettings() { if (showMacImportNotice) chrome.send('openFilesAndFoldersSettings'); }
+     const browserLogoNames: Record<string, string> = {
+-        'Google Chrome': 'chrome', 'Google Chrome Beta': 'chrome_beta',
+-        'Google Chrome Canary': 'chrome_canary', 'Google Chrome Dev': 'chrome_dev',
+-        'Microsoft Edge': 'edge', 'Mozilla Firefox': 'firefox',
+-        'NAVER Whale': 'whale', 'Perplexity Comet': 'comet',
++        'Google Chrome': 'chrome', 'Google Chrome Beta': 'chrome_beta', 'Google Chrome Canary': 'chrome_canary', 'Google Chrome Dev': 'chrome_dev',
++        'Microsoft Edge': 'edge', 'Mozilla Firefox': 'firefox', 'NAVER Whale': 'whale', 'Perplexity Comet': 'comet',
+     };
+     const browserLogo = (name: string) => browserIcons[browserLogoNames[name] ?? name.toLowerCase()];
+ 
+     onMount(() => {
+         document.title = 'Set up Noventra';
+-        if (step === 1 || step === 2) void refreshBrowserProfiles();
+-        const extensionListener = addWebUiListener('extension-state-changed', (diff: ExtensionStatus) => {
+-            managerExtensions = { ...managerExtensions, ...diff };
+-        });
+-        // Ready can be restored directly after a reload. Keep registry state
+-        // for the whole flow; a failed read is reported in its summary.
++        if (step === 1 || selectedId !== undefined) void scanBrowserProfiles();
++        if (step === steps.length - 1) void loadDefaults();
++        const extensionListener = addWebUiListener('extension-state-changed', (diff: ExtensionStatus) => { managerExtensions = { ...managerExtensions, ...diff }; });
+         void refreshManagerExtensions().catch(() => {});
+         const listener = addWebUiListener('import-data-status-changed', (value: ImportDataStatus) => {
+             if (value === ImportDataStatus.IN_PROGRESS) status = 'importing';
+             if (value === ImportDataStatus.SUCCEEDED && status === 'importing') {
+                 status = 'success';
+-                if (importKind === 'passwords') {
+-                    passwordImports += 1;
+-                    if (importingProfileId !== undefined && !importedPasswordProfileIds.includes(importingProfileId)) {
+-                        importedPasswordProfileIds = [...importedPasswordProfileIds, importingProfileId];
+-                    }
+-                } else {
+-                    if (importingDataKinds.includes('bookmarks')) {
+-                        bookmarkImports += 1;
+-                    }
+-                    if (importingDataKinds.includes('history')) historyImports += 1;
+-                    if (importingProfileId !== undefined) {
+-                        importedProfileData = { ...importedProfileData,
+-                            [importingProfileId]: [...new Set([...(importedProfileData[importingProfileId] ?? []), ...importingDataKinds])] };
+-                    }
+-                    const key = importingProfileId === undefined ? 'file' : String(importingProfileId);
+-                    const remaining = dataImportIssues[key]?.filter(kind => !importingDataKinds.includes(kind)) ?? [];
+-                    const issues = { ...dataImportIssues };
+-                    if (remaining.length) issues[key] = remaining;
+-                    else delete issues[key];
+-                    dataImportIssues = issues;
+-                }
++                if (importingKinds.includes('bookmarks')) bookmarkImports += 1;
++                if (importingKinds.includes('history')) historyImports += 1;
++                if (importingKinds.includes('passwords')) passwordImports += 1;
++                if (importingProfileId !== undefined) importedProfileData = { ...importedProfileData,
++                    [importingProfileId]: [...new Set([...(importedProfileData[importingProfileId] ?? []), ...importingKinds])] };
++                else fileImportIssue = false;
++                resolveImport?.(true);
+             }
+-            if (value === ImportDataStatus.FAILED) {
++            if (value === ImportDataStatus.FAILED && (status === 'importing' || status === 'choosing')) {
+                 status = 'error';
+-                if (importKind === 'bookmarks') {
+-                    const key = importingProfileId === undefined ? 'file' : String(importingProfileId);
+-                    dataImportIssues = { ...dataImportIssues,
+-                        [key]: [...new Set([...(dataImportIssues[key] ?? []), ...importingDataKinds])] };
+-                }
++                if (importingProfileId === undefined) fileImportIssue = true;
++                resolveImport?.(false);
+             }
+         });
+-        return () => {
+-            removeWebUiListener(listener);
+-            removeWebUiListener(extensionListener);
+-        };
++        const defaultListener = addWebUiListener('browser-default-state-changed', (state: DefaultBrowserInfo) => { defaultBrowserInfo = state; });
++        return () => { removeWebUiListener(listener); removeWebUiListener(extensionListener); removeWebUiListener(defaultListener); };
+     });
+ </script>
+ 
+ <main id="noventra-onboarding">
+     <header class="brand-bar">
+         <div class="brand"><NoventraLogo height="26px" /><span>Noventra</span></div>
+-        <button id="skip-setup" class="quiet" disabled={busy} onclick={finish}>Skip setup</button>
++        <button id="skip-setup" class="quiet" disabled={busy} onclick={skipSetup}>Skip setup</button>
+     </header>
+-
+     <div class="setup-shell">
+         <nav class="setup-progress" aria-label="Setup progress">
+             <ol class="steps">
+                 {#each steps as label, index}
+                     <li class:active={step === index} class:complete={step > index} aria-current={step === index ? 'step' : undefined}>
+-                        <span class="step-number" aria-hidden="true">{step > index ? '✓' : index + 1}</span>
+-                        <span>{label}</span>
++                        <span class="step-number" aria-hidden="true">{step > index ? '✓' : index + 1}</span><span>{label}</span>
+                     </li>
+                 {/each}
+             </ol>
+         </nav>
+-
+-        <section class="panel" aria-labelledby="step-title" aria-busy={busy || ((step === 1 || step === 2) && discoveryBusy)}>
++        <section class="panel" data-discovery={discovery} aria-labelledby="step-title" aria-busy={busy || (step === 1 && discoveryBusy)}>
+             <div class="panel-content">
+                 <div class="step-count">STEP {step + 1} OF {steps.length}<span>OPTIONAL</span></div>
+                 {#if step === 0}
+@@ -262,14 +393,14 @@
+                     <a class="transfer-link" href="chrome://settings/dataDevices" target="_blank" rel="noopener noreferrer">Moving from another PC? Restore or connect a device.</a>
+                 {:else if step === 1}
+                     <h1 id="step-title" tabindex="-1" bind:this={title}>Bring your browsing data.</h1>
+-                    <p class="intro">Choose a browser and what to copy.</p>
++                    <p class="intro">Choose what to bring. We’ll copy it when you finish setup.</p>
+                     <div class="source-heading"><strong>On this device</strong><span>{discovery === 'initial' ? 'Ready to scan' : discovery === 'loading' ? 'Looking…' : discovery === 'error' ? 'Check needed' : `${profiles.length} profiles`}</span></div>
+                     {#if discovery === 'initial'}
+                         <div class="empty"><strong>Find browsers on this device.</strong><p>Choose what to import after scanning.</p></div>
+                     {:else if discovery === 'loading'}
+                         <div class="empty" role="status"><span class="spinner" aria-hidden="true"></span>Looking for browser profiles…</div>
+                     {:else if profiles.length === 0}
+-                        <div class="empty" role={discovery === 'error' ? 'alert' : undefined}><strong>{discovery === 'error' ? 'We couldn’t check your browser profiles.' : 'No browser profiles found.'}</strong><p>Refresh or choose a file below.</p></div>
++                        <div class="empty" role={discovery === 'error' ? 'alert' : undefined}><strong>{discovery === 'error' ? 'We couldn’t check your browser profiles.' : 'No browser profiles found.'}</strong><p>Refresh or use a file below.</p></div>
+                     {:else}
+                         <fieldset class="profile-list" disabled={busy || discoveryBusy || discovery === 'error'}>
+                             <legend class="sr-only">Choose a browser profile</legend>
+@@ -278,96 +409,65 @@
+                                     <input type="radio" name="source-profile" value={profile.id} bind:group={selectedId} disabled={busy || discoveryBusy || discovery === 'error' || !availableData(profile).length || dataComplete(profile)} onchange={() => selectData(profile)} />
+                                     <span class="source-icon" aria-hidden="true">{#if browserLogo(profile.name)}<img src={browserLogo(profile.name)} alt="" />{:else}<IconWorld />{/if}</span>
+                                     <span class="source-name"><strong>{profile.name}</strong><span>{profile.profileName || 'Default profile'}</span></span>
+-                                    <span class="source-kind">{dataComplete(profile) ? 'Imported ✓' : profile.favorites && profile.history ? 'Bookmarks · History' : profile.favorites ? 'Bookmarks' : profile.history ? 'History' : 'No saved bookmarks or history'}</span>
++                                    <span class="source-kind">{dataComplete(profile) ? 'Imported ✓' : availableData(profile).length ? availableData(profile).map(kind => kindLabels[kind]).join(' · ') : 'No compatible data'}</span>
+                                 </label>
+                             {/each}
+                         </fieldset>
+                     {/if}
+-                    <div class="discovery-actions">
+-                        <button id={discovery === 'initial' ? 'find-import-profiles' : 'refresh-import-profiles'} class="quiet" disabled={busy || discoveryBusy} onclick={refreshBrowserProfiles}>{discovery === 'initial' ? 'Find browsers' : discovery === 'loading' ? 'Looking…' : discovery === 'error' ? 'Try again' : 'Refresh browsers'}</button>
+-                    </div>
++                    <div class="discovery-actions">{#if selectedId !== undefined}<button id="clear-import-selection" class="quiet" disabled={busy} onclick={() => { selectedId = undefined; importError = ''; }}>Clear selection</button>{/if}<button id={discovery === 'initial' ? 'find-import-profiles' : 'refresh-import-profiles'} class="quiet" disabled={busy || discoveryBusy} onclick={refreshBrowserProfiles}>{discovery === 'initial' ? 'Find browsers' : discovery === 'loading' ? 'Looking…' : discovery === 'error' ? 'Try again' : 'Refresh browsers'}</button></div>
+                     {#if discovery === 'error' && profiles.length > 0}<p class="error" role="alert">Refresh before choosing a profile, or use a file.</p>{/if}
+-                    {#if showMacImportNotice}
+-                        <aside class="mac-import-notice" aria-label="Browser import access">
+-                            <p>Missing a browser? Allow access in macOS, then refresh.</p>
+-                            <button id="mac-import-settings" class="quiet" disabled={busy} onclick={openMacImportSettings}>Open Files and Folders settings</button>
+-                        </aside>
++                    {#if showMacImportNotice}<aside class="mac-import-notice" aria-label="Browser import access"><p>Missing a browser? Allow access in macOS, then refresh.</p><button id="mac-import-settings" class="quiet" disabled={busy} onclick={openMacImportSettings}>Open Files and Folders settings</button></aside>{/if}
++                    {#if chosenProfile}
++                        <fieldset class="data-types" disabled={busy || discoveryBusy || discovery === 'error'}>
++                            <legend>Bring from {chosenProfile.name}</legend>
++                            {#each kinds as kind}
++                                <label><input id={`import-data-${kind}`} type="checkbox" checked={selectedData[kind] && availableData(chosenProfile).includes(kind) && !importedProfileData[chosenProfile.id]?.includes(kind)} disabled={!availableData(chosenProfile).includes(kind) || importedProfileData[chosenProfile.id]?.includes(kind)} onchange={event => { selectedData[kind] = event.currentTarget.checked; importError = ''; }} />{kindLabels[kind]}{#if importedProfileData[chosenProfile.id]?.includes(kind)}<span>Copied</span>{:else if !availableData(chosenProfile).includes(kind)}<span>{kind === 'passwords' ? 'Use CSV' : 'Unavailable'}</span>{/if}</label>
++                            {/each}
++                        </fieldset>
++                        {#if stagedKinds.length}<p id="queued-import-note" class="privacy-hint">Selected for the end of setup: {stagedDescription}.</p>{/if}
+                     {/if}
+-                    {#if discovery === 'loaded' && profiles.length && !profiles.some(p => availableData(p).length)}<p class="privacy-hint">Passwords are on the next step.</p>{/if}
+-                    {#if chosenProfile}
+-                        <fieldset class="data-types" disabled={busy || discoveryBusy}>
+-                            <legend>Choose data</legend>
+-                            <label><input id="import-data-bookmarks" type="checkbox" checked={selectedData.bookmarks && chosenProfile.favorites && !importedProfileData[chosenProfile.id]?.includes('bookmarks')} disabled={!chosenProfile.favorites || importedProfileData[chosenProfile.id]?.includes('bookmarks')} onchange={event => selectedData.bookmarks = event.currentTarget.checked} />Bookmarks{#if importedProfileData[chosenProfile.id]?.includes('bookmarks')}<span>Copied</span>{/if}</label>
+-                            <label><input id="import-data-history" type="checkbox" checked={selectedData.history && chosenProfile.history && !importedProfileData[chosenProfile.id]?.includes('history')} disabled={!chosenProfile.history || importedProfileData[chosenProfile.id]?.includes('history')} onchange={event => selectedData.history = event.currentTarget.checked} />History{#if importedProfileData[chosenProfile.id]?.includes('history')}<span>Copied</span>{/if}</label>
+-                        </fieldset>
+-                    {/if}
+-                    <button id="import-bookmarks" class="primary full" onclick={() => importProfile('bookmarks')} disabled={busy || discoveryBusy || !requestedData.length}>{status === 'importing' ? 'Importing data…' : 'Import selected data'}<span aria-hidden="true">↓</span></button>
+-                    <div class="divider"><span>or</span></div>
+-                    <button id="bookmark-file" class="file-card" onclick={importFile} disabled={busy || discoveryBusy}><span class="source-icon" aria-hidden="true"><IconTransferIn /></span><span class="source-name"><strong>Choose a bookmarks file</strong><span>HTML from your previous browser</span></span><span aria-hidden="true">↗</span></button>
+-                    <div class="import-message" role="status" aria-live="polite">
+-                        {#if status === 'success'}<span class="success">✓ {importingDataKinds.includes('history') ? importingDataKinds.includes('bookmarks') ? 'Bookmarks and history import finished.' : 'History import finished.' : 'Bookmark import finished.'}</span>
+-                        {:else if status === 'error'}<span class="error">Import didn’t finish. Some data may already have been copied. Close the source browser and try again.</span>
+-                        {:else if status === 'choosing'}Choose an HTML file, or cancel to continue.
+-                        {:else if status === 'importing'}Copying selected data. Keep this page open.{/if}
+-                    </div>
++                    <details class="import-details file-fallbacks"><summary>Import from a file instead</summary>
++                        <p>File imports open now. Return here afterwards to finish setup.</p>
++                        <button id="bookmark-file" class="file-card" onclick={importFile} disabled={busy || discoveryBusy}><span class="source-icon" aria-hidden="true"><IconTransferIn /></span><span class="source-name"><strong>Choose a bookmarks file</strong><span>HTML from your previous browser</span></span><span aria-hidden="true">↗</span></button>
++                        <button id="password-import" class="file-card" disabled={busy} onclick={openPasswords}><span class="source-icon" aria-hidden="true"><IconKey /></span><span class="source-name"><strong>{passwordOpened ? 'Open password import again' : 'Import passwords from CSV'}</strong><span>Opens the password manager</span></span><span aria-hidden="true">↗</span></button>
++                        <p>Existing passwords are kept. For CSV, export from your previous browser, then select it in Noventra’s password manager. Remove the readable export afterwards.</p>
++                    </details>
++                    <div class="import-message" role="status" aria-live="polite">{#if status === 'success'}<span class="success">✓ Bookmark import finished.</span>{:else if status === 'error'}<span class="error">Import didn’t finish. Some data may already have been copied. Close the source browser and try again.</span>{:else if status === 'choosing'}Choose an HTML file, or cancel to continue.{:else if status === 'importing'}Copying the selected file. Keep this page open.{/if}</div>
++                    {#if passwordOpened}<p class="import-message" role="status">Password import opened in another tab. Check the results there.</p>{/if}
+                 {:else if step === 2}
+-                    <h1 id="step-title" tabindex="-1" bind:this={title}>Your passwords, on this device.</h1>
+-                    {#if canImportBrowserPasswords}
+-                        <p class="intro">Choose a browser to copy its saved passwords.</p>
+-                        <div class="source-heading"><strong>On this device</strong><span>{discovery === 'initial' ? 'Ready to scan' : discovery === 'loading' ? 'Looking…' : discovery === 'error' ? 'Check needed' : `${profiles.length} profiles`}</span></div>
+-                        {#if discovery === 'initial'}
+-                            <div class="empty"><strong>Find your saved passwords.</strong><p>Choose what to import after scanning.</p></div>
+-                        {:else if discovery === 'loading'}
+-                            <div class="empty" role="status"><span class="spinner" aria-hidden="true"></span>Looking for browser profiles…</div>
+-                        {:else if profiles.length === 0}
+-                            <div class="empty" role={discovery === 'error' ? 'alert' : undefined}><strong>{discovery === 'error' ? 'We couldn’t check your browser profiles.' : 'No browser profiles found.'}</strong><p>Refresh or use a CSV below.</p></div>
+-                        {:else}
+-                            <fieldset class="profile-list" disabled={busy || discoveryBusy || discovery === 'error'}>
+-                                <legend class="sr-only">Choose a profile for passwords</legend>
+-                                {#each profiles as profile (profile.id)}
+-                                    <label class="profile-card" class:selected={selectedPasswordId === profile.id} class:imported={importedPasswordProfileIds.includes(profile.id)}>
+-                                        <input type="radio" name="password-source-profile" value={profile.id} bind:group={selectedPasswordId} disabled={busy || discoveryBusy || discovery === 'error' || !profile.passwords || importedPasswordProfileIds.includes(profile.id)} onchange={() => { status = 'idle'; }} />
+-                                        <span class="source-icon" aria-hidden="true">{#if browserLogo(profile.name)}<img src={browserLogo(profile.name)} alt="" />{:else}<IconWorld />{/if}</span>
+-                                        <span class="source-name"><strong>{profile.name}</strong><span>{profile.profileName || 'Default profile'}</span></span>
+-                                        <span class="source-kind">{importedPasswordProfileIds.includes(profile.id) ? 'Imported ✓' : profile.passwords ? 'Saved passwords' : 'Use CSV'}</span>
+-                                    </label>
+-                                {/each}
+-                            </fieldset>
+-                        {/if}
+-                        <div class="discovery-actions">
+-                            <button id={discovery === 'initial' ? 'find-password-profiles' : 'refresh-password-profiles'} class="quiet" disabled={busy || discoveryBusy} onclick={refreshBrowserProfiles}>{discovery === 'initial' ? 'Find browsers' : discovery === 'loading' ? 'Looking…' : discovery === 'error' ? 'Try again' : 'Refresh browsers'}</button>
+-                        </div>
+-                        {#if discovery === 'loaded' && profiles.length && !profiles.some(p => p.passwords)}<p class="privacy-hint">Use a CSV or continue to your password manager.</p>{/if}
+-                        <button id="import-passwords" class="primary full" onclick={() => importProfile('passwords')} disabled={busy || discoveryBusy || !chosenPasswordProfile?.passwords || importedPasswordProfileIds.includes(chosenPasswordProfile.id)}>{status === 'importing' ? 'Importing passwords…' : 'Import selected passwords'}<span aria-hidden="true">↓</span></button>
+-                        <div class="import-message" role="status" aria-live="polite">
+-                            {#if status === 'success'}<span class="success">✓ Password import finished.</span>
+-                            {:else if status === 'error'}<span class="error">Couldn’t import. Check saved passwords, close the source browser and unlock its credential store. Try again or use CSV.</span>
+-                            {:else if status === 'importing'}Copying passwords. Respond to any system unlock prompt.{/if}
+-                        </div>
+-                        <div class="divider"><span>or</span></div>
+-                    {:else}
+-                        <p class="intro">Import a CSV exported from your previous browser.</p>
+-                    {/if}
+-                    <button id="password-import" class="file-card" disabled={busy} onclick={openPasswords}><span class="source-icon" aria-hidden="true"><IconKey /></span><span class="source-name"><strong>{passwordOpened ? 'Open password import again' : 'Import passwords from CSV'}</strong><span>Opens the password manager</span></span><span aria-hidden="true">↗</span></button>
+-                    <details class="import-details"><summary>About password imports</summary><p>Existing Noventra passwords are kept. Your system may ask you to unlock its credential store.</p><p>For CSV, export from your previous browser, select the file in Noventra’s password manager, then return here. CSV files contain readable passwords; remove the export after importing.</p></details>
+-                    {#if passwordOpened}<p class="import-message" role="status">Password import opened in another tab. Finish there, then return here to continue.</p>{/if}
+-                {:else if step === 3}
+                     <h1 id="step-title" tabindex="-1" bind:this={title}>Keep your password manager.</h1>
+                     <p class="intro">Add an extension, then sign in as usual.</p>
+                     <NoventraPasswordManagers bind:extensions={managerExtensions} bind:installing={managerInstalling} refreshExtensions={refreshManagerExtensions} />
+                 {:else}
+                     <div class="finish-symbol" aria-hidden="true"><NoventraLogo height="42px" /></div>
+                     <h1 id="step-title" tabindex="-1" bind:this={title}>You’re ready to browse.</h1>
+-                    <p class="intro">You can change these choices in Settings.</p>
+-                    <div class="summary-row" id="data-import-summary"><div><strong>Browser data</strong><p>{hasIncompleteDataImport ? 'An import didn’t finish. Check Bookmarks and History.' : bookmarkImports && historyImports ? 'Bookmarks and history import finished.' : bookmarkImports ? 'Bookmark import finished.' : historyImports ? 'History import finished.' : 'Import later in Settings.'}</p></div><span class="summary-tag">{hasIncompleteDataImport ? 'Check needed' : bookmarkImports || historyImports ? 'Finished' : 'Optional'}</span></div>
+-                    <div class="summary-row"><div><strong>Passwords</strong><p>{passwordImports ? 'Password import finished.' : passwordOpened ? 'Check the results in your password manager tab.' : 'Import later in Settings.'}</p></div><span class="summary-tag">{passwordImports ? 'Finished' : passwordOpened ? 'Opened' : 'Optional'}</span></div>
++                    <p class="intro">Finish setup to copy your selected data.</p>
++                    <div class="summary-row" id="data-import-summary"><div><strong>Browser data</strong><p>{stagedKinds.length ? `${sourceLabel}: ${stagedDescription}.` : bookmarkImports || historyImports || passwordImports ? 'Selected browser imports finished.' : 'Import later in Settings.'}</p></div><span class="summary-tag">{importError ? 'Check needed' : stagedKinds.length ? 'Queued' : bookmarkImports || historyImports || passwordImports ? 'Finished' : 'Optional'}</span></div>
++                    {#if passwordOpened}<div class="summary-row" id="password-import-summary"><div><strong>Password CSV</strong><p>Check the results in your password manager tab.</p></div><span class="summary-tag">Opened</span></div>{/if}
+                     <div class="summary-row"><div><strong>Password manager</strong><p role="status">{managerLoading ? 'Checking extensions…' : managerCheckFailed ? 'Couldn’t check extensions. Go back to retry.' : enabledManagers.length ? `${enabledManagers.join(', ')} installed. Sign in through the extension.` : 'Add an extension later.'}</p></div><span class="summary-tag">{managerLoading ? 'Checking' : managerCheckFailed ? 'Check needed' : enabledManagers.length ? 'Installed' : 'Optional'}</span></div>
++                    <details id="browsing-defaults" class="import-details browsing-defaults"><summary>Browsing defaults</summary>
++                        <label for="setup-search-engine">Search engine</label>
++                        <select id="setup-search-engine" value={selectedSearchEngineId ?? ''} disabled={busy || defaultsLoading || searchLoadError || searchManaged || !searchEngines.length} onchange={event => { selectedSearchEngineId = Number(event.currentTarget.value); searchChanged = true; importError = ''; }}>
++                            {#each searchEngines as engine (engine.id)}<option value={engine.id} disabled={!engine.default && (!engine.canBeDefault || engine.isManaged)}>{engine.name}{engine.default ? ' (current)' : ''}</option>{/each}
++                        </select>
++                        {#if searchChanged}<button id="keep-current-search" class="quiet" disabled={busy} onclick={() => { selectedSearchEngineId = searchEngines.find(engine => engine.default)?.id; searchChanged = false; importError = ''; }}>Keep current search engine</button>{/if}
++                        {#if searchManaged}<p>Your search engine is managed.</p>{/if}
++                        {#if searchLoadError || !searchEngines.length}<p><a href="chrome://settings/search" target="_blank" rel="noopener noreferrer">Choose a search engine in Settings</a></p>{/if}
++                        {#if defaultBrowserInfo?.isDefault}<p id="already-default-browser">Noventra is already your default browser.</p>
++                        {:else}<label class="default-browser-choice"><input id="setup-make-default" type="checkbox" checked={makeDefault} disabled={busy || defaultsLoading || (!makeDefault && (defaultLoadError || !defaultBrowserInfo?.canBeDefault || defaultBrowserInfo?.isDisabledByPolicy || defaultBrowserInfo?.isUnknownError))} onchange={event => { makeDefault = event.currentTarget.checked; importError = ''; }} />Make Noventra my default browser</label><p>Your operating system may ask you to confirm.</p>{/if}
++                        {#if defaultLoadError || defaultBrowserInfo?.isDisabledByPolicy || defaultBrowserInfo?.isUnknownError}<p><a href="chrome://settings/defaultBrowser" target="_blank" rel="noopener noreferrer">Check default browser settings</a></p>{/if}
++                        {#if searchChanged || makeDefault || defaultsApplyFailed}<button id="setup-keep-current-defaults" class="quiet" disabled={busy || defaultsLoading} onclick={keepCurrentDefaults}>Keep current browsing defaults</button>{/if}
++                    </details>
++                    {#if finishing}<p id="setup-import-progress" class="import-message" role="status" aria-live="polite">{importProgress || 'Saving setup…'} Keep this page open.</p>{/if}
++                    {#if importError}<p id="setup-import-error" class="error" role="alert">{importError}</p>{/if}
++                    {#if interruptedImport && !finishing}<p id="interrupted-import-warning" class="error" role="alert">An import was interrupted. Some data may already have been copied. Check your data before retrying.</p>{/if}
++                    {#if fileImportIssue}<p class="error" role="alert">A file import didn’t finish. Check your bookmarks or go back to import the file again.</p>{/if}
+                 {/if}
+                 {#if saveError}<p class="error" role="alert">Setup couldn’t be saved. Please try again.</p>{/if}
+             </div>
+             <footer>
+                 {#if step > 0}<button id="back" class="quiet" onclick={() => go(step - 1)} disabled={busy}><span aria-hidden="true">←</span> Back</button>{:else}<span class="footer-note">Setup is optional.</span>{/if}
+-                <button id="continue" class="primary" disabled={busy} onclick={() => step === steps.length - 1 ? finish() : go(step + 1)}>{saving ? 'Finishing…' : step === 0 ? 'Get started' : step === steps.length - 1 ? 'Start browsing' : step === 3 && !enabledManagers.length ? 'Continue without installing' : 'Continue'}<span aria-hidden="true">→</span></button>
++                <button id="continue" class="primary" disabled={busy} onclick={() => step === steps.length - 1 ? finish() : go(step + 1)}>{finishing || saving ? 'Finishing…' : step === 0 ? 'Get started' : step === steps.length - 1 ? importError || interruptedImport ? 'Retry and finish' : stagedKinds.length ? 'Import and finish' : 'Finish setup' : step === 2 && !enabledManagers.length ? 'Continue without installing' : 'Continue'}<span aria-hidden="true">→</span></button>
+             </footer>
+         </section>
+     </div>
+@@ -398,7 +498,7 @@
+     .welcome-logo { margin:12px 0 28px; }
+     .transfer-link { display:inline-block;color:var(--muted);font-size:13px;line-height:1.5;margin-top:12px;text-underline-offset:3px; }
+     footer { display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 24px;border-top:1px solid var(--line);background:var(--soft); }.footer-note { font-size:11px;color:var(--muted); }
+-    .primary { background:var(--ink);color:var(--surface);padding:10px 17px;font-size:13px;font-weight:550; }.primary:hover:not(:disabled) { opacity:.86; }.primary.full { width:100%;margin-top:10px;justify-content:space-between; }
++    .primary { background:var(--ink);color:var(--surface);padding:10px 17px;font-size:13px;font-weight:550; }.primary:hover:not(:disabled) { opacity:.86; }
+     .source-heading { display:flex;justify-content:space-between;gap:16px;font-size:12px;margin:10px 0; }.source-heading span { color:var(--muted);font-size:11px; }
+     .discovery-actions { display:flex;justify-content:flex-end;margin-top:5px; }
+     .data-types { display:flex;align-items:center;gap:12px 24px;flex-wrap:wrap;border:0;padding:0;margin:12px 0 4px;font-size:12px; }.data-types legend { padding:0;margin-bottom:9px;color:var(--muted);font-size:11px; }.data-types label { display:flex;align-items:center;gap:8px;min-height:30px; }.data-types input { margin:0;accent-color:var(--ink); }.data-types span { color:var(--muted);font-size:10px; }
+@@ -406,7 +506,8 @@
+     .source-icon { display:grid;place-items:center;width:32px;height:32px;flex-shrink:0; }.source-icon img { width:28px;height:28px;object-fit:contain; }.source-icon :global(svg) { width:24px;height:24px; }
+     .source-name { display:flex;flex-direction:column;gap:3px;flex:1;min-width:0;text-align:left; }.source-name strong { font-size:13px;font-weight:600;overflow-wrap:anywhere; }.source-name>span { font-size:11px;color:var(--muted);overflow-wrap:anywhere; }.source-kind { color:var(--muted);font-size:10px; }
+     .empty { display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;border:1px dashed var(--line);border-radius:10px;padding:23px 16px;text-align:center;font-size:12px;color:var(--muted); }.empty strong { color:var(--ink);font-size:13px;font-weight:500; }.empty p { margin:0;line-height:1.5; }
+-    .divider { display:flex;align-items:center;gap:12px;color:var(--muted);font-size:10px;margin:16px 0; }.divider::before,.divider::after { content:'';height:1px;flex:1;background:var(--line); }
++    .browsing-defaults label { display:block;margin:10px 0 6px; }.browsing-defaults select { width:100%;max-width:360px;border:1px solid var(--line);border-radius:7px;padding:8px;color:var(--ink);background:var(--surface);font:inherit; }.browsing-defaults .default-browser-choice { display:flex;align-items:center;gap:8px; }.browsing-defaults input { accent-color:var(--ink); }
++    .file-fallbacks .file-card { margin-top:10px; }.file-fallbacks p { margin-bottom:10px; }
+     .file-card { border:1px solid var(--line);padding:10px 12px;border-radius:10px;width:100%;justify-content:flex-start;gap:10px;text-align:left; }.file-card:hover:not(:disabled) { background:var(--soft); }
+     .mac-import-notice { border:1px dashed var(--line);border-radius:10px;padding:10px 12px;margin-top:10px; }.mac-import-notice p { color:var(--muted);font-size:12px;line-height:1.5;margin:0; }.mac-import-notice .quiet { margin-top:5px;min-height:36px;padding-left:0;font-size:12px; }
+     .import-message { min-height:18px;margin-top:12px;font-size:12px;color:var(--muted);line-height:1.5; }.success { color:var(--ink); }.error { color:light-dark(#b3261e,#ffb4ab);font-size:12px; }.privacy-hint { font-size:11px;color:var(--muted);line-height:1.5;margin:10px 0; }

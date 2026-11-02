@@ -1,0 +1,12 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "noventra-browser-downloads",
+  "main": "worker.mjs",
+  "account_id": "ce800c24f51aa6f29ca58de1504205ef",
+  "compatibility_date": "2026-11-02",
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [{"pattern": "downloads.noventrastudio.com", "custom_domain": true}],
+  "r2_buckets": [{"binding": "RELEASES", "bucket_name": "noventra-browser-releases"}],
+  "observability": {"enabled": true, "head_sampling_rate": 0.1}
+}

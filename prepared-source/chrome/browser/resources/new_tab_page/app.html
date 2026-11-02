@@ -1,0 +1,54 @@
+<div id="content">
+  <main id="noventraHome" aria-label="Noventra home">
+    <div id="noventraBrand" aria-label="Noventra">
+      <div id="noventraMark" aria-hidden="true"></div>
+      <span>noventra</span>
+    </div>
+    <div id="searchboxContainer">
+      <ntp-searchbox id="noventraSearch" shown
+          placeholder-text="Search or enter an address"
+          ?is-dark="${this.isThemeDark_()}"
+          .composeboxEnabled="${false}" .composeButtonEnabled="${false}">
+      </ntp-searchbox>
+    </div>
+  ${this.lazyRender_ ? html`
+    ${this.shortcutsEnabled_ ? html`
+      <section id="noventraFavorites" aria-labelledby="favoritesTitle">
+      <h2 id="favoritesTitle">Favorite sites</h2>
+      <cr-most-visited id="mostVisited" .theme="${this.theme_?.mostVisited || null}"
+          reflow-on-overflow
+          ?expandable-tiles-enabled="${this.ntpNextFeaturesEnabled_}"
+          max-tiles-in-collapsed-state="${this.maxTilesInCollapsedState_}"
+          max-shortcuts-in-expanded-state="${this.maxShortcutsInExpandedState_}"
+          max-most-visited-tiles-in-expanded-state="${this.maxMostVisitedTilesInExpandedState_}"
+          max-enterprise-shortcuts="${this.maxEnterpriseShortcuts_}">
+      </cr-most-visited>
+      </section>
+    ` : ''}
+  ` : ''}
+  </main>
+  ${this.lazyRender_ ? html`
+  ${!this.isFooterVisible_ ? html`
+      ${this.showCustomizeButton_ ? html`
+        <ntp-customize-buttons id="customizeButtons"
+            ?modules-shown-to-user="${this.modulesShownToUser}"
+            ?show-background-image="${this.showBackgroundImage_}"
+            ?show-customize="${this.showCustomize_}"
+            ?show-customize-chrome-text="${this.showCustomizeChromeText_}"
+            ?show-wallpaper-search="${this.showWallpaperSearch_}"
+            ?show-wallpaper-search-button="${this.showWallpaperSearchButton_}"
+            ?wallpaper-search-button-animation-enabled="${this.wallpaperSearchButtonAnimationEnabled_}"
+            @customize-click="${this.onCustomizeClick_}"
+            @wallpaper-search-click="${this.onWallpaperSearchClick_}" show-shadow>
+        </ntp-customize-buttons>
+      ` : ''}
+    ` : ''}
+    ${this.showThemeAttribution_() ? html`
+      <div id="themeAttribution">
+        <div>$i18n{themeCreatedBy}</div>
+        <img src="${this.theme_!.backgroundImage!.attributionUrl!}">
+      </div>
+    ` : ''}
+  ` : ''}
+
+</div>

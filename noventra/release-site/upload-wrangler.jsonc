@@ -1,0 +1,20 @@
+{
+  "name": "noventra-browser-upload",
+  "main": "upload-worker.mjs",
+  "account_id": "ce800c24f51aa6f29ca58de1504205ef",
+  "compatibility_date": "2026-11-02",
+  "workers_dev": true,
+  "preview_urls": false,
+  "r2_buckets": [
+    {
+      "binding": "RELEASES",
+      "bucket_name": "noventra-browser-releases"
+    }
+  ],
+  "vars": {
+    "UPLOAD_PUBLIC_KEY_SPKI": "MCowBQYDK2VwAyEABcykmUyGDClcWNEQErrqPSqfrFgYT1EUCrR628zMGUo="
+  },
+  "observability": {
+    "enabled": false
+  }
+}

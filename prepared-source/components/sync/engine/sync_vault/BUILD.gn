@@ -1,0 +1,35 @@
+# Copyright 2026 The Helium Authors
+# You can use, redistribute, and/or modify this source code under
+# the terms of the GPL-3.0 license that can be found in the LICENSE file.
+
+import("//third_party/protobuf/proto_library.gni")
+
+proto_library("sync_vault_proto") {
+  proto_in_dir = "//"
+  sources = [ "sync_vault.proto" ]
+  extra_configs = [ "//build/config/compiler:wexit_time_destructors" ]
+}
+
+source_set("sync_vault") {
+  sources = [
+    "sync_vault_cryptographer.cc",
+    "sync_vault_cryptographer.h",
+    "sync_vault_format.cc",
+    "sync_vault_format.h",
+    "sync_vault_limits.h",
+    "sync_vault_state_codec.h",
+    "sync_vault_store.cc",
+    "sync_vault_store.h",
+    "sync_vault_transport.h",
+  ]
+
+  public_deps = [
+    "//base",
+    "//crypto",
+  ]
+
+  deps = [
+    ":sync_vault_proto",
+    "//components/sync/protocol",
+  ]
+}

@@ -1,0 +1,938 @@
+--- a/chrome/browser/extensions/api/settings_private/prefs_util.cc
++++ b/chrome/browser/extensions/api/settings_private/prefs_util.cc
+@@ -220,6 +220,10 @@
+ 
+   (*s_allowlist)["noventra.browser.link_preview"] =
+       settings_api::PrefType::kBoolean;
++  (*s_allowlist)["noventra.browser.link_preview_trigger"] =
++      settings_api::PrefType::kNumber;
++  (*s_allowlist)["noventra.browser.link_preview_pinned"] =
++      settings_api::PrefType::kBoolean;
+   (*s_allowlist)["noventra.browser.glass_enabled"] =
+       settings_api::PrefType::kBoolean;
+   (*s_allowlist)["noventra.browser.tab_density"] =
+--- a/chrome/browser/resources/settings/appearance_page/appearance_page.html.ts
++++ b/chrome/browser/resources/settings/appearance_page/appearance_page.html.ts
+@@ -663,8 +663,23 @@
+     </div>
+     <settings-toggle-button id="noventraLinkPreview"
+         pref-key="noventra.browser.link_preview"
+-        label="Preview links with Alt + click"
+-        sub-label="Take a quick look without leaving your tab. You can also right-click a link and choose Preview link.">
++        label="Link previews"
++        sub-label="Take a quick look without leaving your tab. Preview link also stays available in a link’s right-click menu.">
++    </settings-toggle-button>
++    <div class="cr-row">
++      <div class="flex cr-padded-text" aria-hidden="true">Preview shortcut</div>
++      <settings-dropdown-menu id="noventraPreviewTrigger"
++          label="Preview shortcut"
++          pref-key="noventra.browser.link_preview_trigger"
++          .menuOptions="${this.noventraPreviewTriggerOptions_}"
++          ?disabled="${!this.noventraLinkPreviewPref_?.value}">
++      </settings-dropdown-menu>
++    </div>
++    <settings-toggle-button id="noventraPinnedLinkPreview"
++        pref-key="noventra.browser.link_preview_pinned"
++        label="Preview off-site links from pinned tabs"
++        sub-label="Keep pinned pages open while checking links to other websites."
++        ?disabled="${!this.noventraLinkPreviewPref_?.value}">
+     </settings-toggle-button>
+     <details><summary>Home page destination</summary>
+       <div id="home-button-options" class="list-frame"
+--- a/chrome/browser/resources/settings/appearance_page/appearance_page.ts
++++ b/chrome/browser/resources/settings/appearance_page/appearance_page.ts
+@@ -262,6 +262,8 @@
+       dataDevicesPage: {type: Boolean},
+       noventraColorsOpen_: {type: Boolean},
+       noventraGlassEnabledPref_: {type: Object},
++      noventraLinkPreviewPref_: {type: Object},
++      noventraPreviewTriggerOptions_: {type: Array},
+       noventraTabDensityPref_: {type: Object},
+       noventraBookmarkOpeningPref_: {type: Object},
+       noventraDensityOptions_: {type: Array},
+@@ -338,6 +340,13 @@
+   // Mirrored prefs.
+   protected accessor noventraGlassEnabledPref_: PrefObject<boolean>|undefined =
+       undefined;
++  protected accessor noventraLinkPreviewPref_: PrefObject<boolean>|undefined =
++      undefined;
++  protected accessor noventraPreviewTriggerOptions_: DropdownMenuOptionList = [
++    {value: 0, name: 'Alt + click'},
++    {value: 1, name: 'Ctrl + click'},
++    {value: 2, name: 'Shift + click'},
++  ];
+   protected accessor noventraTabDensityPref_: PrefObject<number>|undefined =
+       undefined;
+   protected accessor noventraBookmarkOpeningPref_: PrefObject<number>|undefined =
+@@ -1565,6 +1574,7 @@
+       'helium.browser.zen_mode_sidebar_pinned': 'zenSidebarPinnedPref_',
+       'helium.browser.zen_mode_top_chrome_pinned': 'zenTopPinnedPref_',
+       'noventra.browser.glass_enabled': 'noventraGlassEnabledPref_',
++      'noventra.browser.link_preview': 'noventraLinkPreviewPref_',
+       'noventra.browser.tab_density': 'noventraTabDensityPref_',
+       'noventra.browser.bookmark_opening': 'noventraBookmarkOpeningPref_',
+       'webkit.webprefs.default_font_size': 'defaultFontSizePref_',
+--- a/chrome/browser/ui/browser_ui_prefs.cc
++++ b/chrome/browser/ui/browser_ui_prefs.cc
+@@ -142,6 +142,8 @@
+ 
+   registry->RegisterBooleanPref(prefs::kHeliumMinimalLocationBar, true);
+   registry->RegisterBooleanPref("noventra.browser.link_preview", true);
++  registry->RegisterIntegerPref("noventra.browser.link_preview_trigger", 0);
++  registry->RegisterBooleanPref("noventra.browser.link_preview_pinned", true);
+   registry->RegisterBooleanPref("noventra.browser.glass_enabled", true);
+   registry->RegisterIntegerPref("noventra.browser.tab_density", 0);
+   registry->RegisterIntegerPref("noventra.browser.bookmark_opening", 0);
+--- a/chrome/browser/ui/noventra/portable_data.cc
++++ b/chrome/browser/ui/noventra/portable_data.cc
+@@ -70,6 +70,7 @@
+ constexpr std::string_view kBooleanPreferences[] = {
+     "noventra.browser.glass_enabled",
+     "noventra.browser.link_preview",
++    "noventra.browser.link_preview_pinned",
+     "noventra.browser.sidebar_controls",
+     "noventra.browser.tab_letters",
+     "noventra.browser.address_on_demand",
+@@ -78,7 +79,8 @@
+     "browser.show_forward_button",
+     "bookmark_bar.show_on_all_tabs"};
+ constexpr std::string_view kIntegerPreferences[] = {
+-    "noventra.browser.tab_density", "noventra.browser.bookmark_opening"};
++    "noventra.browser.tab_density", "noventra.browser.bookmark_opening",
++    "noventra.browser.link_preview_trigger"};
+ constexpr std::string_view kLayoutControls[] = {
+     "back",       "forward", "reload", "home",
+     "address",    "tabs",    "spaces", "saved-sites",
+@@ -193,7 +195,9 @@
+       }
+     } else if (std::ranges::find(kIntegerPreferences, name) !=
+                std::end(kIntegerPreferences)) {
+-      if (!value.is_int() || value.GetInt() < 0 || value.GetInt() > 1) {
++      const int maximum =
++          name == "noventra.browser.link_preview_trigger" ? 2 : 1;
++      if (!value.is_int() || value.GetInt() < 0 || value.GetInt() > maximum) {
+         return false;
+       }
+     } else {
+--- a/chrome/browser/ui/noventra_commands.h
++++ b/chrome/browser/ui/noventra_commands.h
+@@ -9,6 +9,10 @@
+ inline constexpr int IDC_NOVENTRA_SHORTCUTS = 57004;
+ inline constexpr int IDC_NOVENTRA_PREVIEW_LINK = 57005;
+ inline constexpr char kNoventraLinkPreview[] = "noventra.browser.link_preview";
++inline constexpr char kNoventraLinkPreviewTrigger[] =
++    "noventra.browser.link_preview_trigger";
++inline constexpr char kNoventraLinkPreviewPinned[] =
++    "noventra.browser.link_preview_pinned";
+ #include <string>
+ #include <vector>
+ class BrowserWindowInterface;
+--- a/chrome/browser/ui/views/noventra_link_preview.cc
++++ b/chrome/browser/ui/views/noventra_link_preview.cc
+@@ -5,10 +5,12 @@
+ #include <algorithm>
+ 
+ #include "base/functional/bind.h"
++#include "base/functional/callback.h"
+ #include "base/strings/utf_string_conversions.h"
+ #include "base/task/single_thread_task_runner.h"
+ #include "chrome/app/vector_icons/vector_icons.h"
+ #include "chrome/browser/profiles/profile.h"
++#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+ #include "chrome/browser/ui/browser_window/public/global_browser_collection.h"
+ #include "chrome/browser/ui/navigator/browser_navigator.h"
+ #include "chrome/browser/ui/navigator/browser_navigator_params.h"
+@@ -16,10 +18,13 @@
+ #include "chrome/browser/ui/tab_helpers.h"
+ #include "chrome/browser/ui/tabs/public/tab_dialog_manager.h"
+ #include "chrome/browser/ui/tabs/public/tab_features.h"
++#include "chrome/browser/ui/tabs/tab_strip_model.h"
+ #include "components/input/native_web_keyboard_event.h"
+ #include "components/prefs/pref_service.h"
+ #include "components/tabs/public/tab_interface.h"
++#include "components/tabs/public/split_tab_data.h"
+ #include "content/public/browser/context_menu_params.h"
++#include "content/public/browser/global_routing_id.h"
+ #include "content/public/browser/keyboard_event_processing_result.h"
+ #include "content/public/browser/navigation_controller.h"
+ #include "content/public/browser/navigation_handle.h"
+@@ -27,6 +32,7 @@
+ #include "content/public/browser/render_frame_host.h"
+ #include "content/public/browser/web_contents.h"
+ #include "content/public/browser/web_contents_delegate.h"
++#include "net/base/registry_controlled_domains/registry_controlled_domain.h"
+ #include "third_party/blink/public/common/input/web_mouse_event.h"
+ #include "ui/base/metadata/metadata_impl_macros.h"
+ #include "ui/base/mojom/dialog_button.mojom.h"
+@@ -48,6 +54,72 @@
+ 
+ namespace {
+ const char kPreviewContentsKey = 0;
++const char kAutomaticPreviewTargetKey = 0;
++
++// Only this exact newly created, uncommitted destination may be closed when
++// converting a target=_blank anchor navigation into a preview. Any subsequent
++// navigation or commit invalidates it, including another navigation to the
++// same URL. Ordinary blank tabs and script-created popups are never inferred.
++struct AutomaticPreviewTarget : public base::SupportsUserData::Data,
++                                public content::WebContentsObserver {
++  AutomaticPreviewTarget(content::WebContents* destination,
++                         content::WebContents* source_contents,
++                         const GURL& target_url,
++                         base::TimeTicks input)
++      : content::WebContentsObserver(destination),
++        source(source_contents->GetWeakPtr()),
++        url(target_url),
++        input_start(input),
++        requires_link_click(destination->HasOpener()) {}
++
++  void DidStartNavigation(content::NavigationHandle* navigation) override {
++    if (!navigation->IsInPrimaryMainFrame()) {
++      return;
++    }
++    if (navigation_id == 0 && navigation->GetURL() == url &&
++        navigation->NavigationInputStart() == input_start &&
++        navigation->IsNavigatingFromInitialEmptyDocument()) {
++      navigation_id = navigation->GetNavigationId();
++    } else if (navigation->GetNavigationId() != navigation_id) {
++      valid = false;
++    }
++  }
++  void DidFinishNavigation(content::NavigationHandle* navigation) override {
++    if (navigation->IsInPrimaryMainFrame() && navigation->HasCommitted()) {
++      // A normal committed tab no longer needs preview-only bookkeeping.
++      // Removing this user data also detaches this observer; do not access
++      // members after the call.
++      web_contents()->RemoveUserData(&kAutomaticPreviewTargetKey);
++    }
++  }
++  base::WeakPtr<content::WebContents> source;
++  GURL url;
++  base::TimeTicks input_start;
++  const bool requires_link_click;
++  int64_t navigation_id = 0;
++  bool valid = true;
++};
++
++class AutomaticPreviewNavigationThrottle : public content::NavigationThrottle {
++ public:
++  AutomaticPreviewNavigationThrottle(
++      content::NavigationThrottleRegistry& registry,
++      base::RepeatingCallback<bool(const GURL&)> preview)
++      : content::NavigationThrottle(registry), preview_(std::move(preview)) {}
++  ThrottleCheckResult WillStartRequest() override { return CheckURL(); }
++  ThrottleCheckResult WillRedirectRequest() override { return CheckURL(); }
++  const char* GetNameForLogging() override {
++    return "NoventraPinnedPreviewNavigationThrottle";
++  }
++
++ private:
++  ThrottleCheckResult CheckURL() {
++    return preview_.Run(navigation_handle()->GetURL()) ? CANCEL_AND_IGNORE
++                                                       : PROCEED;
++  }
++  base::RepeatingCallback<bool(const GURL&)> preview_;
++};
++
+ class PreviewNavigationThrottle : public content::NavigationThrottle {
+  public:
+   explicit PreviewNavigationThrottle(
+@@ -146,6 +218,9 @@
+     open->SetImageModel(views::Button::STATE_NORMAL,
+         ui::ImageModel::FromVectorIcon(kOpenInNewIcon, ui::kColorIcon, 16));
+     open->SetTooltipText(u"Continue in a full tab without reloading");
++    split_ = add_icon(
++        base::BindRepeating(&PreviewTab::SplitAndClose, base::Unretained(this)),
++        kSplitSceneIcon, u"Open in split without reloading");
+     add_icon(base::BindRepeating(&PreviewTab::Close, base::Unretained(this)),
+              kCloseIcon, u"Close preview (Esc)");
+     auto* profile = Profile::FromBrowserContext(source->GetBrowserContext());
+@@ -165,6 +240,7 @@
+                   std::max(160, std::min(740, bounds.height() - 180))));
+     contents_->GetController().LoadURL(url, referrer, ui::PAGE_TRANSITION_LINK,
+                                        std::string());
++    UpdateSplitButton();
+   }
+   ~PreviewTab() override {
+     view_->SetWebContents(nullptr);
+@@ -229,29 +305,101 @@
+     // Navigate() can synchronously close this tab-scoped dialog when it
+     // activates the destination tab. Never access this view afterwards.
+     auto weak = GetWeakPtr();
+-    Promote();
+-    if (weak) {
++    const bool promoted = PromoteContents(false);
++    if (weak && promoted) {
+       weak->Close();
+     }
+   }
+-  void Promote() {
++  void SplitAndClose() {
++    if (!CanSplit()) {
++      UpdateSplitButton();
++      return;
++    }
++    auto weak = GetWeakPtr();
++    const bool promoted = PromoteContents(true);
++    if (weak && promoted) {
++      weak->Close();
++    }
++  }
++  void Promote() { PromoteContents(false); }
++
++ private:
++  bool CanSplit() const {
+     if (!source_ || !contents_) {
+-      return;
++      return false;
+     }
+     auto* browser = GlobalBrowserCollection::GetInstance()->FindBrowserWithTab(
+         source_.get());
+     if (!browser) {
+-      return;
+-    }
++      return false;
++    }
++    auto* model = browser->GetTabStripModel();
++    const int index = model->GetIndexOfWebContents(source_.get());
++    if (!model->ContainsIndex(index)) {
++      return false;
++    }
++    auto* tab = model->GetTabAtIndex(index);
++    return !tab->IsSplit() ||
++           model->GetSplitData(tab->GetSplit().value())->ListTabs().size() < 4;
++  }
++  void UpdateSplitButton() {
++    const bool can_split = CanSplit();
++    split_->SetEnabled(can_split);
++    split_->SetTooltipText(can_split ? u"Open in split without reloading"
++                                     : u"A split can contain up to four tabs");
++  }
++  bool PromoteContents(bool split) {
++    if (!source_ || !contents_) {
++      return false;
++    }
++    auto* browser = GlobalBrowserCollection::GetInstance()->FindBrowserWithTab(
++        source_.get());
++    if (!browser) {
++      return false;
++    }
++    auto* model = browser->GetTabStripModel();
++    const int source_index = model->GetIndexOfWebContents(source_.get());
++    if (!model->ContainsIndex(source_index) || (split && !CanSplit())) {
++      return false;
++    }
++    // Insertion and split activation can synchronously destroy this dialog.
++    // Retain only weak contents identities and local values across Navigate().
++    auto source = source_;
++    auto preview = contents_->GetWeakPtr();
++    const bool pinned = model->IsTabPinned(source_index);
+     view_->SetWebContents(nullptr);
+     contents_->SetDelegate(nullptr);
+     contents_->RemoveUserData(&kPreviewContentsKey);
+     NavigateParams params(browser, std::move(contents_));
+-    params.disposition = WindowOpenDisposition::NEW_FOREGROUND_TAB;
++    params.source_contents = source.get();
++    params.disposition = split ? WindowOpenDisposition::NEW_BACKGROUND_TAB
++                               : WindowOpenDisposition::NEW_FOREGROUND_TAB;
++    if (split) {
++      params.tabstrip_add_types = pinned ? AddTabTypes::ADD_PINNED : 0;
++    }
+     Navigate(&params);
+-  }
+-
+- private:
++    if (!split || !preview) {
++      return true;
++    }
++    auto* destination =
++        GlobalBrowserCollection::GetInstance()->FindBrowserWithTab(
++            preview.get());
++    if (!destination) {
++      return false;
++    }
++    model = destination->GetTabStripModel();
++    const int preview_index = model->GetIndexOfWebContents(preview.get());
++    const int target_index = source ? model->GetIndexOfWebContents(source.get())
++                                    : TabStripModel::kNoTab;
++    if (model->ContainsIndex(preview_index) &&
++        (!model->ContainsIndex(target_index) ||
++         !model->JoinNoventraSplit(preview_index, target_index))) {
++      // A concurrent model change must not discard an already promoted page.
++      model->ActivateTabAt(model->GetIndexOfWebContents(preview.get()));
++    }
++    return true;
++  }
++
+   base::WeakPtr<content::WebContents> source_;
+   std::unique_ptr<content::WebContents> contents_;
+   raw_ptr<views::WebView> view_ = nullptr;
+@@ -259,6 +407,7 @@
+   raw_ptr<views::Label> title_ = nullptr;
+   raw_ptr<views::ImageButton> back_ = nullptr;
+   raw_ptr<views::ImageButton> forward_ = nullptr;
++  raw_ptr<views::ImageButton> split_ = nullptr;
+   base::WeakPtrFactory<PreviewTab> weak_factory_{this};
+ };
+ BEGIN_METADATA(PreviewTab)
+@@ -306,23 +455,35 @@
+   if (event.button != blink::WebMouseEvent::Button::kLeft) {
+     return false;
+   }
+-  if (event.GetType() == blink::WebInputEvent::Type::kMouseUp &&
+-      swallowing_click_) {
+-    swallowing_click_ = false;
+-    return true;
++  constexpr int kKeys =
++      blink::WebInputEvent::kAltKey | blink::WebInputEvent::kControlKey |
++      blink::WebInputEvent::kShiftKey | blink::WebInputEvent::kMetaKey;
++  const int modifiers = event.GetModifiers() & kKeys;
++  if (event.GetType() == blink::WebInputEvent::Type::kMouseUp) {
++    if (swallowing_click_) {
++      swallowing_click_ = false;
++      return true;
++    }
++    // Observe the real anchor click, allowing page handlers and ordinary
++    // controls to run. The navigation must later carry this exact timestamp.
++    plain_click_input_start_ = modifiers == 0 && CanAutomaticallyPreview()
++                                   ? event.TimeStamp()
++                                   : base::TimeTicks();
++    return false;
+   }
+   if (event.GetType() != blink::WebInputEvent::Type::kMouseDown) {
+     return false;
+   }
+   pending_hit_test_ = base::TimeTicks();
+-  const int modifiers = event.GetModifiers();
+-  if (!(modifiers & blink::WebInputEvent::kAltKey) ||
+-      (modifiers &
+-       (blink::WebInputEvent::kControlKey | blink::WebInputEvent::kShiftKey |
+-        blink::WebInputEvent::kMetaKey)) ||
+-      !Profile::FromBrowserContext(web_contents()->GetBrowserContext())
+-           ->GetPrefs()
+-           ->GetBoolean(kNoventraLinkPreview) ||
++  plain_click_input_start_ = base::TimeTicks();
++  const auto* prefs =
++      Profile::FromBrowserContext(web_contents()->GetBrowserContext())
++          ->GetPrefs();
++  const int choice = prefs->GetInteger(kNoventraLinkPreviewTrigger);
++  const int trigger = choice == 1   ? blink::WebInputEvent::kControlKey
++                      : choice == 2 ? blink::WebInputEvent::kShiftKey
++                                    : blink::WebInputEvent::kAltKey;
++  if (modifiers != trigger || !prefs->GetBoolean(kNoventraLinkPreview) ||
+       !GlobalBrowserCollection::GetInstance()->FindBrowserWithTab(
+           web_contents())) {
+     return false;
+@@ -333,6 +494,124 @@
+   // It bypasses page contextmenu handlers and preserves ordinary clicks.
+   host->ShowContextMenuAtPoint(gfx::ToRoundedPoint(event.PositionInWidget()),
+                                ui::mojom::MenuSourceType::kNone);
++  return true;
++}
++bool NoventraLinkPreview::CanAutomaticallyPreview() const {
++  if (!web_contents() ||
++      !web_contents()->GetLastCommittedURL().SchemeIsHTTPOrHTTPS()) {
++    return false;
++  }
++  auto* tab = tabs::TabInterface::MaybeGetFromContents(web_contents());
++  if (!tab || !tab->CanShowModalUI()) {
++    return false;
++  }
++  auto* prefs = Profile::FromBrowserContext(web_contents()->GetBrowserContext())
++                    ->GetPrefs();
++  if (!prefs->GetBoolean(kNoventraLinkPreview) ||
++      !prefs->GetBoolean(kNoventraLinkPreviewPinned)) {
++    return false;
++  }
++  auto* browser = GlobalBrowserCollection::GetInstance()->FindBrowserWithTab(
++      web_contents());
++  if (!browser) {
++    return false;
++  }
++  auto* model = browser->GetTabStripModel();
++  const int index = model->GetIndexOfWebContents(web_contents());
++  return model->ContainsIndex(index) && model->IsTabPinned(index);
++}
++
++void NoventraLinkPreview::DidOpenRequestedURL(
++    content::WebContents* new_contents,
++    content::RenderFrameHost* source_frame,
++    const GURL& url,
++    const content::Referrer& referrer,
++    WindowOpenDisposition disposition,
++    ui::PageTransition transition,
++    bool started_from_context_menu,
++    bool renderer_initiated) {
++  if (!new_contents || new_contents == web_contents() || !renderer_initiated ||
++      started_from_context_menu ||
++      !ui::PageTransitionCoreTypeIs(transition, ui::PAGE_TRANSITION_LINK) ||
++      !url.SchemeIsHTTPOrHTTPS() || !CanAutomaticallyPreview() ||
++      plain_click_input_start_.is_null() ||
++      base::TimeTicks::Now() - plain_click_input_start_ > base::Seconds(2) ||
++      new_contents->GetBrowserContext() !=
++          web_contents()->GetBrowserContext() ||
++      (disposition != WindowOpenDisposition::NEW_FOREGROUND_TAB &&
++       disposition != WindowOpenDisposition::NEW_BACKGROUND_TAB &&
++       disposition != WindowOpenDisposition::NEW_WINDOW &&
++       disposition != WindowOpenDisposition::NEW_POPUP)) {
++    return;
++  }
++  new_contents->SetUserData(
++      &kAutomaticPreviewTargetKey,
++      std::make_unique<AutomaticPreviewTarget>(new_contents, web_contents(),
++                                               url, plain_click_input_start_));
++}
++
++bool NoventraLinkPreview::PreviewPinnedUrl(
++    base::WeakPtr<content::WebContents> destination,
++    base::TimeTicks input_start,
++    const GURL& source_url,
++    const GURL& url) {
++  if (!destination || !CanAutomaticallyPreview() ||
++      plain_click_input_start_ != input_start ||
++      web_contents()->GetLastCommittedURL() != source_url ||
++      !url.SchemeIsHTTPOrHTTPS() ||
++      net::registry_controlled_domains::SameDomainOrHost(
++          source_url, url,
++          net::registry_controlled_domains::INCLUDE_PRIVATE_REGISTRIES)) {
++    return false;
++  }
++  plain_click_input_start_ = base::TimeTicks();
++  auto source = web_contents()->GetWeakPtr();
++  base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
++      FROM_HERE,
++      base::BindOnce(
++          [](base::WeakPtr<NoventraLinkPreview> helper,
++             base::WeakPtr<content::WebContents> source,
++             base::WeakPtr<content::WebContents> destination,
++             base::TimeTicks input_start, GURL url) {
++            bool activate_source = false;
++            if (destination && destination.get() != source.get()) {
++              auto* tag = static_cast<AutomaticPreviewTarget*>(
++                  destination->GetUserData(&kAutomaticPreviewTargetKey));
++              if (!tag || !tag->valid || tag->source.get() != source.get() ||
++                  tag->input_start != input_start) {
++                return;
++              }
++              auto* browser =
++                  GlobalBrowserCollection::GetInstance()->FindBrowserWithTab(
++                      destination.get());
++              activate_source =
++                  browser &&
++                  browser->GetTabStripModel()->GetActiveWebContents() ==
++                      destination.get();
++              destination->Close();
++            }
++            if (!helper || !source || !helper->CanAutomaticallyPreview()) {
++              return;
++            }
++            auto* browser =
++                GlobalBrowserCollection::GetInstance()->FindBrowserWithTab(
++                    source.get());
++            if (!browser) {
++              return;
++            }
++            auto* model = browser->GetTabStripModel();
++            if (activate_source) {
++              const int index = model->GetIndexOfWebContents(source.get());
++              if (!model->ContainsIndex(index)) {
++                return;
++              }
++              model->ActivateTabAt(index);
++            }
++            if (helper && model->GetActiveWebContents() == source.get()) {
++              helper->ShowPreview(url, content::Referrer());
++            }
++          },
++          weak_factory_.GetWeakPtr(), source, destination, input_start, url));
+   return true;
+ }
+ bool NoventraLinkPreview::HandleContextMenu(
+@@ -424,10 +703,77 @@
+ }
+ void NoventraLinkPreview::MaybeCreateThrottle(
+     content::NavigationThrottleRegistry& registry) {
+-  if (registry.GetNavigationHandle().GetWebContents()->GetUserData(
+-          &kPreviewContentsKey)) {
++  auto& navigation = registry.GetNavigationHandle();
++  if (navigation.GetWebContents()->GetUserData(&kPreviewContentsKey)) {
+     registry.AddThrottle(std::make_unique<PreviewNavigationThrottle>(registry));
+-  }
++    return;
++  }
++  if (!navigation.IsInPrimaryMainFrame() || !navigation.IsRendererInitiated() ||
++      navigation.IsSameDocument() || navigation.IsFormSubmission() ||
++      navigation.IsPost() || navigation.WasStartedFromContextMenu() ||
++      !ui::PageTransitionCoreTypeIs(navigation.GetPageTransition(),
++                                    ui::PAGE_TRANSITION_LINK) ||
++      navigation.NavigationInputStart().is_null() ||
++      !navigation.GetInitiatorFrameToken()) {
++    return;
++  }
++  auto* frame = content::RenderFrameHost::FromFrameToken(
++      {navigation.GetInitiatorProcessId(),
++       *navigation.GetInitiatorFrameToken()});
++  auto* source =
++      frame ? content::WebContents::FromRenderFrameHost(frame) : nullptr;
++  auto* helper = source ? FromWebContents(source) : nullptr;
++  if (!helper || !helper->CanAutomaticallyPreview() ||
++      helper->plain_click_input_start_ != navigation.NavigationInputStart() ||
++      base::TimeTicks::Now() - helper->plain_click_input_start_ >
++          base::Seconds(2)) {
++    return;
++  }
++  auto* destination = navigation.GetWebContents();
++  if (destination == source) {
++    // Cross-process frame-proxy navigations deliberately filter HasUserGesture
++    // and drop the link flag upstream. Their input time is forwarded only for
++    // actual anchor gestures; it must still match our observed native click.
++    // Require the initiator to belong to this primary frame tree and a distinct
++    // process, so ordinary iframe script navigation cannot use this exception.
++    auto* primary = source->GetPrimaryMainFrame();
++    const bool remote_anchor = frame->GetParent() &&
++                               frame->GetMainFrame() == primary &&
++                               frame->GetProcess() != primary->GetProcess() &&
++                               navigation.StartedWithTransientActivation();
++    if (!(navigation.HasUserGesture() &&
++          navigation.WasInitiatedByLinkClick()) &&
++        !remote_anchor) {
++      return;
++    }
++  } else {
++    if (!navigation.HasUserGesture()) {
++      return;
++    }
++    auto* tag = static_cast<AutomaticPreviewTarget*>(
++        destination->GetUserData(&kAutomaticPreviewTargetKey));
++    if (!tag || !tag->valid || tag->source.get() != source ||
++        tag->navigation_id != navigation.GetNavigationId() ||
++        tag->input_start != navigation.NavigationInputStart() ||
++        // Opener windows navigate in the renderer and retain the anchor flag.
++        // Noopener loads use the browser's anchor-only forwarded input time.
++        (tag->requires_link_click && !navigation.WasInitiatedByLinkClick()) ||
++        !navigation.IsNavigatingFromInitialEmptyDocument()) {
++      return;
++    }
++  }
++  registry.AddThrottle(std::make_unique<AutomaticPreviewNavigationThrottle>(
++      registry,
++      base::BindRepeating(
++          [](base::WeakPtr<NoventraLinkPreview> helper,
++             base::WeakPtr<content::WebContents> destination,
++             base::TimeTicks input_start, const GURL& source_url,
++             const GURL& url) {
++            return helper && helper->PreviewPinnedUrl(destination, input_start,
++                                                      source_url, url);
++          },
++          helper->weak_factory_.GetWeakPtr(), destination->GetWeakPtr(),
++          navigation.NavigationInputStart(), source->GetLastCommittedURL())));
+ }
+ void NoventraLinkPreview::DidStartNavigation(
+     content::NavigationHandle* navigation) {
+--- a/chrome/browser/ui/views/noventra_link_preview.h
++++ b/chrome/browser/ui/views/noventra_link_preview.h
+@@ -43,10 +43,23 @@
+   void RenderFrameCreated(content::RenderFrameHost* frame) override;
+   void RenderWidgetHostDestroyed(content::RenderWidgetHost* host) override;
+   void DidStartNavigation(content::NavigationHandle* navigation) override;
++  void DidOpenRequestedURL(content::WebContents* new_contents,
++                           content::RenderFrameHost* source_frame,
++                           const GURL& url,
++                           const content::Referrer& referrer,
++                           WindowOpenDisposition disposition,
++                           ui::PageTransition transition,
++                           bool started_from_context_menu,
++                           bool renderer_initiated) override;
+   void WebContentsDestroyed() override;
+   void Attach(content::RenderFrameHost* frame);
+   bool OnMouse(content::RenderWidgetHost* host,
+                const blink::WebMouseEvent& event);
++  bool CanAutomaticallyPreview() const;
++  bool PreviewPinnedUrl(base::WeakPtr<content::WebContents> destination,
++                        base::TimeTicks input_start,
++                        const GURL& source_url,
++                        const GURL& url);
+   void ShowPreview(const GURL& url, const content::Referrer& referrer);
+   void ClosePreview();
+   void OnPreviewClosed();
+@@ -54,6 +67,7 @@
+            content::RenderWidgetHost::MouseEventCallback>
+       hosts_;
+   base::TimeTicks pending_hit_test_;
++  base::TimeTicks plain_click_input_start_;
+   bool swallowing_click_ = false;
+   base::WeakPtr<PreviewTab> preview_;
+   std::unique_ptr<views::DialogDelegate> preview_delegate_;
+--- a/content/browser/renderer_host/navigation_controller_impl.cc
++++ b/content/browser/renderer_host/navigation_controller_impl.cc
+@@ -3341,7 +3341,8 @@
+     bool force_new_browsing_instance,
+     bool is_container_initiated,
+     bool has_rel_opener,
+-    network::mojom::CSPDisposition should_check_main_world_csp) {
++    network::mojom::CSPDisposition should_check_main_world_csp,
++    base::TimeTicks anchor_input_start) {
+   SiteInstanceImpl* source_site_instance =
+       initiator_navigation_state ? static_cast<InitiatorNavigationStateImpl*>(
+                                        initiator_navigation_state.get())
+@@ -3459,7 +3460,7 @@
+   params.should_clear_history_list = false;
+   params.started_from_context_menu = false;
+   /* params.navigation_ui_data: skip */
+-  /* params.input_start: skip */
++  params.input_start = anchor_input_start;
+   params.was_activated = blink::mojom::WasActivatedOption::kUnknown;
+   /* params.reload_type: skip */
+   params.download_policy = std::move(download_policy);
+--- a/content/browser/renderer_host/navigation_controller_impl.h
++++ b/content/browser/renderer_host/navigation_controller_impl.h
+@@ -252,7 +252,8 @@
+       bool is_container_initiated = false,
+       bool has_rel_opener = false,
+       network::mojom::CSPDisposition should_check_main_world_csp =
+-          network::mojom::CSPDisposition::CHECK);
++          network::mojom::CSPDisposition::CHECK,
++      base::TimeTicks anchor_input_start = base::TimeTicks());
+ 
+   // Navigates to the history entry associated with the given navigation API
+   // |key|. Searches |entries_| for a FrameNavigationEntry associated with
+--- a/content/browser/renderer_host/navigator.cc
++++ b/content/browser/renderer_host/navigator.cc
+@@ -1200,7 +1200,8 @@
+     bool force_new_browsing_instance,
+     bool is_container_initiated,
+     bool has_rel_opener,
+-    network::mojom::CSPDisposition should_check_main_world_csp) {
++    network::mojom::CSPDisposition should_check_main_world_csp,
++    base::TimeTicks anchor_input_start) {
+   // |method != "POST"| should imply absence of |post_body|.
+   if (method != "POST" && post_body) {
+     NOTREACHED();
+@@ -1266,7 +1267,7 @@
+       started_by_ad, actual_navigation_start_time, navigation_start_time,
+       is_embedder_initiated_fenced_frame_navigation, is_unfenced_top_navigation,
+       force_new_browsing_instance, is_container_initiated, has_rel_opener,
+-      should_check_main_world_csp);
++      should_check_main_world_csp, anchor_input_start);
+ }
+ 
+ void Navigator::BeforeUnloadCompleted(FrameTreeNode* frame_tree_node,
+--- a/content/browser/renderer_host/navigator.h
++++ b/content/browser/renderer_host/navigator.h
+@@ -174,7 +174,8 @@
+       bool is_container_initiated = false,
+       bool has_rel_opener = false,
+       network::mojom::CSPDisposition should_check_main_world_csp =
+-          network::mojom::CSPDisposition::CHECK);
++          network::mojom::CSPDisposition::CHECK,
++      base::TimeTicks anchor_input_start = base::TimeTicks());
+ 
+   // Called after BeforeUnloadCompleted callback is invoked from the renderer.
+   // If `frame_tree_node` has a NavigationRequest waiting for the renderer
+--- a/content/browser/renderer_host/render_frame_proxy_host.cc
++++ b/content/browser/renderer_host/render_frame_proxy_host.cc
+@@ -1088,7 +1088,8 @@
+       /*is_embedder_initiated_fenced_frame_navigation=*/false,
+       /*is_unfenced_top_navigation=*/false,
+       /*force_new_browsing_instance=*/false, params->is_container_initiated,
+-      params->has_rel_opener, should_check_main_world_csp);
++      params->has_rel_opener, should_check_main_world_csp,
++      params->anchor_input_start);
+ }
+ 
+ void RenderFrameProxyHost::UpdateViewportIntersection(
+--- a/content/browser/web_contents/web_contents_impl.cc
++++ b/content/browser/web_contents/web_contents_impl.cc
+@@ -5975,6 +5975,7 @@
+     load_params->transition_type = ui::PAGE_TRANSITION_LINK;
+     load_params->is_renderer_initiated = true;
+     load_params->was_opener_suppressed = true;
++    load_params->input_start = params.input_start;
+     load_params->has_user_gesture = has_user_gesture;
+     load_params->is_form_submission = params.is_form_submission;
+     if (params.form_submission_post_data) {
+--- a/content/common/frame.mojom
++++ b/content/common/frame.mojom
+@@ -628,6 +628,10 @@
+   pending_associated_remote<blink.mojom.Widget> widget;
+   pending_associated_receiver<blink.mojom.FrameWidgetHost> frame_widget_host;
+   pending_associated_remote<blink.mojom.FrameWidget> frame_widget;
++
++  // Original input time for an anchor navigation that creates this window.
++  // Null for non-anchor/script-created windows, even during a native click.
++  mojo_base.mojom.TimeTicks input_start;
+ };
+ 
+ // Operation result when the renderer asks the browser to create a new window.
+--- a/content/renderer/render_frame_impl.cc
++++ b/content/renderer/render_frame_impl.cc
+@@ -7086,9 +7086,11 @@
+     const blink::SessionStorageNamespaceId& session_storage_namespace_id,
+     bool& consumed_user_gesture,
+     const std::optional<blink::WebPictureInPictureWindowOptions>& pip_options,
+-    const blink::WebURL& base_url) {
++    const blink::WebURL& base_url,
++    base::TimeTicks input_start) {
+   consumed_user_gesture = false;
+   mojom::CreateNewWindowParamsPtr params = mojom::CreateNewWindowParams::New();
++  params->input_start = input_start;
+ 
+   // The user activation check is done at the browser process through
+   // |frame_host->CreateNewWindow()| call below.  But the extensions case
+--- a/content/renderer/render_frame_impl.h
++++ b/content/renderer/render_frame_impl.h
+@@ -653,7 +653,8 @@
+       const blink::SessionStorageNamespaceId& session_storage_namespace_id,
+       bool& consumed_user_gesture,
+       const std::optional<blink::WebPictureInPictureWindowOptions>& pip_options,
+-      const blink::WebURL& base_url) override;
++      const blink::WebURL& base_url,
++      base::TimeTicks input_start) override;
+ 
+   base::ScopedClosureRunner CreateScopedClientNavigationThrottler() override;
+ 
+--- a/content/renderer/render_view_browsertest.cc
++++ b/content/renderer/render_view_browsertest.cc
+@@ -990,7 +990,7 @@
+       gfx::Rect(0, 0, 100, 100), blink::kWebNavigationPolicyNewForegroundTab,
+       network::mojom::WebSandboxFlags::kNone,
+       blink::AllocateSessionStorageNamespaceId(), consumed_user_gesture,
+-      std::nullopt, /*base_url=*/blink::WebURL());
++      std::nullopt, /*base_url=*/blink::WebURL(), base::TimeTicks());
+   auto popup_navigation_info = std::make_unique<blink::WebNavigationInfo>();
+   popup_navigation_info->initiator_state_token =
+       frame()->GetWebFrame()->GetInitiatorStateToken();
+--- a/third_party/blink/public/mojom/frame/remote_frame.mojom
++++ b/third_party/blink/public/mojom/frame/remote_frame.mojom
+@@ -186,6 +186,9 @@
+   // world which has initiated the navigation should be passed.
+   network.mojom.CSPDisposition should_check_main_world_csp =
+       network.mojom.CSPDisposition.CHECK;
++  // Preserve a real anchor click across the remote-frame navigation path.
++  // Script navigations and clicks without a user gesture leave this null.
++  mojo_base.mojom.TimeTicks anchor_input_start;
+ };
+ 
+ // Implemented in Browser, this interface defines frame-specific methods that
+--- a/third_party/blink/public/web/web_local_frame_client.h
++++ b/third_party/blink/public/web/web_local_frame_client.h
+@@ -39,6 +39,7 @@
+ #include "base/functional/function_ref.h"
+ #include "base/i18n/rtl.h"
+ #include "base/notreached.h"
++#include "base/time/time.h"
+ #include "base/unguessable_token.h"
+ #include "media/base/audio_processing.h"
+ #include "media/base/output_device_info.h"
+@@ -891,10 +892,10 @@
+       const SessionStorageNamespaceId& session_storage_namespace_id,
+       bool& consumed_user_gesture,
+       const std::optional<WebPictureInPictureWindowOptions>& pip_options,
+-      const WebURL& base_url) {
+-    return nullptr;
+-  }
+-
++      const WebURL& base_url,
++      base::TimeTicks input_start) {
++    return nullptr;
++  }
+ 
+   virtual base::ScopedClosureRunner CreateScopedClientNavigationThrottler() {
+     return {};
+--- a/third_party/blink/renderer/core/exported/web_view_test.cc
++++ b/third_party/blink/renderer/core/exported/web_view_test.cc
+@@ -5340,7 +5340,8 @@
+       const SessionStorageNamespaceId&,
+       bool& consumed_user_gesture,
+       const std::optional<WebPictureInPictureWindowOptions>&,
+-      const WebURL&) override {
++      const WebURL&,
++      base::TimeTicks) override {
+     return web_view_helper_.InitializeWithOpener(Frame());
+   }
+   WebView* CreatedWebView() const { return web_view_helper_.GetWebView(); }
+@@ -5439,7 +5440,8 @@
+       const SessionStorageNamespaceId&,
+       bool& consumed_user_gesture,
+       const std::optional<WebPictureInPictureWindowOptions>&,
+-      const WebURL&) override {
++      const WebURL&,
++      base::TimeTicks) override {
+     return web_view_;
+   }
+ 
+--- a/third_party/blink/renderer/core/frame/frame_test_helpers.cc
++++ b/third_party/blink/renderer/core/frame/frame_test_helpers.cc
+@@ -1014,7 +1014,8 @@
+     const SessionStorageNamespaceId&,
+     bool& consumed_user_gesture,
+     const std::optional<WebPictureInPictureWindowOptions>&,
+-    const WebURL&) {
++    const WebURL&,
++    base::TimeTicks) {
+   auto webview_helper = std::make_unique<WebViewHelper>();
+   WebView* result = webview_helper->InitializeWithOpener(frame_);
+   child_web_views_.push_back(std::move(webview_helper));
+--- a/third_party/blink/renderer/core/frame/frame_test_helpers.h
++++ b/third_party/blink/renderer/core/frame/frame_test_helpers.h
+@@ -567,7 +567,8 @@
+       const SessionStorageNamespaceId&,
+       bool& consumed_user_gesture,
+       const std::optional<WebPictureInPictureWindowOptions>&,
+-      const WebURL& base_url) override;
++      const WebURL& base_url,
++      base::TimeTicks input_start) override;
+ 
+   int VisuallyNonEmptyLayoutCount() const {
+     return visually_non_empty_layout_count_;
+--- a/third_party/blink/renderer/core/frame/remote_frame.cc
++++ b/third_party/blink/renderer/core/frame/remote_frame.cc
+@@ -268,6 +268,10 @@
+     params->initiator_base_url = frame_request.GetRequestorBaseURL();
+   }
+   params->actual_navigation_start = frame_request.GetCreationTime();
++  if (request.HasUserGesture() && frame_request.GetClientNavigationReason() ==
++                                      ClientNavigationReason::kAnchorClick) {
++    params->anchor_input_start = frame_request.GetInputStartTime();
++  }
+   params->post_body =
+       blink::GetRequestBodyForWebURLRequest(WrappedResourceRequest(request));
+   DCHECK_EQ(!!params->post_body, request.HttpMethod().Utf8() == "POST");
+--- a/third_party/blink/renderer/core/frame/web_frame_test.cc
++++ b/third_party/blink/renderer/core/frame/web_frame_test.cc
+@@ -8045,7 +8045,8 @@
+       const SessionStorageNamespaceId&,
+       bool& consumed_user_gesture,
+       const std::optional<WebPictureInPictureWindowOptions>&,
+-      const WebURL&) override {
++      const WebURL&,
++      base::TimeTicks) override {
+     EXPECT_TRUE(expect_create_new_window_);
+     did_call_create_new_window_ = true;
+     new_window_sandbox_flags_ = sandbox_flags;
+--- a/third_party/blink/renderer/core/page/chrome_client_impl.cc
++++ b/third_party/blink/renderer/core/page/chrome_client_impl.cc
+@@ -432,7 +432,10 @@
+           requested_screen_rect,
+           static_cast<WebNavigationPolicy>(r.GetNavigationPolicy()),
+           sandbox_flags, session_storage_namespace_id, consumed_user_gesture,
+-          r.GetPictureInPictureWindowOptions(), r.GetRequestorBaseURL()));
++          r.GetPictureInPictureWindowOptions(), r.GetRequestorBaseURL(),
++          r.GetClientNavigationReason() == ClientNavigationReason::kAnchorClick
++              ? r.GetInputStartTime()
++              : base::TimeTicks()));
+   if (!new_view) {
+     return nullptr;
+   }
+--- a/third_party/blink/renderer/core/page/chrome_client_impl_test.cc
++++ b/third_party/blink/renderer/core/page/chrome_client_impl_test.cc
+@@ -113,7 +113,8 @@
+       const SessionStorageNamespaceId&,
+       bool& consumed_user_gesture,
+       const std::optional<WebPictureInPictureWindowOptions>&,
+-      const WebURL& creator_base_url) override {
++      const WebURL& creator_base_url,
++      base::TimeTicks) override {
+     return web_view_helper_.InitializeWithOpener(Frame());
+   }
+ 

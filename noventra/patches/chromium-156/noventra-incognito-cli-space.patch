@@ -1,0 +1,85 @@
+diff --git a/chrome/browser/ui/noventra/incognito_space_host.cc b/chrome/browser/ui/noventra/incognito_space_host.cc
+--- a/chrome/browser/ui/noventra/incognito_space_host.cc
++++ b/chrome/browser/ui/noventra/incognito_space_host.cc
+@@ -725,9 +725,10 @@
+ #endif
+ }
+ 
+-bool CreateIncognitoSpaceForProfile(Profile* profile) {
++BrowserWindowInterface* CreateIncognitoSpaceForProfile(Profile* profile,
++                                                       bool add_initial_tab) {
+   if (!profile) {
+-    return false;
++    return nullptr;
+   }
+   BrowserWindowInterface* source = nullptr;
+   GlobalBrowserCollection::GetInstance()->ForEach(
+@@ -743,7 +744,7 @@
+         return true;
+       },
+       BrowserCollection::Order::kActivation);
+-  return CreateIncognitoSpace(source) != nullptr;
++  return CreateIncognitoSpace(source, add_initial_tab);
+ }
+ 
+ void LayoutIncognitoSpaces(BrowserView* host_view) {
+diff --git a/chrome/browser/ui/noventra/incognito_space_host.h b/chrome/browser/ui/noventra/incognito_space_host.h
+--- a/chrome/browser/ui/noventra/incognito_space_host.h
++++ b/chrome/browser/ui/noventra/incognito_space_host.h
+@@ -31,7 +31,9 @@
+ 
+ BrowserWindowInterface* CreateIncognitoSpace(BrowserWindowInterface* source,
+                                              bool add_initial_tab = true);
+-bool CreateIncognitoSpaceForProfile(Profile* profile);
++BrowserWindowInterface* CreateIncognitoSpaceForProfile(
++    Profile* profile,
++    bool add_initial_tab = true);
+ BrowserWindowInterface* IncognitoSpaceHost(BrowserWindowInterface* browser);
+ BrowserWindowInterface* SelectedIncognitoBrowser(
+     BrowserWindowInterface* browser);
+diff --git a/chrome/browser/ui/startup/startup_browser_creator_impl.cc b/chrome/browser/ui/startup/startup_browser_creator_impl.cc
+--- a/chrome/browser/ui/startup/startup_browser_creator_impl.cc
++++ b/chrome/browser/ui/startup/startup_browser_creator_impl.cc
+@@ -46,6 +46,7 @@
+ #include "chrome/browser/ui/browser_window/public/global_browser_collection.h"
+ #include "chrome/browser/ui/navigator/browser_navigator.h"
+ #include "chrome/browser/ui/navigator/browser_navigator_params.h"
++#include "chrome/browser/ui/noventra/incognito_space_host.h"
+ #include "chrome/browser/ui/noventra_commands.h"
+ #include "chrome/browser/ui/startup/infobar_utils.h"
+ #include "chrome/browser/ui/startup/startup_browser_creator.h"
+@@ -801,7 +802,19 @@
+     chrome::startup::IsProcessStartup process_startup,
+     bool is_post_crash_launch) {
+   BrowserWindowInterface* browser = nullptr;
+-  if (behavior == BrowserOpenBehavior::SYNCHRONOUS_RESTORE) {
++  // A forwarded Incognito launch creates a fresh private Space in an existing
++  // matching regular host. Keep the startup URL/tab handling below unchanged,
++  // and preserve genuine private-window startup when no host is available or
++  // the caller explicitly requested a new window.
++  if (process_startup == chrome::startup::IsProcessStartup::kNo &&
++      profile_->IsIncognitoProfile() &&
++      command_line_->HasSwitch(switches::kIncognito) &&
++      !command_line_->HasSwitch(switches::kOpenInNewWindow) &&
++      !headless::ShouldProcessHeadlessCommands()) {
++    browser = noventra::CreateIncognitoSpaceForProfile(
++        profile_, /*add_initial_tab=*/false);
++  }
++  if (!browser && behavior == BrowserOpenBehavior::SYNCHRONOUS_RESTORE) {
+     // It's worth noting that this codepath is not hit by crash restore
+     // because we want to avoid a crash restore loop, so we don't
+     // automatically restore after a crash.
+@@ -815,9 +828,10 @@
+     if (browser_window) {
+       return browser_window;
+     }
+-  } else if (behavior == BrowserOpenBehavior::USE_EXISTING ||
+-             behavior ==
+-                 BrowserOpenBehavior::USE_EXISTING_AND_OVERWRITE_ACTIVE_TAB) {
++  } else if (!browser &&
++             (behavior == BrowserOpenBehavior::USE_EXISTING ||
++              behavior ==
++                  BrowserOpenBehavior::USE_EXISTING_AND_OVERWRITE_ACTIVE_TAB)) {
+     browser = GetExistingBrowserForOpenBehavior(profile_, process_startup);
+   }
+ 

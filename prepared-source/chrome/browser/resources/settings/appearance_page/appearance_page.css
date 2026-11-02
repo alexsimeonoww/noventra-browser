@@ -1,0 +1,791 @@
+/* Copyright 2026 The Chromium Authors
+ * Use of this source code is governed by a BSD-style license that can be
+ * found in the LICENSE file. */
+
+/* #css_wrapper_metadata_start
+ * #type=style-lit
+ * #import=chrome://resources/cr_elements/cr_shared_style_lit.css.js
+ * #import=chrome://resources/cr_elements/md_select_lit.css.js
+ * #import=../settings_shared_lit.css.js
+ * #import=../settings_vars.css.js
+ * #include=cr-shared-style-lit settings-shared-lit md-select-lit
+ * #css_wrapper_metadata_end */
+
+/* Lines up with cr-input. */
+#custom-input {
+  /* (cr-input line-height + cr-input top/bottom padding) / 2 -
+     cr-radio disc-wrapper height / 2 */
+  --cr-radio-button-disc-margin-block-start: calc(
+      (1.54em + 12px) / 2 - 8px);
+  align-items: start;
+}
+
+/* The theme mixes a link and a cr-button divided by a separator with
+ * grit expressions and dom-if templates. That leads to a tricky thing
+ * to style correctly, these are a workaround. */
+#themeRow cr-button,
+#toolbarRow cr-button {
+  margin-inline-end: 20px;
+}
+
+#themeRow .separator,
+#toolbarRow .separator  {
+  margin-inline-start: 0;
+}
+
+#toolbarRow {
+  border-top: var(--cr-separator-line);
+}
+
+.indented-toggles,
+.indented-rows {
+  padding-inline-end: 0;
+}
+
+.indented-toggles settings-toggle-button,
+.indented-rows .cr-row {
+  padding-inline-start: 0;
+}
+
+#noventraPresetRow cr-button {
+  margin-inline: 16px;
+  white-space: nowrap;
+}
+
+#noventraColors,
+#noventraToolbar {
+  border-top: var(--cr-separator-line);
+  padding: 16px var(--cr-section-padding);
+}
+
+#noventraColors summary,
+#noventraToolbar summary {
+  cursor: pointer;
+}
+
+#noventraColors cr-theme-color-picker {
+  display: block;
+  margin-top: 16px;
+  max-width: 420px;
+}
+
+#noventraAppearancePresets,
+#noventraAppearanceChoices,
+#noventraSurfaceChoices {
+  border: 0;
+  margin: 8px 0 0;
+  min-width: 0;
+  padding: 0 var(--cr-section-padding) 16px;
+}
+
+#noventraAppearancePresets legend,
+#noventraAppearanceChoices legend,
+#noventraSurfaceChoices legend {
+  font-weight: 500;
+  margin-bottom: 12px;
+  padding: 0;
+}
+
+#noventraBarVisibility {
+  border-top: var(--cr-separator-line);
+  padding: 20px var(--cr-section-padding);
+}
+
+#noventraBarVisibility h2 {
+  font-size: 16px;
+  font-weight: 500;
+  margin: 0 0 8px;
+}
+
+#noventraBarVisibility p {
+  color: var(--cr-secondary-text-color);
+  line-height: 1.5;
+  margin: 8px 0 16px;
+}
+
+.bar-visibility-presets {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(min(145px, 100%), 1fr));
+}
+
+.bar-visibility-presets button {
+  align-items: center;
+  background: transparent;
+  border: 1px solid var(--cr-separator-color);
+  border-radius: 8px;
+  color: var(--cr-primary-text-color);
+  cursor: pointer;
+  display: flex;
+  font: inherit;
+  gap: 10px;
+  min-height: 56px;
+  padding: 10px;
+  text-align: start;
+}
+
+.bar-visibility-presets button[aria-pressed='true'] {
+  background: color-mix(in srgb, var(--cr-primary-text-color) 8%, transparent);
+  border-color: var(--cr-secondary-text-color);
+}
+
+.bar-visibility-presets button:hover:enabled {
+  background: var(--cr-hover-background-color);
+}
+
+#noventraBarVisibility :is(button, select):focus-visible,
+#noventraBarVisibility:focus-visible {
+  outline: 2px solid var(--cr-secondary-text-color);
+  outline-offset: 2px;
+}
+
+.bar-visibility-presets button:disabled {
+  color: var(--cr-disabled-text-color);
+  cursor: default;
+}
+
+.bar-visibility-preview {
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  flex: 0 0 32px;
+  height: 26px;
+  opacity: .65;
+  position: relative;
+}
+
+.bar-visibility-top,
+.bar-visibility-side {
+  background: currentColor;
+  border-radius: 1px;
+  position: absolute;
+}
+
+.bar-visibility-top {
+  height: 4px;
+  inset: 3px 3px auto;
+}
+
+.bar-visibility-side {
+  inset: 10px auto 3px 3px;
+  width: 6px;
+}
+
+[data-visibility='sidebars'] .bar-visibility-side,
+[data-visibility='all'] .bar-visibility-side,
+[data-visibility='top'] .bar-visibility-top,
+[data-visibility='all'] .bar-visibility-top {
+  background: transparent;
+  border: 1px dotted currentColor;
+  box-sizing: border-box;
+}
+
+.bar-visibility-details {
+  align-items: center;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: auto minmax(0, 1fr);
+  margin-top: 20px;
+}
+
+.bar-visibility-details select {
+  max-width: 100%;
+  width: 100%;
+}
+
+#noventraBarVisibility #noventraBarVisibilityError {
+  color: var(--cr-primary-text-color);
+}
+
+@media (forced-colors: active) {
+  .bar-visibility-presets button[aria-pressed='true'] {
+    border-color: Highlight;
+    outline: 1px solid Highlight;
+  }
+
+  #noventraBarVisibility :is(button, select):focus-visible,
+  #noventraBarVisibility:focus-visible {
+    outline-color: Highlight;
+  }
+}
+
+.appearance-choices {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.surface-choices {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.appearance-note {
+  color: var(--cr-secondary-text-color);
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 12px 0 0;
+}
+
+.appearance-choice {
+  border: 1px solid var(--cr-separator-color);
+  border-radius: 12px;
+  cursor: pointer;
+  display: grid;
+  gap: 4px 8px;
+  grid-template-columns: 16px minmax(0, 1fr);
+  padding: 8px 8px 12px;
+}
+
+.appearance-choice:has(input:checked) {
+  border-color: var(--cr-focus-outline-color);
+  box-shadow: 0 0 0 1px var(--cr-focus-outline-color);
+}
+
+.appearance-choice:has(input:focus-visible) {
+  outline: 2px solid var(--cr-focus-outline-color);
+  outline-offset: 3px;
+}
+
+.appearance-choice input {
+  accent-color: var(--cr-focus-outline-color);
+  grid-column: 1;
+  grid-row: 2;
+  height: 16px;
+  margin: 1px 0 0;
+  width: 16px;
+}
+
+.appearance-choice-name,
+.surface-choice-name {
+  font-weight: 500;
+  grid-column: 2;
+}
+
+.appearance-choice-hint,
+.surface-choice-hint {
+  color: var(--cr-secondary-text-color);
+  font-size: 11px;
+  grid-column: 2;
+  line-height: 1.4;
+}
+
+#noventraAppearanceChoices .appearance-choice input,
+#noventraAppearanceChoices .appearance-choice-name {
+  grid-row: 1;
+}
+
+#noventraAppearanceChoices .appearance-choice-hint {
+  grid-row: 2;
+}
+
+#dataDevicesContent > noventra-transfer,
+#dataDevicesContent > .space-details {
+  display: block;
+  padding: 20px var(--cr-section-padding);
+}
+
+.appearance-preview {
+  border-radius: 7px;
+  display: flex;
+  grid-column: 1 / -1;
+  grid-row: 1;
+  height: 84px;
+  margin-bottom: 6px;
+  overflow: hidden;
+}
+
+.appearance-preview-pane {
+  --preview-surface: #f6f7fa;
+  --preview-page: #fff;
+  --preview-ink: #78818e;
+  background: linear-gradient(135deg, #bdcbd9, #e9d7ca 55%, #b6b7d5);
+  flex: 1;
+  min-width: 0;
+  padding: 10px 8px;
+}
+
+.appearance-preview-pane.dark {
+  --preview-surface: #17191f;
+  --preview-page: #24272e;
+  --preview-ink: #979caa;
+  background: linear-gradient(135deg, #394359, #635166 55%, #243d49);
+}
+
+.appearance-preview-window {
+  background: var(--preview-surface);
+  border: 1px solid color-mix(in srgb, var(--preview-ink) 35%, transparent);
+  border-radius: 6px;
+  display: grid;
+  grid-template-columns: 22% 1fr;
+  grid-template-rows: 15px 1fr;
+  height: 100%;
+  overflow: hidden;
+}
+
+[data-glass='true'] .appearance-preview-window,
+[data-surface='glass'] .appearance-preview-window {
+  background: color-mix(in srgb, var(--preview-surface) 65%, transparent);
+}
+
+.appearance-preview-toolbar {
+  border-bottom: 1px solid color-mix(in srgb, var(--preview-ink) 20%, transparent);
+  grid-column: 1 / -1;
+}
+
+.appearance-preview-toolbar::before {
+  background: var(--preview-ink);
+  border-radius: 50%;
+  box-shadow: 6px 0 var(--preview-ink), 12px 0 var(--preview-ink);
+  content: '';
+  display: block;
+  height: 3px;
+  margin: 5px;
+  width: 3px;
+}
+
+.appearance-preview-sidebar {
+  border-inline-end: 1px solid color-mix(in srgb, var(--preview-ink) 20%, transparent);
+}
+
+.appearance-preview-page {
+  background: var(--preview-page);
+  border-radius: 3px;
+  margin: 4px;
+}
+
+@media (max-width: 560px) {
+  .appearance-choices { gap: 8px; }
+  .appearance-choice { grid-template-columns: 1fr; }
+  .appearance-choice input { grid-row: 2; }
+  .appearance-choice-name,
+  .appearance-choice-hint,
+  .surface-choice-name,
+  .surface-choice-hint { grid-column: 1; }
+  .appearance-preview { height: 64px; }
+  .appearance-preview-pane { padding: 8px 4px; }
+}
+
+@media (forced-colors: active) {
+  .appearance-choice:has(input:checked) { border: 2px solid Highlight; }
+  .appearance-preview { border: 1px solid CanvasText; }
+}
+
+.noventra-toolbar-action {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  min-height: 36px;
+}
+
+#noventraToolbar summary {
+  margin-bottom: 12px;
+}
+
+#noventraSpaces .noventra-space-row {
+  gap: 12px;
+  padding-block: 8px;
+  flex-wrap: wrap;
+}
+
+/* Use the theme's surface text palette, including neutral themes. Toolbar icon
+ * colors can be overridden independently by extension themes and need not
+ * contrast with Settings cards.
+ * Keep the platform's dedicated high-contrast button colors in forced colors. */
+@media (forced-colors: none) {
+  #noventraSpaces {
+    --noventra-space-action-color: var(--cr-secondary-text-color);
+    --cr-focus-outline-color: var(--noventra-space-action-color);
+  }
+
+  #noventraSpaces cr-button {
+    --cr-button-text-color: var(--noventra-space-action-color);
+    --cr-button-border-color: color-mix(in srgb,
+        var(--noventra-space-action-color) 35%, transparent);
+    --cr-button-ripple-color: color-mix(in srgb,
+        var(--noventra-space-action-color) 12%, transparent);
+    --cr-hover-background-color: color-mix(in srgb,
+        var(--noventra-space-action-color) 8%, transparent);
+  }
+
+  #noventraSpaces cr-button.action-button {
+    --cr-button-background-color: var(--noventra-space-action-color);
+    --cr-button-text-color: contrast-color(var(--noventra-space-action-color));
+    --cr-button-ripple-color: color-mix(in srgb,
+        contrast-color(var(--noventra-space-action-color)) 18%, transparent);
+    --cr-hover-on-prominent-background-color: color-mix(in srgb,
+        contrast-color(var(--noventra-space-action-color)) 8%, transparent);
+  }
+}
+
+.noventra-space-row .noventra-space-input {
+  flex-basis: 180px;
+}
+
+.noventra-workspace-tool-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-block: 12px;
+}
+
+.noventra-tool-field {
+  display: flex;
+  flex-basis: 180px;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.noventra-tool-field input,
+.noventra-tool-field select {
+  box-sizing: border-box;
+  max-width: 100%;
+  width: 100%;
+}
+
+.noventra-rule-name {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+.noventra-space-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.noventra-space-actions cr-button[data-action^='move-'] {
+  min-width: 32px;
+  padding-inline: 8px;
+}
+
+.noventra-archived-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+#noventraArchivedHeading {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.noventra-space-input {
+  background: var(--cr-input-background-color);
+  border: 1px solid var(--cr-separator-color);
+  border-radius: 6px;
+  box-sizing: border-box;
+  color: var(--cr-primary-text-color);
+  font: inherit;
+  min-width: 0;
+  padding: 10px 12px;
+}
+
+.noventra-space-input:focus-visible {
+  outline: 2px solid var(--cr-focus-outline-color);
+  outline-offset: 1px;
+}
+
+.noventra-space-badge {
+  align-items: center;
+  background: var(--cr-hover-background-color);
+  border-radius: 6px;
+  display: flex;
+  font-weight: 500;
+  height: 32px;
+  justify-content: center;
+  width: 32px;
+}
+
+.sidebar-preferences {
+  padding: 0 var(--cr-section-padding);
+}
+
+.sidebar-preferences .customize-heading {
+  padding: 20px 0 8px;
+}
+
+.customize-section .sidebar-preferences .cr-row {
+  border-top: 0;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  min-height: 52px;
+  padding: 10px 0;
+}
+
+.sidebar-preferences .flex {
+  min-width: min(240px, 100%);
+}
+
+.sidebar-preferences settings-dropdown-menu {
+  max-width: 100%;
+}
+
+.noventra-space-appearance {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.noventra-space-badge svg {
+  fill: none;
+  height: 18px;
+  width: 18px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.6;
+}
+
+.noventra-space-appearance label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--cr-secondary-text-color);
+  font-size: 12px;
+}
+
+.noventra-space-appearance select {
+  max-width: 100%;
+  min-width: 108px;
+  width: 128px;
+}
+
+.noventra-space-appearance .noventra-space-theme select {
+  width: 180px;
+}
+
+.noventra-space-badge[data-color]:not([data-color='default']) {
+  color: var(--space-accent, var(--cr-primary-text-color));
+  background: color-mix(in srgb, currentColor 12%, var(--cr-card-background-color));
+  border: 1px solid currentColor;
+}
+
+.noventra-space-badge[data-color='red'] { --space-accent: light-dark(#b3261e, #ffb4ab); }
+
+.noventra-space-badge[data-color='orange'] { --space-accent: light-dark(#9b4500, #ffb77c); }
+
+.noventra-space-badge[data-color='yellow'] { --space-accent: light-dark(#755b00, #e5c349); }
+
+.noventra-space-badge[data-color='green'] { --space-accent: light-dark(#1d6d38, #91d69b); }
+
+.noventra-space-badge[data-color='teal'] { --space-accent: light-dark(#006a6a, #80d5d1); }
+
+.noventra-space-badge[data-color='blue'] { --space-accent: light-dark(#2457a7, #adc7ff); }
+
+.noventra-space-badge[data-color='purple'] { --space-accent: light-dark(#7546a5, #dbb8ff); }
+
+.noventra-space-badge[data-color='pink'] { --space-accent: light-dark(#98436e, #ffb0d2); }
+
+@media (forced-colors: active) {
+  .noventra-space-badge[data-color] {
+    color: CanvasText;
+    background: Canvas;
+    border-color: CanvasText;
+  }
+}
+
+.customize-nav {
+  align-items: center;
+  background: var(--cr-card-background-color);
+  border-bottom: var(--cr-separator-line);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 8px var(--cr-section-padding);
+  position: sticky;
+  top: 0;
+  z-index: 3;
+}
+
+.customize-nav button {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--cr-secondary-text-color);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  min-height: 32px;
+  padding: 6px 10px;
+  position: relative;
+  transition: background-color 140ms ease, border-color 140ms ease;
+}
+
+.customize-nav button:hover {
+  background: var(--cr-hover-background-color);
+  border-color: transparent;
+}
+
+.customize-nav button:focus-visible,
+.space-details summary:focus-visible {
+  outline: 2px solid var(--cr-focus-outline-color);
+  outline-offset: 2px;
+}
+
+.customize-section {
+  scroll-margin-top: var(--noventra-section-scroll-margin, 72px);
+}
+
+.customize-heading {
+  padding: 20px var(--cr-section-padding) 10px;
+}
+
+.customize-heading h2,
+#noventraSpaces h2 {
+  font-size: 20px;
+  font-weight: 500;
+  margin: 0 0 6px;
+}
+
+.customize-heading p {
+  color: var(--cr-secondary-text-color);
+  font-size: 12px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.space-details {
+  color: var(--cr-secondary-text-color);
+  font-size: 12px;
+  line-height: 1.6;
+  padding: 8px var(--cr-section-padding) 20px;
+}
+
+.space-details summary {
+  cursor: pointer;
+  width: fit-content;
+}
+
+.space-details p {
+  margin: 10px 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .customize-nav button {
+    transition: none;
+  }
+}
+
+/* This page uses the outer Settings scroller for its sticky navigation. */
+settings-section {
+  --settings-card-overflow: visible;
+  --cr-section-vertical-margin: 12px;
+}
+
+/* The current section remains visible while clicking or scrolling. */
+.customize-nav button[aria-current='location'] {
+  background: var(--cr-hover-background-color);
+  color: var(--cr-primary-text-color);
+}
+
+/* Panels stay mounted so a layout draft survives section navigation. */
+.customize-nav[hidden],
+.customize-section[hidden] {
+  display: none;
+}
+
+.customize-section .cr-row {
+  min-height: 60px;
+}
+
+.customize-section select {
+  max-width: 100%;
+}
+
+@media (max-width: 560px) {
+  .customize-nav {
+    gap: 2px;
+    padding: 10px 12px;
+  }
+  .customize-nav button { flex: 1 0 40%; }
+  #noventraSpaces .noventra-space-row { flex-wrap: wrap; }
+  .noventra-space-input { width: 100%; }
+}
+
+.customize-section:focus {
+  outline: none;
+}
+
+#noventraCustomAppearance {
+  border-top: var(--cr-separator-line);
+  padding: 16px var(--cr-section-padding);
+}
+
+#noventraCustomAppearance > summary {
+  cursor: pointer;
+}
+
+#noventraCustomAppearance > fieldset {
+  padding-inline: 0;
+}
+
+#noventraCustomAppearance > #noventraColors {
+  padding-inline: 0;
+}
+
+.theme-presets {
+  grid-template-columns: repeat(auto-fit, minmax(min(132px, 100%), 1fr));
+}
+
+.theme-presets .appearance-preview {
+  height: 72px;
+}
+
+#noventraAppearancePresets:disabled .appearance-choice {
+  cursor: default;
+  opacity: .6;
+}
+
+/* Keep everyday controls visible and secondary choices within named groups. */
+.settings-options > summary,
+.settings-help > summary {
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.settings-options > summary:focus-visible,
+.settings-help > summary:focus-visible {
+  outline: 2px solid var(--cr-focus-outline-color);
+  outline-offset: 3px;
+}
+
+.settings-options > .cr-row,
+.settings-options > .list-frame {
+  padding-inline: 0;
+}
+
+#noventraAutoHide #noventraBarVisibility {
+  border-top: 0;
+  padding: 0;
+}
+
+.settings-help {
+  margin-top: 12px;
+}
+
+.settings-help p {
+  color: var(--cr-secondary-text-color);
+  line-height: 1.5;
+  margin-block: 10px;
+}
+
+.settings-group-heading {
+  font-size: 13px;
+  font-weight: 500;
+  margin: 0;
+  padding: 16px var(--cr-section-padding) 8px;
+}
+
+.settings-options .settings-group-heading {
+  padding-inline: 0;
+}
+
+.settings-options:not([open]) {
+  padding-block: 16px;
+}
+
+.settings-options + .settings-options {
+  border-top: var(--cr-separator-line);
+}

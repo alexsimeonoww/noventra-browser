@@ -1,0 +1,81 @@
+{
+  "sources": {
+    "noventra-favicon-dark.png": {
+      "sha256": "b297119cdff8ac10842930e4b7ad0c317c869976a63394705dc1fbe88d194e86",
+      "size": [
+        64,
+        64
+      ]
+    },
+    "noventra-favicon-light.png": {
+      "sha256": "6c5e66098cfe0e440dbadd1da613e1bc00aa1d6394b61bb6a6b2519d2bdb7ee2",
+      "size": [
+        64,
+        64
+      ]
+    },
+    "noventra-symbol.png": {
+      "sha256": "929313569f35f09def6057288492216f77750ae563243224c06e32f6edd2685f",
+      "size": [
+        1254,
+        1254
+      ]
+    }
+  },
+  "desktop_source": "approved/noventra-symbol.png",
+  "resampling": "Lanczos; approved glyph geometry retained without tracing or cropping",
+  "desktop_presentation": "Common/Linux app icons use a neutral rounded tile; Mac/Windows containers retain the approved transparent original",
+  "files": {
+    "app-icon-tile.png": "f25091e4a727956fa19f8d6769539e442551b8c660c4e609c84f43f0c226efcd",
+    "icon-1024.png": "f25091e4a727956fa19f8d6769539e442551b8c660c4e609c84f43f0c226efcd",
+    "icon-128.png": "177ef90a880d8f551aafda6c2251103a778d8207142a7d7c2b131fd7299302ac",
+    "icon-16.png": "234a414117f8c01de47ad16a51075657d8626f6047a6fd93ac59a8e81fdf3613",
+    "icon-24.png": "0d245e0624849fb9cb283c7465153c137b7a5a915de49bc4c0e1a023c0e0d93b",
+    "icon-256.png": "8cd3e32b9693551b82b794d84aade6af2ae7e76a49f27b9f3b73ec38f23cb161",
+    "icon-32.png": "0e93bc20b4adea32a39af16640728c1736c4d136974ddce933cde9290bf7ed57",
+    "icon-48.png": "db1b8a8df54f22a2e11a37698cd79a74391a73ec7c08f67528c6da6f85006b64",
+    "icon-512.png": "4359513148b771303ad92cc517a687c1d609e783ba35d486c27de9227a1755a6",
+    "icon-64.png": "d1223a8f4f7af23962e2664b6b0e2eedab1e239fa30f2ebb78f45087b53cd377",
+    "linux/hicolor/1024x1024/apps/noventra-browser.png": "f25091e4a727956fa19f8d6769539e442551b8c660c4e609c84f43f0c226efcd",
+    "linux/hicolor/128x128/apps/noventra-browser.png": "177ef90a880d8f551aafda6c2251103a778d8207142a7d7c2b131fd7299302ac",
+    "linux/hicolor/16x16/apps/noventra-browser.png": "234a414117f8c01de47ad16a51075657d8626f6047a6fd93ac59a8e81fdf3613",
+    "linux/hicolor/24x24/apps/noventra-browser.png": "0d245e0624849fb9cb283c7465153c137b7a5a915de49bc4c0e1a023c0e0d93b",
+    "linux/hicolor/256x256/apps/noventra-browser.png": "8cd3e32b9693551b82b794d84aade6af2ae7e76a49f27b9f3b73ec38f23cb161",
+    "linux/hicolor/32x32/apps/noventra-browser.png": "0e93bc20b4adea32a39af16640728c1736c4d136974ddce933cde9290bf7ed57",
+    "linux/hicolor/48x48/apps/noventra-browser.png": "db1b8a8df54f22a2e11a37698cd79a74391a73ec7c08f67528c6da6f85006b64",
+    "linux/hicolor/512x512/apps/noventra-browser.png": "4359513148b771303ad92cc517a687c1d609e783ba35d486c27de9227a1755a6",
+    "linux/hicolor/64x64/apps/noventra-browser.png": "d1223a8f4f7af23962e2664b6b0e2eedab1e239fa30f2ebb78f45087b53cd377",
+    "logo-dark-16.png": "3569b86087313a23e1dfe5e9f73607cc0a8ff6c62935dc50d0140f5f5d269760",
+    "logo-dark-22.png": "cb7646a3cc715710748ebe8c13e0e7245763b51c8e2232e55601f46296f68985",
+    "logo-dark-32.png": "739e4515ab986662161222f8123da0fff23bd7c583b394a517fdd24a9349b618",
+    "logo-dark-44.png": "1eb0b86dcd6670c6961451cfa6e885aadaa625f75f2381f59a5f34aa18062b1d",
+    "logo-dark-64.png": "b297119cdff8ac10842930e4b7ad0c317c869976a63394705dc1fbe88d194e86",
+    "logo-light-16.png": "4cde11e02ee19ff1679aee9c26d9e27c81916df7480a19753cb67f05d551528f",
+    "logo-light-22.png": "19f77efcf94e7d2fe84a62f9fe2f2cbecc511dd543248b42aaabea3831d9acec",
+    "logo-light-32.png": "77b2a06f2eb5f848902ac7f5a55a8142665eec20754d9c90d0f9009ceb0112db",
+    "logo-light-44.png": "51bc24d61f4848d686efa51d0952cd6a70a198a9a01ed0deaec8e1f70c85d43d",
+    "logo-light-64.png": "6c5e66098cfe0e440dbadd1da613e1bc00aa1d6394b61bb6a6b2519d2bdb7ee2",
+    "macos/Noventra.iconset/icon_128x128.png": "2ef39153d19ff0046d01546065e7e9e113292c8ea9e170ddd35ba57294805cab",
+    "macos/Noventra.iconset/icon_128x128@2x.png": "ab282c7220eaf363ddcf68b032349f558e812843134097ba74b267441f09b92a",
+    "macos/Noventra.iconset/icon_16x16.png": "223986e5339b39a707a1f0f394c9a6b423f01d46bbdf7e601f48f661e7f7b6dd",
+    "macos/Noventra.iconset/icon_16x16@2x.png": "dca9edf59092307a3d252a90115f43680bf5b255e949405553b910287e9e3ee3",
+    "macos/Noventra.iconset/icon_256x256.png": "ab282c7220eaf363ddcf68b032349f558e812843134097ba74b267441f09b92a",
+    "macos/Noventra.iconset/icon_256x256@2x.png": "175d8be2b55f05184d4c31305bec9e26b1b2883510f3bc2e9903d80e0acce113",
+    "macos/Noventra.iconset/icon_32x32.png": "dca9edf59092307a3d252a90115f43680bf5b255e949405553b910287e9e3ee3",
+    "macos/Noventra.iconset/icon_32x32@2x.png": "18e09cf587157edcf035515f9e19b8ec8433777615a1c92155247549d812eec5",
+    "macos/Noventra.iconset/icon_512x512.png": "175d8be2b55f05184d4c31305bec9e26b1b2883510f3bc2e9903d80e0acce113",
+    "macos/Noventra.iconset/icon_512x512@2x.png": "e29d6051218b8851c69789bb4f91fb5dfbc0ee9bc392fae3c3c5b844c34d07d9",
+    "macos/noventra.icns": "a14b0e1b40c5ade646da11c4b013dc99f56569adc5aa6b6bfce0bcf82bff5a36",
+    "mono-22.png": "19f77efcf94e7d2fe84a62f9fe2f2cbecc511dd543248b42aaabea3831d9acec",
+    "noventra_logo_data.h": "667a3972ab02b1e0c99ddc3826c4cf88a0c15d3557c18e11844d17c28f245112",
+    "windows/noventra.ico": "01a872022b0a2a77aef4076d1dcea4bd3dac42ee0ff5beced5fc07da363eeb89",
+    "wordmark-200.png": "89df11c60fa53166972a979d517ef3ff14a15c3c8bafa411249e9c477ae3b32c",
+    "wordmark-22.png": "19f77efcf94e7d2fe84a62f9fe2f2cbecc511dd543248b42aaabea3831d9acec",
+    "wordmark-44.png": "51bc24d61f4848d686efa51d0952cd6a70a198a9a01ed0deaec8e1f70c85d43d",
+    "wordmark-white-200.png": "c72473c0ac339792e73490221b9affb26f178f70a49d261c37af0ae79334653e",
+    "wordmark-white-22.png": "cb7646a3cc715710748ebe8c13e0e7245763b51c8e2232e55601f46296f68985",
+    "wordmark-white-44.png": "1eb0b86dcd6670c6961451cfa6e885aadaa625f75f2381f59a5f34aa18062b1d",
+    "wordmark-white.png": "739e4515ab986662161222f8123da0fff23bd7c583b394a517fdd24a9349b618",
+    "wordmark.png": "77b2a06f2eb5f848902ac7f5a55a8142665eec20754d9c90d0f9009ceb0112db"
+  }
+}

@@ -1,0 +1,571 @@
+--- a/chrome/browser/resources/settings/appearance_page/appearance_page.css
++++ b/chrome/browser/resources/settings/appearance_page/appearance_page.css
+@@ -524,6 +524,8 @@
+   display: flex;
+   flex-wrap: wrap;
+   gap: 8px;
++  max-width: 100%;
++  min-width: 0;
+ }
+ 
+ .noventra-space-badge svg {
+@@ -548,6 +550,10 @@
+   max-width: 100%;
+   min-width: 108px;
+   width: 128px;
++}
++
++.noventra-space-appearance .noventra-space-theme select {
++  width: 180px;
+ }
+ 
+ .noventra-space-badge[data-color]:not([data-color='default']) {
+--- a/chrome/browser/resources/settings/appearance_page/appearance_page.html.ts
++++ b/chrome/browser/resources/settings/appearance_page/appearance_page.html.ts
+@@ -526,14 +526,15 @@
+     <div id="noventraSpaces" aria-busy="${this.noventraSpacesPending_}">
+       <div class="customize-heading">
+         <h2 id="spacesHeading">Spaces</h2>
+-        <p>Each space has its own cookies, website logins and site storage.</p>
+-        <p>Drag the sidebar icons to reorder spaces, or use the arrows below. Names save when you finish editing. Colors and icons save immediately on this device.</p>
++        <p>A Space groups tabs and keeps its website accounts separate, with its own cookies, logins and site storage.</p>
++        <p>Drag the sidebar icons to reorder spaces, or use the arrows below. Names save when you finish editing. Colors, icons and themes save immediately on this device.</p>
++        <p id="noventraSpaceThemeHint">Use browser theme follows your main appearance settings. Choosing another theme applies it to this window while you use that Space. Theme changes affect browser controls, not websites.</p>
+       </div>
+       <div id="noventraSpacesVisibility" class="cr-row noventra-space-row"
+           data-state="${this.spaceSwitcherState_()}"
+           aria-busy="${this.noventraShowSpacesPending_}">
+         <div class="flex noventra-tool-field">
+-          <div>Workspace switcher</div>
++          <div>Space switcher</div>
+           <div id="noventraSpacesVisibilityHint" class="secondary">
+             ${this.spaceSwitcherDescription_()}
+           </div>
+@@ -583,6 +584,18 @@
+                 ${this.noventraSpaceIcons_.map(icon => html`<option value="${icon}" ?selected="${space.icon === icon}">${this.spaceChoiceLabel_(icon)}</option>`)}
+               </select>
+             </label>
++<if expr="not is_chromeos">
++            <label class="noventra-space-theme">Theme
++              <select class="md-select" data-space="${space.id}" data-appearance="theme"
++                  aria-label="Theme for ${space.name}" .value="${space.theme}"
++                  aria-describedby="noventraSpaceThemeHint"
++                  ?disabled="${this.noventraSpacesPending_ || !space.themeEditable}"
++                  @change="${this.onSpaceAppearanceChange_}">
++                <option value="browser" ?selected="${space.theme === 'browser'}">Use browser theme</option>
++                ${this.noventraAppearancePresets_.map(preset => html`<option value="${preset.id}" ?selected="${space.theme === preset.id}">${preset.name}</option>`)}
++              </select>
++            </label>
++</if>
+           </div>
+           <div class="noventra-space-actions">
+             <cr-button data-space="${space.id}" data-action="move-before"
+--- a/chrome/browser/resources/settings/appearance_page/appearance_page.ts
++++ b/chrome/browser/resources/settings/appearance_page/appearance_page.ts
+@@ -100,7 +100,8 @@
+ type NoventraSection = typeof NOVENTRA_SECTIONS[keyof typeof NOVENTRA_SECTIONS];
+ interface NoventraSpace {
+   id: string; name: string; archived: boolean;
+-  color: string; icon: string; appearanceEditable: boolean;
++  color: string; icon: string; theme: string;
++  appearanceEditable: boolean; themeEditable: boolean;
+ }
+ interface NoventraWorkspaceRoute {host: string; space_id: string;}
+ interface NoventraSyncStatus {
+@@ -1174,21 +1175,27 @@
+     const select = event.currentTarget as HTMLSelectElement;
+     const id = select.dataset['space'] || '';
+     const space = this.noventraSpaces_.find(item => item.id === id);
+-    if (!space || !space.appearanceEditable || this.noventraSpacesPending_) {
++    const field = select.dataset['appearance'];
++    if (!space || !space.appearanceEditable || this.noventraSpacesPending_ ||
++        (field !== 'color' && field !== 'icon' && field !== 'theme') ||
++        (field === 'theme' && !space.themeEditable)) {
+       return;
+     }
+-    const appearance = select.dataset['appearance'] === 'color' ?
+-        {color: select.value} : {icon: select.value};
++    // Send only the changed field. Native code merges it with the latest saved
++    // appearance, including edits made in another Settings window.
+     const saved = await this.updateSpaces_(
+-        'appearance', id, JSON.stringify(appearance));
++        'appearance', id, JSON.stringify({[field]: select.value}));
+     if (!this.isConnected) return;
+-    if (saved) this.noventraSpaceStatus_ = `Appearance saved for ${space.name}.`;
++    if (saved) {
++      this.noventraSpaceStatus_ = field === 'theme' ?
++          `Theme saved for ${space.name}. It applies when you use this space.` :
++          `Appearance saved for ${space.name}.`;
++    }
+     await this.updateComplete;
+     // A rejected native mutation must restore the displayed saved choice.
+     const current = this.noventraSpaces_.find(item => item.id === id);
+     if (current && select.isConnected) {
+-      select.value = select.dataset['appearance'] === 'color' ?
+-          current.color : current.icon;
++      select.value = current[field];
+       select.focus();
+     }
+   }
+--- a/chrome/browser/ui/browser_commands.cc
++++ b/chrome/browser/ui/browser_commands.cc
+@@ -51,6 +51,8 @@
+ #include "chrome/browser/prefs/incognito_mode_prefs.h"
+ #include "chrome/browser/profiles/noventra_account_spaces.h"
+ #include "chrome/browser/profiles/profile.h"
++#include "chrome/browser/themes/theme_service.h"
++#include "chrome/browser/themes/theme_service_factory.h"
+ #include "chrome/browser/reading_list/reading_list_model_factory.h"
+ #include "chrome/browser/resource_coordinator/tab_lifecycle_unit_external.h"
+ #include "chrome/browser/search/search.h"
+@@ -3215,6 +3217,18 @@
+ namespace noventra {
+ namespace {
+ 
++constexpr SpaceTheme kSpaceThemes[] = {
++    {"white-glass", false, true, 0},     {"black-glass", true, true, 0},
++    {"solid-white", false, false, 0},    {"solid-black", true, false, 0},
++    {"forest", true, false, 0xff397a58}, {"ocean", true, false, 0xff2563a8},
++    {"sand", false, false, 0xffb99a66},
++};
++
++const SpaceTheme* FindSpaceTheme(std::string_view id) {
++  const auto it = std::ranges::find(kSpaceThemes, id, &SpaceTheme::id);
++  return it == std::end(kSpaceThemes) ? nullptr : &*it;
++}
++
+ bool IsValidSpaceId(const std::string& id) {
+   return id.empty() || base::Uuid::ParseLowercase(id).is_valid();
+ }
+@@ -3308,6 +3322,51 @@
+   return true;
+ }
+ 
++bool CanCustomizeSpaceTheme(BrowserWindowInterface* browser) {
++  if (!browser || browser->GetType() != BrowserWindowInterface::TYPE_NORMAL) {
++    return false;
++  }
++  Profile* profile = browser->GetProfile();
++  if (!profile || profile->ShutdownStarted() || profile->IsOffTheRecord() ||
++      profile->IsGuestSession() || profile->IsEnterpriseIsolatedModeProfile() ||
++      !CanManageSpaces(profile)) {
++    return false;
++  }
++  const auto* prefs = profile->GetPrefs();
++  for (const char* name : {kSpaceAppearancePref, prefs::kBrowserColorScheme,
++                           prefs::kUserColor, prefs::kGrayscaleThemeEnabled,
++                           prefs::kBrowserColorVariant, prefs::kCurrentThemeID,
++#if BUILDFLAG(IS_LINUX)
++                           prefs::kSystemTheme,
++#endif
++                           "noventra.browser.glass_enabled"}) {
++    if (const auto* pref = prefs->FindPreference(name);
++        pref && !pref->IsUserModifiable()) {
++      return false;
++    }
++  }
++  const auto* themes = ThemeServiceFactory::GetForProfile(profile);
++  return themes && !themes->UsingPolicyTheme();
++}
++
++const SpaceTheme* GetSpaceTheme(BrowserWindowInterface* browser) {
++  if (!CanCustomizeSpaceTheme(browser)) {
++    return nullptr;
++  }
++  // Mirrored windows can have no local page, or a local active tab from another
++  // Space. The logical selection is authoritative. Never create a service while
++  // a color provider is being constructed or a window is shutting down.
++  std::string id;
++  if (auto* mirror =
++          WindowMirrorService::GetForProfileIfExisting(browser->GetProfile());
++      mirror && mirror->IsEnrolled(browser)) {
++    id = mirror->SelectedSpace(browser);
++  } else if (auto* model = browser->GetTabStripModel()) {
++    id = SpaceId(model->GetActiveWebContents());
++  }
++  return FindSpaceTheme(GetSpaceAppearance(browser->GetProfile(), id).theme);
++}
++
+ SpaceAppearance GetSpaceAppearance(Profile* profile, const std::string& id) {
+   SpaceAppearance result;
+   if (!profile || !IsValidSpaceId(id)) {
+@@ -3327,6 +3386,10 @@
+         icon && IsSpaceIcon(*icon)) {
+       result.icon = *icon;
+     }
++    if (const auto* theme = appearance->FindString("theme");
++        theme && FindSpaceTheme(*theme)) {
++      result.theme = *theme;
++    }
+   }
+   return result;
+ }
+@@ -3334,9 +3397,11 @@
+ bool SetSpaceAppearance(BrowserWindowInterface* browser,
+                         const std::string& id,
+                         const std::string& color,
+-                        const std::string& icon) {
++                        const std::string& icon,
++                        const std::string& theme) {
+   if (!browser || !CanManageSpaces(browser->GetProfile()) ||
+-      !IsValidSpaceId(id) || !IsSpaceColor(color) || !IsSpaceIcon(icon)) {
++      !IsValidSpaceId(id) || !IsSpaceColor(color) || !IsSpaceIcon(icon) ||
++      (theme != "browser" && !FindSpaceTheme(theme))) {
+     return false;
+   }
+   auto* prefs = browser->GetProfile()->GetPrefs();
+@@ -3348,11 +3413,22 @@
+   if (std::ranges::find(known, id) == known.end()) {
+     return false;
+   }
++  const auto current = GetSpaceAppearance(browser->GetProfile(), id);
++  if (theme != current.theme && !CanCustomizeSpaceTheme(browser)) {
++    return false;
++  }
+   ScopedDictPrefUpdate update(prefs, kSpaceAppearancePref);
+-  if (color == "default" && icon == "default") {
++  if (color == "default" && icon == "default" && theme == "browser") {
+     update->Remove(id);
+   } else {
+-    update->Set(id, base::DictValue().Set("color", color).Set("icon", icon));
++    base::DictValue entry;
++    entry.Set("color", color);
++    entry.Set("icon", icon);
++    // Keep inherited legacy entries byte-compatible with color/icon-only data.
++    if (theme != "browser") {
++      entry.Set("theme", theme);
++    }
++    update->Set(id, std::move(entry));
+   }
+   return true;
+ }
+--- a/chrome/browser/ui/noventra_commands.h
++++ b/chrome/browser/ui/noventra_commands.h
+@@ -13,7 +13,9 @@
+     "noventra.browser.link_preview_trigger";
+ inline constexpr char kNoventraLinkPreviewPinned[] =
+     "noventra.browser.link_preview_pinned";
++#include <cstdint>
+ #include <string>
++#include <string_view>
+ #include <vector>
+ class BrowserWindowInterface;
+ class Profile;
+@@ -43,12 +45,24 @@
+ struct SpaceAppearance {
+   std::string color = "default";
+   std::string icon = "default";
++  std::string theme = "browser";
+ };
++// Window-local preset values. A null effective theme inherits the profile
++// theme; switching Spaces never writes the profile ThemeService preferences.
++struct SpaceTheme {
++  std::string_view id;
++  bool dark;
++  bool glass;
++  uint32_t seed;  // Zero uses the grayscale palette.
++};
++bool CanCustomizeSpaceTheme(BrowserWindowInterface* browser);
++const SpaceTheme* GetSpaceTheme(BrowserWindowInterface* browser);
+ SpaceAppearance GetSpaceAppearance(Profile* profile, const std::string& id);
+ bool SetSpaceAppearance(BrowserWindowInterface* browser,
+                         const std::string& id,
+                         const std::string& color,
+-                        const std::string& icon);
++                        const std::string& icon,
++                        const std::string& theme);
+ // Creation requires a new lowercase UUID; rename/move/archive require an
+ // existing space. None of these operations change a tab's account partition.
+ bool SetSpaceName(BrowserWindowInterface* browser,
+--- a/chrome/browser/ui/views/frame/browser_view.cc
++++ b/chrome/browser/ui/views/frame/browser_view.cc
+@@ -1,6 +1,7 @@
+ #include "chrome/browser/lifetime/browser_shutdown.h"
+ #include "chrome/browser/ui/views/frame/noventra_window_mirror_view.h"
+ #include "chrome/browser/ui/noventra/window_mirror_service.h"
++#include "chrome/browser/ui/noventra_commands.h"
+ #include "chrome/browser/ui/views/frame/noventra_dock_controller.h"
+ #include "chrome/browser/ui/views/helium/native_frame_materials.h"
+ #include "ui/base/class_property.h"
+@@ -4391,6 +4392,7 @@
+   // can change its preferred size. Re-lay-out the toolbar to reflect the
+   // possible change.
+   if (selection.active_tab_changed()) {
++    RefreshNoventraSpaceTheme();
+     toolbar_->InvalidateLayout();
+ 
+     // Update the accessible URL when the selected tab changes. This ensures
+@@ -6193,6 +6195,35 @@
+         FROM_HERE, base::BindOnce(&BrowserView::RefreshNoventraGlassAppearance,
+                                   weak_ptr_factory_.GetWeakPtr()));
+   }
++}
++
++void BrowserView::RefreshNoventraSpaceTheme() {
++  if (!initialized_ || !GetWidget() || GetWidget()->IsClosed() ||
++      GetProfile()->ShutdownStarted() ||
++      noventra_space_theme_refresh_pending_) {
++    return;
++  }
++  noventra_space_theme_refresh_pending_ = true;
++  base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
++      FROM_HERE, base::BindOnce(
++                     [](base::WeakPtr<BrowserView> self) {
++                       if (!self) {
++                         return;
++                       }
++                       self->noventra_space_theme_refresh_pending_ = false;
++                       if (self->GetProfile()->ShutdownStarted()) {
++                         return;
++                       }
++                       const auto* theme =
++                           noventra::GetSpaceTheme(self->browser());
++                       const std::string id(theme ? theme->id : "");
++                       if (self->noventra_space_theme_ == id) {
++                         return;
++                       }
++                       self->noventra_space_theme_ = id;
++                       self->RefreshNoventraGlassAppearance();
++                     },
++                     weak_ptr_factory_.GetWeakPtr()));
+ }
+ 
+ void BrowserView::RefreshNoventraGlassAppearance() {
+--- a/chrome/browser/ui/views/frame/browser_view.h
++++ b/chrome/browser/ui/views/frame/browser_view.h
+@@ -171,6 +171,7 @@
+   bool noventra_desktop_glass_available() const;
+   void SetNoventraDesktopGlassAvailable(bool available);
+   void RefreshNoventraGlassAppearance();
++  void RefreshNoventraSpaceTheme();
+ 
+   // Unhide views::View::OnEvent (takes ui::Event*) which is shadowed by
+   // ui::EventObserver::OnEvent (takes const ui::Event&).
+@@ -1516,6 +1517,8 @@
+ 
+   std::unique_ptr<TabCyclingEventHandler> tab_cycling_event_handler_;
+ 
++  std::string noventra_space_theme_;
++  bool noventra_space_theme_refresh_pending_ = false;
+   std::unique_ptr<NoventraDockController> noventra_dock_controller_;
+   std::unique_ptr<NoventraWindowMirrorPresentation> noventra_window_mirror_;
+ 
+--- a/chrome/browser/ui/views/frame/browser_widget.cc
++++ b/chrome/browser/ui/views/frame/browser_widget.cc
+@@ -5,6 +5,7 @@
+ #include "chrome/browser/ui/views/frame/browser_widget.h"
+ 
+ #include <memory>
++#include <optional>
+ #include <utility>
+ 
+ #include "base/command_line.h"
+@@ -21,6 +22,7 @@
+ #include "chrome/browser/ui/browser_window/public/browser_window_features.h"
+ #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+ #include "chrome/browser/ui/browser_window_state.h"
++#include "chrome/browser/ui/noventra_commands.h"
+ #include "chrome/browser/ui/ui_features.h"
+ #include "chrome/browser/ui/immersive/immersive_mode_controller.h"
+ #include "chrome/browser/ui/sessions/session_service_browser_helper.h"
+@@ -342,7 +344,8 @@
+   // If there is a user color override (e.g., Focus Mode is active),
+   // fallback to the un-themed baseline provider so custom extension
+   // theme images are suppressed.
+-  if (user_color_override().has_value()) {
++  if (user_color_override().has_value() ||
++      noventra::GetSpaceTheme(browser_view_->browser())) {
+     Profile* profile = browser_view_->browser()->GetProfile();
+     return &ThemeServiceFactory::GetForProfile(profile)
+                 ->GetDefaultThemeProvider();
+@@ -370,7 +373,8 @@
+   // enterprise isolated mode browser, or if there is a user color override
+   // (e.g. Focus Mode).
+   if (IsIncognitoBrowser() || IsEnterpriseIsolatedModeBrowser() ||
+-      user_color_override().has_value()) {
++      user_color_override().has_value() ||
++      noventra::GetSpaceTheme(browser_view_->browser())) {
+     return nullptr;
+   }
+ 
+@@ -500,6 +504,25 @@
+   key = theme_service->GetColorProviderKey(key, profile);
+   key.custom_theme = GetCustomTheme();
+ 
++  const auto* space_theme = noventra::GetSpaceTheme(browser_view_->browser());
++  if (space_theme) {
++    key.color_mode = space_theme->dark
++                         ? ui::ColorProviderKey::ColorMode::kDark
++                         : ui::ColorProviderKey::ColorMode::kLight;
++    key.user_color = space_theme->seed
++                         ? std::make_optional<SkColor>(space_theme->seed)
++                         : std::nullopt;
++    key.user_color_source =
++        space_theme->seed ? ui::ColorProviderKey::UserColorSource::kAccent
++                          : ui::ColorProviderKey::UserColorSource::kGrayscale;
++    key.scheme_variant =
++        space_theme->seed ? std::make_optional(
++                                ui::ColorProviderKey::SchemeVariant::kTonalSpot)
++                          : std::nullopt;
++    key.custom_theme = nullptr;
++    key.system_theme = ui::SystemTheme::kDefault;
++  }
++
+   // Re-apply Widget overrides because GetColorProviderKey might have
+   // overwritten them.
+   if (color_mode_override().has_value()) {
+@@ -536,7 +559,8 @@
+ #endif
+ 
+   if (auto* const glass_frame_service = GlassFrameService::GetInstance()) {
+-    if (glass_frame_service->IsBrowserWindowEligible(
++    if ((!space_theme || space_theme->glass) &&
++        glass_frame_service->IsBrowserWindowEligible(
+             browser_view_->browser())) {
+       key.frame_style = ui::ColorProviderKey::FrameStyle::kGlass;
+     }
+--- a/chrome/browser/ui/views/frame/noventra_dock_controller.cc
++++ b/chrome/browser/ui/views/frame/noventra_dock_controller.cc
+@@ -10,6 +10,7 @@
+ #include "base/numerics/safe_conversions.h"
+ #include "base/task/single_thread_task_runner.h"
+ #include "chrome/browser/profiles/profile.h"
++#include "chrome/browser/profiles/noventra_account_spaces.h"
+ #include "chrome/browser/ui/layout_constants.h"
+ #include "chrome/browser/ui/omnibox/omnibox_popup_view.h"
+ #include "chrome/browser/ui/omnibox/omnibox_view.h"
+@@ -67,6 +68,10 @@
+       helium::kNoventraGlassEnabledPref,
+       base::BindRepeating(&NoventraDockController::RefreshGlassAppearance,
+                           base::Unretained(this)));
++  registrar_.Add(noventra::kSpaceAppearancePref,
++                 base::BindRepeating(&BrowserView::RefreshNoventraSpaceTheme,
++                                     browser.GetAsWeakPtr()));
++  browser.RefreshNoventraSpaceTheme();
+   using BatterySaver =
+       performance_manager::user_tuning::BatterySaverModeManager;
+   if (BatterySaver::HasInstance()) {
+--- a/chrome/browser/ui/views/frame/noventra_window_mirror_view.cc
++++ b/chrome/browser/ui/views/frame/noventra_window_mirror_view.cc
+@@ -582,6 +582,7 @@
+   }
+   void Refresh() {
+     refresh_pending_ = false;
++    view_->RefreshNoventraSpaceTheme();
+     auto* service = Service();
+     if (!service || !service->ObserveWindow(view_->browser()) || !Enabled()) {
+       RestoreNativeStrip();
+--- a/chrome/browser/ui/views/helium/native_frame_materials.cc
++++ b/chrome/browser/ui/views/helium/native_frame_materials.cc
+@@ -10,6 +10,7 @@
+ #include "chrome/browser/themes/theme_service_factory.h"
+ #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+ #include "chrome/browser/ui/color/chrome_color_id.h"
++#include "chrome/browser/ui/noventra_commands.h"
+ #include "chrome/browser/ui/views/frame/browser_view.h"
+ #include "components/prefs/pref_service.h"
+ #include "ui/color/color_provider.h"
+@@ -26,11 +27,20 @@
+     return false;
+   }
+   Profile* profile = browser_view->GetProfile();
+-  if (!profile || !profile->GetPrefs()->GetBoolean(kNoventraGlassEnabledPref)) {
++  if (!profile || profile->ShutdownStarted()) {
++    return false;
++  }
++  // Catalog lookup takes a mutable window identity; this query only reads its
++  // selected Space and appearance.
++  const auto* space_theme = noventra::GetSpaceTheme(
++      const_cast<BrowserWindowInterface*>(browser_view->browser()));
++  if (!(space_theme
++            ? space_theme->glass
++            : profile->GetPrefs()->GetBoolean(kNoventraGlassEnabledPref))) {
+     return false;
+   }
+   const auto* theme_service = ThemeServiceFactory::GetForProfile(profile);
+-  if (theme_service && theme_service->UsingExtensionTheme()) {
++  if (!space_theme && theme_service && theme_service->UsingExtensionTheme()) {
+     return false;
+   }
+   const auto* native_theme = browser_view->GetWidget()->GetNativeTheme();
+--- a/chrome/browser/ui/webui/settings/appearance_handler.cc
++++ b/chrome/browser/ui/webui/settings/appearance_handler.cc
+@@ -32,6 +32,7 @@
+ #include "chrome/browser/ui/webui/settings/appearance_handler.h"
+ #include "chrome/common/pref_names.h"
+ #include "components/prefs/pref_service.h"
++#include "components/themes/pref_names.h"
+ #include "content/public/browser/web_ui.h"
+ #include "extensions/common/extension.h"
+ #include "ui/actions/actions.h"
+@@ -62,6 +63,27 @@
+         base::BindRepeating(&AppearanceHandler::NotifyNoventraSpacesChanged,
+                             base::Unretained(this)));
+   }
++  // Refresh theme availability when policy or the browser-wide appearance
++  // changes while this Settings page stays open. Other Space choices remain.
++  for (const char* key : {
++           themes::kPolicyThemeColor,
++           prefs::kBrowserColorScheme,
++           prefs::kUserColor,
++           prefs::kGrayscaleThemeEnabled,
++           prefs::kBrowserColorVariant,
++           prefs::kCurrentThemeID,
++           "noventra.browser.glass_enabled",
++#if BUILDFLAG(IS_LINUX)
++           prefs::kSystemTheme,
++#endif
++       }) {
++    if (profile_->GetPrefs()->FindPreference(key)) {
++      layout_registrar_.Add(
++          key,
++          base::BindRepeating(&AppearanceHandler::NotifyNoventraSpacesChanged,
++                              base::Unretained(this)));
++    }
++  }
+   extension_observation_.Observe(extensions::ExtensionRegistry::Get(profile_));
+ }
+ void AppearanceHandler::OnJavascriptDisallowed() {
+@@ -333,16 +355,20 @@
+         name_or_target, base::JSON_PARSE_RFC);
+     const auto* color = appearance ? appearance->FindString("color") : nullptr;
+     const auto* icon = appearance ? appearance->FindString("icon") : nullptr;
++    const auto* theme = appearance ? appearance->FindString("theme") : nullptr;
+     // Merge a single changed field with the current native value. Another
+-    // Settings window may have changed the other field since this page read it.
++    // Settings window may have changed the other fields since this page read
++    // it.
+     const auto current = noventra::GetSpaceAppearance(profile_, id);
+-    if (!appearance || appearance->size() != 1 || (!color && !icon) ||
+-        !noventra::SetSpaceAppearance(browser, id,
+-                                      color ? *color : current.color,
+-                                      icon ? *icon : current.icon)) {
++    if (!appearance || appearance->size() != 1 || (!color && !icon && !theme) ||
++        (theme && !noventra::CanCustomizeSpaceTheme(browser)) ||
++        !noventra::SetSpaceAppearance(
++            browser, id, color ? *color : current.color,
++            icon ? *icon : current.icon, theme ? *theme : current.theme)) {
+       RejectJavascriptCallback(
+-          args[0], base::Value("Choose a supported color and icon for an "
+-                               "existing, unmanaged space."));
++          args[0], base::Value("Choose a supported color, icon or theme for an "
++                               "existing space. Managed appearance cannot be "
++                               "changed."));
+       return;
+     }
+   } else if (action == "switch") {
+@@ -369,9 +395,11 @@
+             .Set("archived", noventra::IsSpaceArchived(profile_, space_id))
+             .Set("color", appearance.color)
+             .Set("icon", appearance.icon)
+-            .Set("appearanceEditable",
+-                 noventra::CanManageSpaces(profile_) &&
+-                     !prefs->IsManagedPreference(noventra::kSpaceAppearancePref)));
++            .Set("theme", appearance.theme)
++            .Set("appearanceEditable", noventra::CanManageSpaces(profile_) &&
++                                           !prefs->IsManagedPreference(
++                                               noventra::kSpaceAppearancePref))
++            .Set("themeEditable", noventra::CanCustomizeSpaceTheme(browser)));
+   }
+   ResolveJavascriptCallback(args[0], spaces);
+   if (action == "switch") noventra::SwitchSpace(browser, id);

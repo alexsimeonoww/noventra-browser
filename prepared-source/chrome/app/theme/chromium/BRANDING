@@ -1,0 +1,10 @@
+COMPANY_FULLNAME=Noventra contributors
+COMPANY_SHORTNAME=Noventra
+PRODUCT_FULLNAME=Noventra
+PRODUCT_SHORTNAME=Noventra
+PRODUCT_INSTALLER_FULLNAME=Noventra Installer
+PRODUCT_INSTALLER_SHORTNAME=Noventra Installer
+COPYRIGHT=Copyright @LASTCHANGE_YEAR@ The Helium Authors. All rights reserved.
+MAC_BUNDLE_ID=local.noventra.browser
+MAC_CREATOR_CODE=Cr24
+MAC_TEAM_ID=

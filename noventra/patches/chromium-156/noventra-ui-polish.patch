@@ -1,0 +1,2084 @@
+diff --git a/chrome/browser/extensions/api/settings_private/prefs_util.cc b/chrome/browser/extensions/api/settings_private/prefs_util.cc
+index 0e9cfc5a580d1eac2c1e8ec3b16e52f7e42b1f1a..2a94beb094c18fa7c04acb5a4c357802b47a1d41 100644
+--- a/chrome/browser/extensions/api/settings_private/prefs_util.cc
++++ b/chrome/browser/extensions/api/settings_private/prefs_util.cc
+@@ -514,6 +514,8 @@ const PrefsUtil::TypedPrefMap& PrefsUtil::GetAllowlistedKeys() {
+       settings_api::PrefType::kBoolean;
+   (*s_allowlist)[::prefs::kNoventraChromeWebStoreDownloads] =
+       settings_api::PrefType::kBoolean;
++  (*s_allowlist)[::prefs::kNoventraDictionaryDownloads] =
++      settings_api::PrefType::kBoolean;
+   (*s_allowlist)[::prefs::kHeliumBangsEnabled] =
+       settings_api::PrefType::kBoolean;
+   (*s_allowlist)[::prefs::kHeliumSpellcheckEnabled] =
+diff --git a/chrome/browser/prefs/session_startup_pref.cc b/chrome/browser/prefs/session_startup_pref.cc
+index 0159cee9db245937c4c38ac58baa1d08e97713c0..33981359a86da0019e4f24811e50b012f5491499 100644
+--- a/chrome/browser/prefs/session_startup_pref.cc
++++ b/chrome/browser/prefs/session_startup_pref.cc
+@@ -8,11 +8,9 @@
+ 
+ #include <string>
+ 
+-#include "base/feature_list.h"
+ #include "base/values.h"
+ #include "build/build_config.h"
+ #include "chrome/browser/profiles/profile.h"
+-#include "chrome/browser/ui/ui_features.h"
+ #include "chrome/common/pref_names.h"
+ #include "components/pref_registry/pref_registry_syncable.h"
+ #include "components/prefs/pref_service.h"
+@@ -63,14 +61,10 @@ void SessionStartupPref::RegisterProfilePrefs(
+ 
+ // static
+ SessionStartupPref::Type SessionStartupPref::GetDefaultStartupType() {
+-#if BUILDFLAG(IS_CHROMEOS)
++#if BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_WIN) || BUILDFLAG(IS_LINUX) || \
++    BUILDFLAG(IS_MAC)
+   return SessionStartupPref::LAST;
+ #else
+-#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC)
+-  if (features::kSetDefaultToContinueSession.Get()) {
+-    return SessionStartupPref::LAST;
+-  }
+-#endif
+   return SessionStartupPref::DEFAULT;
+ #endif
+ }
+diff --git a/chrome/browser/resources/settings/appearance_page/appearance_page.ts b/chrome/browser/resources/settings/appearance_page/appearance_page.ts
+index 268314010f1d129f4c73bbca0a1e87745915f920..80b246c35eacff81517fcf56f61c4ff9ddf91e73 100644
+--- a/chrome/browser/resources/settings/appearance_page/appearance_page.ts
++++ b/chrome/browser/resources/settings/appearance_page/appearance_page.ts
+@@ -745,7 +745,7 @@ export class SettingsAppearancePageElement extends
+     if (this.noventraSyncBusy_ || !this.noventraSyncAvailable_) return;
+     if (this.noventraSyncMode_ === 'join' &&
+         hasPendingLayoutChanges()) {
+-      this.noventraSyncError_ = 'Apply or discard your layout draft before joining a vault.';
++      this.noventraSyncError_ = 'Wait for layout changes to save, or resolve the Layout error before joining a vault.';
+       this.workspaceSyncErrorAt_ = null;
+       return;
+     }
+@@ -771,7 +771,7 @@ export class SettingsAppearancePageElement extends
+ 
+   protected onResolveWorkspaceSyncClick_(event: Event) {
+     if (hasPendingLayoutChanges()) {
+-      this.noventraSyncError_ = 'Apply or discard your layout draft before resolving a sync conflict.';
++      this.noventraSyncError_ = 'Wait for layout changes to save, or resolve the Layout error before resolving a sync conflict.';
+       this.workspaceSyncErrorAt_ = null;
+       return;
+     }
+@@ -958,7 +958,7 @@ export class SettingsAppearancePageElement extends
+     ++this.workspaceImportGeneration_;
+     if (this.noventraImportLayout_ &&
+         hasPendingLayoutChanges()) {
+-      this.noventraToolsError_ = 'Apply or discard your layout draft before importing a layout, or uncheck Include layout.';
++      this.noventraToolsError_ = 'Wait for layout changes to save, or resolve the Layout error before importing a layout. You can also uncheck Include layout.';
+       return;
+     }
+     this.noventraToolsPending_ = true;
+@@ -1125,7 +1125,7 @@ export class SettingsAppearancePageElement extends
+     if (updateRoute && router.getCurrentRoute() === routes.APPEARANCE) {
+       const params = router.getQueryParameters();
+       params.set('section', entry[0]);
+-      // Changing a section is not leaving Settings or committing a draft.
++      // Changing a section stays inside Settings while layout saves finish.
+       router.updateRouteParams(params);
+     }
+     await this.updateComplete;
+@@ -1359,7 +1359,7 @@ export class SettingsAppearancePageElement extends
+       case 'loading':
+         return 'Loading saved layout…';
+       case 'hidden':
+-        return 'Hidden in the saved layout. Add it to your draft, then choose Apply layout.';
++        return 'Hidden in the saved layout. Show it in the sidebar from Layout.';
+       case 'left':
+         return 'Shown at the bottom of the left sidebar.';
+       case 'right':
+@@ -1390,7 +1390,7 @@ export class SettingsAppearancePageElement extends
+     } catch {
+       if (this.isConnected) {
+         this.noventraSpacesVisibilityError_ =
+-            'Could not prepare the workspace switcher. Your saved layout is unchanged.';
++            'Could not save the workspace switcher. Open Layout to resolve the error.';
+         await this.selectNoventraSection_('customizeSpaces');
+       }
+     } finally {
+diff --git a/chrome/browser/resources/settings/appearance_page/noventra_layout_editor.html.ts b/chrome/browser/resources/settings/appearance_page/noventra_layout_editor.html.ts
+index 3be3c91d149876462f905624bbee6defac47a6d0..94250e1e8ddf83d2616c67ab27f42ffd2051a60b 100644
+--- a/chrome/browser/resources/settings/appearance_page/noventra_layout_editor.html.ts
++++ b/chrome/browser/resources/settings/appearance_page/noventra_layout_editor.html.ts
+@@ -5,13 +5,13 @@ import type {NoventraLayoutEditorElement} from './noventra_layout_editor.js';
+ export function getHtml(this: NoventraLayoutEditorElement) {
+   return html`
+     <div class="editor-heading"><div><h2>Layout</h2>
+-      <p class="muted">Layout changes stay in your draft until Apply, even when you switch sections.</p></div>
+-      <span class="draft-badge" ?data-dirty="${this.dirty()}">${this.dirty() ? 'Unapplied changes' : 'Layout saved'}</span>
++      <p class="muted">Changes save immediately. Choose a starting layout or arrange individual controls.</p></div>
++      <span class="draft-badge" ?data-dirty="${this.dirty()}">${this.savingStatus()}</span>
+     </div>
+     ${!this.draft ? html`<p role="status">${this.message || 'Loading your layout…'}</p>` : html`
+       ${this.managed() ? html`<p class="notice">Your organization controls this layout.</p>` : ''}
+       <div class="presets" aria-label="Layout presets">
+-        ${this.presetNames().map(name => html`<button data-preset="${name}" ?disabled="${this.managed() || this.applying}"
++        ${this.presetNames().map(name => html`<button data-preset="${name}" ?disabled="${this.controlsDisabled()}"
+             aria-pressed="${this.presetMatches(name)}" title="${this.presetDescription(name)}"
+             aria-label="${this.presetLabel(name)}. ${this.presetDescription(name)}" @click="${this.onPresetClick}">
+           <span class="preset-preview" data-layout="${name}" aria-hidden="true"><span></span><span></span></span>
+@@ -39,11 +39,11 @@ export function getHtml(this: NoventraLayoutEditorElement) {
+                   aria-label="Place ${this.label(control.id)} on ${this.edgeLabel(edge)}">${({top:'Top',left:'Left',right:'Right'})[edge]}</button>`)}
+             </div>
+           </div>`)}
+-        <p class="position-hint" id="positionHint">These choices move only the selected control. Use Navigation controls to move the toolbar together. Apply layout when ready.</p>
++        <p class="position-hint" id="positionHint">These choices move only the selected control. Use Navigation controls to move the toolbar together. Every choice saves automatically.</p>
+       </div>
+       <details id="individualControls" ?open="${this.searchMode || this.filter.length > 0}">
+       <summary>Arrange individual controls</summary>
+-      <div class="preview-heading"><div><h3>Your browser layout</h3><p class="muted" id="previewHelp">Click a control to select it. Drag it to move.</p></div><span class="preview-mode">${this.dirty() ? 'Draft preview' : 'Saved layout'}</span></div>
++      <div class="preview-heading"><div><h3>Your browser layout</h3><p class="muted" id="previewHelp">Click a control to select it. Drag it to move.</p></div><span class="preview-mode">${this.applying || this.dirty() ? 'Saving changes…' : 'Current layout'}</span></div>
+       <div class="preview-frame">
+       <div class="canvas" aria-label="Browser layout preview" aria-describedby="previewHelp" ?data-dragging="${!!this.dragGhost}"
+           ?data-comfortable="${this.tabDensity === 1}"
+@@ -60,7 +60,7 @@ export function getHtml(this: NoventraLayoutEditorElement) {
+               ${group.items.map(item => html`
+               <div class="${item.id === 'address' && edge === 'top' ? 'address-slot' : 'control-slot'}"><button class="chip" data-control="${item.id}" ?data-region="${this.isRegion(item.id)}"
+         aria-label="${this.label(item.id)}" aria-pressed="${this.selected === item.id}"
+-        draggable="false" @pointerdown="${this.onControlPointerdown}" ?disabled="${this.applying}"
++        draggable="false" @pointerdown="${this.onControlPointerdown}" ?disabled="${this.controlsDisabled()}"
+         ?data-before="${this.dropTarget?.before === item.id}" ?data-dragging="${this.dragGhost?.id === item.id}"
+         title="${this.label(item.id)} — drag to move or click for options"
+         @click="${this.onSelectClick}" @keydown="${this.onChipKeydown}">
+@@ -87,7 +87,7 @@ export function getHtml(this: NoventraLayoutEditorElement) {
+                 ${this.footerItems(edge).map(item => html`
+                   <button class="chip" data-control="${item.id}" ?data-region="${this.isRegion(item.id)}"
+                       aria-label="${this.label(item.id)}" aria-pressed="${this.selected === item.id}"
+-                      draggable="false" @pointerdown="${this.onControlPointerdown}" ?disabled="${this.applying}"
++                      draggable="false" @pointerdown="${this.onControlPointerdown}" ?disabled="${this.controlsDisabled()}"
+                       ?data-before="${this.dropTarget?.before === item.id}"
+                       ?data-dragging="${this.dragGhost?.id === item.id}"
+                       title="${this.label(item.id)} — drag to move or click for options"
+@@ -128,7 +128,7 @@ export function getHtml(this: NoventraLayoutEditorElement) {
+               <button @click="${this.onMoveEarlierClick}" ?disabled="${!this.canReorder(-1)}" aria-label="Move ${this.label(item.id)} earlier">← Earlier</button>
+               <button @click="${this.onMoveLaterClick}" ?disabled="${!this.canReorder(1)}" aria-label="Move ${this.label(item.id)} later">Later →</button>
+             </div>` : ''}
+-            <button id="hideControl" ?disabled="${this.managed() || this.applying || !item.visible || !cap.hideable || cap.requiredVisibility === true}"
++            <button id="hideControl" ?disabled="${this.controlsDisabled() || !item.visible || !cap.hideable || cap.requiredVisibility === true}"
+                 @click="${this.onHideClick}">Hide control</button>
+           </div>
+           ${cap.requiredVisibility !== undefined ? html`<p class="restriction">Visibility is managed by your organization.</p>` : ''}
+@@ -136,7 +136,7 @@ export function getHtml(this: NoventraLayoutEditorElement) {
+           ${cap.members?.length ? html`<p class="restriction">Installed: ${cap.members.map(member => member.label).join(', ')}</p>` : ''}
+         </section>`)}
+       </div>
+-      <p class="preview-note muted">Example tabs and page content. Your open tabs stay as they are when you apply.</p>
++      <p class="preview-note muted">Example tabs and page content. Layout changes keep your open tabs.</p>
+       ${this.items('left').some(item => item.id === 'tabs') || this.items('right').some(item => item.id === 'tabs') ? html`
+         <p class="preview-note muted">Sidebar presets hide the address row. Press Ctrl+L to edit in the centered address bar. New Tab follows the tabs. Bookmarks, workspace dots and Menu share one bottom row, and stack in the icon rail. Resize the sidebar from 144 to 320 pixels, or collapse it to a 48-pixel icon rail. Custom arrangements keep their control order.</p>` : ''}
+       <section class="tray" aria-label="Available controls" ?data-over="${this.dropTarget?.edge === 'tray'}">
+@@ -149,7 +149,7 @@ export function getHtml(this: NoventraLayoutEditorElement) {
+             <h4>${group.label}</h4>
+             <div class="chips">${group.items.map(item => html`
+     <button class="chip" data-control="${item.id}" ?data-region="${this.isRegion(item.id)}" aria-label="${this.label(item.id)}" aria-pressed="${this.selected === item.id}"
+-        draggable="false" @pointerdown="${this.onControlPointerdown}" ?disabled="${this.applying}"
++        draggable="false" @pointerdown="${this.onControlPointerdown}" ?disabled="${this.controlsDisabled()}"
+         ?data-before="${this.dropTarget?.before === item.id}" ?data-dragging="${this.dragGhost?.id === item.id}"
+         title="${this.label(item.id)} — drag into the preview or click to choose a position"
+         @click="${this.onSelectClick}" @keydown="${this.onChipKeydown}">
+@@ -166,25 +166,25 @@ export function getHtml(this: NoventraLayoutEditorElement) {
+       </details>
+       <div class="footer">
+         <div class="footer-actions">
+-          <button id="undoLayout" ?disabled="${this.managed() || this.applying || !this.draft.undo.length}" @click="${this.onUndoClick}">Undo</button>
+-          <button id="redoLayout" ?disabled="${this.managed() || this.applying || !this.draft.redo.length}" @click="${this.onRedoClick}">Redo</button>
+-          <button id="resetLayout" ?disabled="${this.managed() || this.applying}" @click="${this.onResetClick}" title="Restore the default left sidebar in this draft. Appearance and Spaces are kept.">Reset layout</button>
++          <button id="undoLayout" ?disabled="${this.controlsDisabled() || !this.draft.undo.length}" @click="${this.onUndoClick}">Undo</button>
++          <button id="redoLayout" ?disabled="${this.controlsDisabled() || !this.draft.redo.length}" @click="${this.onRedoClick}">Redo</button>
++          <button id="resetLayout" ?disabled="${this.controlsDisabled()}" @click="${this.onResetClick}" title="Restore the default left sidebar. Appearance and Spaces are kept.">Reset layout</button>
+           <span class="spacer"></span>
+-          <button id="cancelLayout" ?disabled="${this.applying || (!this.dirty() && !this.conflict)}" @click="${this.onCancelClick}">${this.conflict ? 'Reload saved' : 'Discard layout changes'}</button>
+-          <button id="applyLayout" class="primary" ?disabled="${this.managed() || this.applying || !this.dirty() || this.conflict}" @click="${this.onApplyClick}">${this.applying ? 'Applying…' : 'Apply layout'}</button>
++          ${this.conflict || this.saveFailed ? html`<button id="reloadLayout" ?disabled="${this.applying || this.reloading}" @click="${this.onReloadCurrentClick}">${this.reloading ? 'Loading…' : 'Reload current layout'}</button>` : ''}
++          ${this.saveFailed && !this.conflict && this.dirty() ? html`<button id="retryLayoutSave" class="primary" ?disabled="${this.applying || this.managed()}" @click="${this.onRetrySaveClick}">Retry saving</button>` : ''}
+         </div>
+-        <p class="status" role="status" aria-live="polite">${this.message || 'The preview is a draft. Your browser changes when you apply the layout.'}</p>
++        <p class="status" role="status" aria-live="polite">${this.message || 'Changes save automatically.'}</p>
+       </div>
+     `}
+     ${this.dragGhost ? html`<div class="drag-ghost" aria-hidden="true" style="left:${this.dragGhost.x}px;top:${this.dragGhost.y}px">
+       <svg class="control-icon" viewBox="0 0 24 24"><path d="${this.iconPath(this.dragGhost.id)}"></path></svg>${this.label(this.dragGhost.id)}
+     </div>` : ''}
+     <dialog aria-labelledby="leaveTitle" @cancel="${this.onDialogCancel}">
+-      <h2 id="leaveTitle">Leave without applying?</h2>
+-      <p class="muted">Your layout changes are still a draft. Keep editing or discard them before leaving.</p>
++      <h2 id="leaveTitle">Leave without saving?</h2>
++      <p class="muted">Your latest layout choice could not be saved. Stay here to resolve the error, or leave using the last saved layout.</p>
+       <div class="dialog-actions">
+-        <button id="keepEditing" autofocus @click="${this.onKeepEditingClick}">Keep editing</button>
+-        <button id="discardChanges" @click="${this.onDiscardAndLeaveClick}">Discard changes</button>
++        <button id="keepEditing" autofocus @click="${this.onKeepEditingClick}">Stay here</button>
++        <button id="discardChanges" @click="${this.onDiscardAndLeaveClick}">Leave without saving</button>
+       </div>
+     </dialog>`;
+ }
+diff --git a/chrome/browser/resources/settings/appearance_page/noventra_layout_editor.ts b/chrome/browser/resources/settings/appearance_page/noventra_layout_editor.ts
+index 233139fee5a3f39f10895c88acd4b9cadaa70d79..2f62103d4a14ad3b4228af19966ed04742cf6b4e 100644
+--- a/chrome/browser/resources/settings/appearance_page/noventra_layout_editor.ts
++++ b/chrome/browser/resources/settings/appearance_page/noventra_layout_editor.ts
+@@ -4,7 +4,7 @@ import {addWebUiListener, removeWebUiListener, sendWithPromise} from 'chrome://r
+ import type {WebUiListener} from 'chrome://resources/js/cr.js';
+ import type {CSSResultGroup} from 'chrome://resources/lit/v3_0/lit.rollup.js';
+ import {CrLitElement, css} from 'chrome://resources/lit/v3_0/lit.rollup.js';
+-import {canPlaceNavigation, createDraft, dropBefore, EDGES, isDirty, keyboardEdge, navigationEdge, navigationMatches, reduceDraft, reconcileDraft, visibleItems, workspacePreset} from './noventra_layout_model.js';
++import {acknowledgeSave, canPlaceNavigation, createDraft, dropBefore, EDGES, isDirty, keyboardEdge, navigationEdge, navigationMatches, reduceDraft, reconcileDraft, visibleItems, workspacePreset} from './noventra_layout_model.js';
+ import type {BrowserLayout, DockEdge, DraftAction, LayoutCapability, LayoutDraft, LayoutItem, NavigationPlacement} from './noventra_layout_model.js';
+ import {getHtml} from './noventra_layout_editor.html.js';
+ interface LayoutState {
+@@ -26,6 +26,10 @@ export class NoventraLayoutEditorElement extends CrLitElement {
+       .guide {display:flex;gap:16px;flex-wrap:wrap;padding:0;list-style:none;counter-reset:steps;margin:18px 0;color:var(--cr-secondary-text-color);font-size:12px}.guide li {counter-increment:steps;display:flex;align-items:center;gap:7px}.guide li::before {content:counter(steps);display:grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--cr-hover-background-color);font-size:11px}
+       .presets {display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin:0 0 24px}.presets button {display:flex;flex-direction:column;gap:5px;align-items:start;text-align:start;min-width:0;padding:10px;font-size:12px}.presets button[aria-pressed=true] {border-color:color-mix(in srgb,var(--cr-primary-text-color) 55%,transparent);background:color-mix(in srgb,var(--cr-primary-text-color) 7%,transparent)}.preset-description {font-size:11px;color:var(--cr-secondary-text-color);line-height:1.4}.preset-name {font-weight:500}
+       .preset-preview {width:48px;height:32px;background:var(--cr-hover-background-color);border:1px solid var(--line);border-radius:4px;position:relative;margin-bottom:3px}.preset-preview span:first-child {position:absolute;inset:3px auto 3px 3px;width:10px;border-radius:2px;background:var(--cr-primary-text-color);opacity:.3}.preset-preview span:last-child {position:absolute;inset:8px 5px auto 18px;height:2px;background:var(--line);border-radius:2px}.preset-preview[data-layout=minimal-right] span:first-child {inset:3px 3px 3px auto}.preset-preview[data-layout=minimal-right] span:last-child {inset:8px 18px auto 5px}.preset-preview[data-layout=classic-top] span:first-child {inset:3px 3px auto;width:auto;height:6px}
++      .preset-preview[data-layout=classic-top] span:first-child {inset:3px 3px auto;width:auto;height:4px}
++      .preset-preview[data-layout=classic-top] span:last-child {inset:11px 3px auto;width:auto;height:3px}
++      .preset-preview[data-layout=compact-top] span:first-child {inset:3px 3px auto;width:auto;height:6px}
++      .preset-preview[data-layout=compact-top] span:last-child {display:none}
+       .preview-heading {display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+       .position-controls {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:18px}.position-control {min-width:0;padding:12px;border:1px solid var(--line);border-radius:8px}.position-label {display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:9px}.position-hidden {font-size:11px;color:var(--cr-secondary-text-color)}.position-options {display:flex;gap:4px}.position-options button {flex:1;min-width:0;padding:6px 7px;font-size:11px;min-height:32px}.position-options [aria-pressed=true] {border-color:var(--accent);color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,var(--cr-card-background-color))}.position-hint {grid-column:1/-1;font-size:11px;color:var(--cr-secondary-text-color)}
+       .library-options {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:18px}.library-option {display:flex;align-items:center;gap:10px;padding:12px;border:1px solid var(--line);border-radius:8px;min-width:0}.library-option>div {flex:1;min-width:0}.library-option p {font-size:11px;color:var(--cr-secondary-text-color);margin-top:4px}.library-option button {flex:none;font-size:11px;padding:6px 9px}.library-option [aria-pressed=true] {color:var(--accent);border-color:var(--accent)}
+@@ -187,7 +191,7 @@ export class NoventraLayoutEditorElement extends CrLitElement {
+     `;
+   }
+   override render() { return getHtml.call(this); }
+-  presetNames(): string[] { return ['minimal-left', 'minimal-right', 'sidebar-top', 'classic-top'].filter(name => !!this.presets[name]); }
++  presetNames(): string[] { return ['minimal-left', 'minimal-right', 'sidebar-top', 'classic-top', 'compact-top'].filter(name => !!this.presets[name]); }
+   edges(): DockEdge[] { return EDGES; }
+   previewSideSize(edge: DockEdge): string {
+     const items = this.items(edge);
+@@ -210,7 +214,14 @@ export class NoventraLayoutEditorElement extends CrLitElement {
+     const side = edge === 'left' || edge === 'right';
+     const footer = new Set(this.footerItems(edge).map(item => item.id));
+     const items = this.items(edge).filter(item => !footer.has(item.id));
+-    if (!side) return [{items, tabs: false, last: true}];
++    if (!side) {
++      const firstNavigation = items.findIndex(item => ['back', 'forward', 'reload', 'address'].includes(item.id));
++      if (items[0]?.id === 'tabs' && firstNavigation > 0) {
++        return [{items: items.slice(0, firstNavigation), tabs: true, last: false},
++          {items: items.slice(firstNavigation), tabs: false, last: true}];
++      }
++      return [{items, tabs: false, last: true}];
++    }
+     const tabs = items.findIndex(item => item.id === 'tabs');
+     const address = this.draft?.current.items.find(
+         item => item.id === 'address' && item.edge === edge);
+@@ -252,25 +263,23 @@ export class NoventraLayoutEditorElement extends CrLitElement {
+     if (!this.draft || !spaces || !this.capabilities.some(cap => cap.id === 'spaces')) {
+       throw new Error('The workspace switcher is not available yet. Wait for the layout to load or reload saved changes.');
+     }
+-    if (this.applying) {
+-      this.message = 'Wait for the current layout change to finish.';
+-      return;
+-    }
+     this.selected = 'spaces';
+     const tabs = this.draft.current.items.find(item => item.id === 'tabs' && item.visible);
+     const edge = tabs && (tabs.edge === 'left' || tabs.edge === 'right') ? tabs.edge :
+         spaces.edge === 'right' ? 'right' : 'left';
+     if (this.conflict) {
+-      this.message = 'The saved layout changed. Your draft is kept here. Reload saved before adding Spaces.';
++      this.message = 'The saved layout changed. Reload the current layout before showing Spaces.';
+     } else if (!this.canPlaceControl('spaces', edge)) {
+       this.message = 'Your organization controls the workspace switcher. Its placement is unchanged.';
+     } else {
+       this.act({kind: 'move', id: 'spaces', edge});
+       const revealed = this.draft.current.items.find(item => item.id === 'spaces');
+       if (revealed?.visible && revealed.edge === edge) {
+-        this.message = this.dirty() ?
+-            'Workspace switcher is in your draft. Apply layout to show it in the sidebar.' :
+-            'The workspace switcher is already visible in the saved layout.';
++        await this.whenSaved();
++        if (this.dirty() || this.conflict || this.saveFailed) {
++          throw new Error('The workspace switcher could not be saved. Resolve the layout error and try again.');
++        }
++        this.message = 'The workspace switcher is visible in the sidebar.';
+       }
+     }
+     await this.updateComplete;
+@@ -323,7 +332,7 @@ export class NoventraLayoutEditorElement extends CrLitElement {
+   }
+   onChipKeydown(event: KeyboardEvent) { this.chipKey(event, this.controlId(event)); }
+   onControlPointerdown(event: PointerEvent) {
+-    if (event.button !== 0 || this.managed() || this.applying) return;
++    if (event.button !== 0 || this.controlsDisabled()) return;
+     this.selected = this.controlId(event);
+     (event.currentTarget as HTMLElement).focus({preventScroll: true});
+     this.pointer_ = {id: event.pointerId, control: this.selected, x: event.clientX, y: event.clientY,
+@@ -339,7 +348,7 @@ export class NoventraLayoutEditorElement extends CrLitElement {
+   }
+   canPlaceControl(id: string, edge: DockEdge): boolean {
+     const cap = this.capabilities.find(c => c.id === id);
+-    return !!cap && !this.managed() && !this.applying &&
++    return !!cap && !this.controlsDisabled() &&
+         cap.requiredVisibility !== false && EDGES.includes(edge) && cap.edges.includes(edge);
+   }
+   positionItem(id: string): LayoutItem|undefined {
+@@ -347,7 +356,7 @@ export class NoventraLayoutEditorElement extends CrLitElement {
+   }
+   navigationChoices(): NavigationPlacement[] { return ['top', 'sidebar']; }
+   canPlaceNavigation(placement: NavigationPlacement): boolean {
+-    return !!this.draft && !this.applying && canPlaceNavigation(this.draft.current, this.capabilities, placement);
++    return !!this.draft && !this.controlsDisabled() && canPlaceNavigation(this.draft.current, this.capabilities, placement);
+   }
+   navigationMatches(placement: NavigationPlacement): boolean {
+     return !!this.draft && navigationMatches(this.draft.current, placement);
+@@ -381,7 +390,7 @@ export class NoventraLayoutEditorElement extends CrLitElement {
+   }
+   canReorder(offset: number): boolean {
+     const item = this.selectedItem();
+-    if (!item?.visible || this.managed() || this.applying) return false;
++    if (!item?.visible || this.controlsDisabled()) return false;
+     const peers = this.reorderPeers(item);
+     const index = peers.findIndex(i => i.id === item.id) + offset;
+     return index >= 0 && index < peers.length;
+@@ -394,11 +403,12 @@ export class NoventraLayoutEditorElement extends CrLitElement {
+   onMoveLaterClick() { this.reorder(1); }
+   presetLabel(name: string): string {
+     return ({workspace: 'Workspace', 'sidebar-top': 'Sidebar & top bar', 'minimal-left': 'Left sidebar', 'minimal-right': 'Right sidebar',
+-      'classic-top': 'Compact top'} as Record<string, string>)[name] || name;
++      'classic-top': 'Normal browser', 'compact-top': 'Compact top'} as Record<string, string>)[name] || name;
+   }
+   presetDescription(name: string): string {
+     return ({workspace: 'Tabs and quick bookmarks; address entry on demand', 'sidebar-top': 'Bookmarks & tabs beside your page', 'minimal-left': 'Pinned sites and tabs, with New Tab below', 'minimal-right': 'The same sidebar controls on the right',
+-      'classic-top': 'One compact row for tabs, address and controls; no sidebar'} as Record<string, string>)[name] || '';
++      'classic-top': 'Tabs above a separate address and navigation toolbar',
++      'compact-top': 'Navigation, address and tabs in one compact row'} as Record<string, string>)[name] || '';
+   }
+   presetMatches(name: string): boolean {
+     const preset = this.presets[name];
+@@ -411,7 +421,7 @@ export class NoventraLayoutEditorElement extends CrLitElement {
+              address:
+                  'Search the web or enter a website address. Sidebar presets hide this row; press Ctrl+L for centered editing or add the address row to your layout.',
+              tabs:
+-                 'Your open pages and pinned site cards. A combined sidebar uses compact rows with New Tab below them. Workspace dots remain at the bottom; other arrangements keep their control order. Top tabs share the toolbar when there is room.',
++                 'Your open pages and pinned site cards. A combined sidebar uses compact rows with New Tab below them. Workspace dots remain at the bottom; other arrangements keep their control order. Normal browser puts top tabs above the toolbar; Compact top shares one row.',
+              bookmarks:
+                  'An optional section for saved pages and expandable folders. The sidebar presets use the searchable Bookmarks popup instead.',
+              spaces:
+@@ -470,8 +480,8 @@ export class NoventraLayoutEditorElement extends CrLitElement {
+   onDialogCancel(event: Event) { event.preventDefault(); this.onKeepEditingClick(); }
+   static override get properties() {
+     return {draft: {type: Object}, capabilities: {type: Array}, presets: {type: Object},
+-      selected: {type: String}, message: {type: String}, conflict: {type: Boolean},
+-      applying: {type: Boolean}, pendingNavigation: {type: Object}, dropTarget: {type: Object},
++      selected: {type: String}, message: {type: String}, conflict: {type: Boolean}, saveFailed: {type: Boolean},
++      applying: {type: Boolean}, reloading: {type: Boolean}, pendingNavigation: {type: Object}, dropTarget: {type: Object},
+       dragGhost: {type: Object}, filter: {type: String},
+       glassEnabled: {type: Boolean, attribute: 'glass-enabled', reflect: true},
+       tabDensity: {type: Number}, bookmarkOpening: {type: Number},
+@@ -490,6 +500,9 @@ export class NoventraLayoutEditorElement extends CrLitElement {
+   accessor message = '';
+   accessor conflict = false;
+   accessor applying = false;
++  accessor reloading = false;
++  accessor saveFailed = false;
++  private savePromise_: Promise<void>|null = null;
+   accessor pendingNavigation: (() => void)|null = null;
+   accessor dropTarget: {edge: DockEdge|'tray'; before?: string}|null = null;
+   private motionMedia_ = matchMedia('(prefers-reduced-motion: reduce)');
+@@ -551,7 +564,17 @@ export class NoventraLayoutEditorElement extends CrLitElement {
+         this.capabilities.find(c => c.id === id)?.label || id;
+   }
+   receive(state: LayoutState) {
+-    if (this.applying) { this.deferredState_ = state; return; }
++    if (this.applying) {
++      if (!this.deferredState_ || state.layout.revision >= this.deferredState_.layout.revision) {
++        this.deferredState_ = state;
++      }
++      return;
++    }
++    this.acceptState_(state);
++  }
++  private acceptState_(state: LayoutState) {
++    // A read or event started before our last save can arrive afterwards.
++    if (this.draft && state.layout.revision < this.draft.saved.revision) return;
+     this.latest_ = state;
+     this.capabilities = state.capabilities;
+     this.presets = {...state.presets};
+@@ -560,37 +583,55 @@ export class NoventraLayoutEditorElement extends CrLitElement {
+     } else if (state.presets['sidebar-top']) {
+       this.presets['workspace'] = workspacePreset(state.presets['sidebar-top']);
+     }
+-    if (!this.draft || !this.dirty()) {
++    if (!this.draft) {
+       this.draft = createDraft(state.layout);
+       this.conflict = false;
+-    } else if (state.layout.revision !== this.draft.saved.revision ||
+-        state.capabilities.some(c => !this.draft!.current.items.some(i => i.id === c.id)) ||
+-        this.draft.current.items.some(i => !state.capabilities.some(c => c.id === i.id))) {
++      return;
++    }
++    const catalogChanged = state.capabilities.some(c => !this.draft!.current.items.some(i => i.id === c.id)) ||
++        this.draft.current.items.some(i => !state.capabilities.some(c => c.id === i.id));
++    if (!this.dirty()) {
++      // Our save acknowledgement must leave Undo and Redo available. A genuinely
++      // newer external layout starts a new history rather than undoing it.
++      if (state.layout.revision !== this.draft.saved.revision || catalogChanged) {
++        this.draft = createDraft(state.layout);
++      } else {
++        this.draft = reconcileDraft(this.draft, state.layout, state.capabilities);
++      }
++      this.conflict = false;
++      this.saveFailed = false;
++    } else if (state.layout.revision !== this.draft.saved.revision || catalogChanged) {
+       this.conflict = true;
+-      this.message = 'The saved layout or available controls changed. Your draft is kept here. Reload saved to continue.';
++      this.message = 'The saved layout changed while you were editing. Your latest choice has not been saved. Reload the current layout to continue.';
+     } else {
+-      // Live pin/policy updates must not erase unrelated draft placement. Policy
+-      // remains authoritative for visibility and invalidates incompatible undo.
+       const next = reconcileDraft(this.draft, state.layout, state.capabilities);
+       if (next !== this.draft) {
+         this.draft = next;
+-        this.message = 'Organization settings changed. Visibility was updated; your other edits are kept.';
++        this.message = 'Organization settings changed. Required controls were updated.';
++      }
++      if (this.managed() && this.dirty()) {
++        this.conflict = true;
++        this.message = 'Your organization now controls the layout. Reload the current layout to continue.';
+       }
+     }
+   }
++  controlsDisabled(): boolean { return this.managed() || this.conflict || this.reloading; }
++  savingStatus(): string {
++    return this.reloading ? 'Loading…' : this.conflict ? 'Layout changed' : this.saveFailed ? 'Not saved' :
++        this.applying || this.dirty() ? 'Saving…' : 'Layout saved';
++  }
+   act(action: DraftAction) {
+-    if (!this.draft || this.applying) return;
++    if (!this.draft || this.controlsDisabled()) return;
+     try {
+       const previous = this.draft;
+       this.draft = reduceDraft(this.draft, action, this.capabilities);
+-      const detail = action.kind === 'move' ? `${this.label(action.id)} moved to ${this.edgeLabel(action.edge)}.` :
+-          action.kind === 'navigation' ? `Navigation controls moved ${action.placement === 'top' ? 'to the top toolbar' : 'with the sidebar'}.` :
+-          action.kind === 'hide' ? `${this.label(action.id)} hidden from the layout.` :
+-          action.kind === 'preset' ? 'Starting layout selected.' :
+-          action.kind === 'undo' ? 'Last layout change undone.' : 'Layout change redone.';
+-      this.message = this.conflict ? 'The saved layout changed. Reload saved before applying.' :
+-          this.dirty() ? `${detail} Apply layout when you are ready.` : 'No unapplied changes.';
+-      if (this.draft !== previous) void this.updateComplete.then(() => this.animatePlacement_());
++      if (this.draft !== previous) {
++        void this.updateComplete.then(() => this.animatePlacement_());
++      }
++      if (!this.dirty() && !this.applying) return;
++      this.saveFailed = false;
++      this.message = 'Saving layout…';
++      void this.saveLayout_();
+     } catch (error) { this.message = error instanceof Error ? error.message : String(error); }
+   }
+   private animatePlacement_() {
+@@ -630,30 +671,101 @@ export class NoventraLayoutEditorElement extends CrLitElement {
+     if (layout) this.act({kind: 'preset', layout});
+   }
+   onCancelClick() {
++    if (this.applying) return;
+     if (this.latest_) this.draft = createDraft(this.latest_.layout);
+-    this.conflict = false; this.message = 'Saved layout restored. Nothing was applied.';
++    this.conflict = false;
++    this.saveFailed = false;
++    this.message = 'Current layout loaded.';
+   }
+-  async onApplyClick() {
+-    if (!this.draft || this.applying || !this.dirty() || this.conflict || this.managed()) return;
+-    this.applying = true;
++  async onReloadCurrentClick() {
++    if (this.applying || this.reloading) return;
++    this.reloading = true;
+     try {
+-      const result = await sendWithPromise<ApplyResult>('noventraApplyLayout', {
+-        expectedRevision: this.draft.saved.revision, layout: this.draft.current,
+-      });
+-      if (result.status === 'ok') {
+-        this.draft = createDraft(result.layout);
+-        this.conflict = false; this.message = 'Layout applied.';
+-      } else {
+-        this.conflict = result.status === 'conflict';
+-        this.message = result.message || 'The layout could not be applied. Your draft is kept.';
++      let state = await sendWithPromise<LayoutState>('noventraGetLayout');
++      if (!this.isConnected) return;
++      if (this.latest_ && this.latest_.layout.revision > state.layout.revision) {
++        state = this.latest_;
+       }
+-    } catch { this.message = 'The layout could not be applied. Your draft is kept; try again.'; }
+-    finally {
++      this.draft = createDraft(state.layout);
++      this.acceptState_(state);
++      this.conflict = false;
++      this.saveFailed = false;
++      this.message = 'Current layout loaded.';
++    } catch {
++      this.message = 'The current layout could not be loaded. Your unsaved choice is kept. Try again.';
++    } finally {
++      this.reloading = false;
++      if (!this.dirty() && !this.conflict && !this.saveFailed) {
++        this.resumeNavigation_();
++      }
++    }
++  }
++  onRetrySaveClick() {
++    if (this.controlsDisabled()) return;
++    this.saveFailed = false;
++    void this.saveLayout_();
++  }
++  async whenSaved(): Promise<void> {
++    while (this.savePromise_) await this.savePromise_;
++  }
++  private saveLayout_(): Promise<void> {
++    if (this.savePromise_) return this.savePromise_;
++    if (!this.draft || !this.dirty() || this.controlsDisabled() || this.saveFailed) {
++      return Promise.resolve();
++    }
++    this.applying = true;
++    this.savePromise_ = this.flushChanges_().finally(() => {
+       this.applying = false;
+-      if (this.deferredState_) { this.receive(this.deferredState_); this.deferredState_ = null; }
+-      else void sendWithPromise<LayoutState>('noventraGetLayout').then(state => {
++      this.savePromise_ = null;
++      if (this.deferredState_) {
++        const state = this.deferredState_;
++        this.deferredState_ = null;
++        this.acceptState_(state);
++      }
++      if (this.isConnected && this.dirty() && !this.controlsDisabled() && !this.saveFailed) {
++        void this.saveLayout_();
++      } else if (this.isConnected && this.pendingNavigation) {
++        if (!this.dirty() && !this.conflict) {
++          this.resumeNavigation_();
++        } else {
++          void this.showNavigationError_();
++        }
++      }
++    });
++    return this.savePromise_;
++  }
++  private async flushChanges_(): Promise<void> {
++    while (this.isConnected && this.draft && this.dirty() &&
++           !this.controlsDisabled() && !this.saveFailed) {
++      const submitted = structuredClone(this.draft.current);
++      try {
++        const result = await sendWithPromise<ApplyResult>('noventraApplyLayout', {
++          expectedRevision: this.draft.saved.revision, layout: submitted,
++        });
++        if (result.status !== 'ok') {
++          this.conflict = result.status === 'conflict';
++          this.saveFailed = true;
++          this.message = result.message || 'The layout could not be saved. Retry or reload the current layout.';
++          break;
++        }
++        this.draft = acknowledgeSave(this.draft, submitted, result.layout);
++        if (this.latest_) this.latest_ = {...this.latest_, layout: result.layout};
++        this.message = this.dirty() ? 'Saving your latest layout choice…' : 'Layout saved.';
++        if (this.deferredState_) {
++          const state = this.deferredState_;
++          this.deferredState_ = null;
++          this.acceptState_(state);
++        }
++      } catch {
++        this.saveFailed = true;
++        this.message = 'The layout could not be saved. Retry or reload the current layout.';
++      }
++    }
++    if (this.saveFailed || this.conflict) {
++      try {
++        const state = await sendWithPromise<LayoutState>('noventraGetLayout');
+         if (this.isConnected) this.receive(state);
+-      });
++      } catch { /* The unsaved choice stays available for an explicit retry. */ }
+     }
+   }
+   private cancelPointer_() {
+@@ -725,11 +837,11 @@ export class NoventraLayoutEditorElement extends CrLitElement {
+   private readonly onEditorKeydown_ = (event: KeyboardEvent) => {
+     if (event.key === 'Escape' && this.pointer_) {
+       event.preventDefault(); event.stopPropagation(); this.cancelPointer_();
+-      this.message = 'Drag cancelled. Your draft is unchanged.';
++      this.message = 'Drag cancelled.';
+       return;
+     }
+     const target = event.composedPath()[0] as HTMLElement;
+-    if (target.matches('input,textarea') || target.isContentEditable || this.managed() || this.applying) return;
++    if (target.matches('input,textarea') || target.isContentEditable || this.controlsDisabled()) return;
+     if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'z') {
+       event.preventDefault(); this.act({kind: event.shiftKey ? 'redo' : 'undo'});
+       void this.updateComplete.then(() => this.focusSelected());
+@@ -769,17 +881,31 @@ export class NoventraLayoutEditorElement extends CrLitElement {
+   private readonly beforeNavigation_ = (event: Event) => {
+     if ((!this.dirty() && !this.applying) || !this.isConnected) return;
+     event.preventDefault();
+-    const visibility = {complete: Promise.resolve<unknown>(undefined)};
+-    this.fire('noventra-layout-request-visibility', visibility);
+-    if (this.applying) { this.message = 'Wait for Apply to finish before leaving.'; return; }
+     this.navigationFocus_ = this.shadowRoot.activeElement as HTMLElement|null;
+     this.pendingNavigation = (event as CustomEvent<{resume: () => void}>).detail.resume;
+-    void Promise.all([visibility.complete, this.updateComplete]).then(() => {
+-      if (this.isConnected && this.pendingNavigation) {
+-        this.shadowRoot.querySelector<HTMLDialogElement>('dialog')?.showModal();
+-      }
+-    });
++    if (this.saveFailed || this.conflict) {
++      void this.showNavigationError_();
++    } else {
++      this.message = 'Saving layout before leaving…';
++      void this.saveLayout_();
++    }
+   };
++  private async showNavigationError_() {
++    const visibility = {complete: Promise.resolve<unknown>(undefined)};
++    this.fire('noventra-layout-request-visibility', visibility);
++    await Promise.all([visibility.complete, this.updateComplete]);
++    if (this.isConnected && this.pendingNavigation) {
++      const dialog = this.shadowRoot.querySelector<HTMLDialogElement>('dialog');
++      if (dialog && !dialog.open) dialog.showModal();
++    }
++  }
++  private resumeNavigation_() {
++    if (!this.isConnected || !this.pendingNavigation) return;
++    const resume = this.pendingNavigation;
++    this.pendingNavigation = null;
++    this.shadowRoot.querySelector<HTMLDialogElement>('dialog')?.close();
++    resume();
++  }
+   onKeepEditingClick() {
+     this.shadowRoot.querySelector<HTMLDialogElement>('dialog')?.close();
+     this.pendingNavigation = null; this.navigationFocus_?.focus();
+diff --git a/chrome/browser/resources/settings/appearance_page/noventra_layout_model.ts b/chrome/browser/resources/settings/appearance_page/noventra_layout_model.ts
+index ff7fc67af5015bd2e8920b5753bd4dd3359e2e05..cfbd7a06fef592b5b7cfca912543ed2f138d2579 100644
+--- a/chrome/browser/resources/settings/appearance_page/noventra_layout_model.ts
++++ b/chrome/browser/resources/settings/appearance_page/noventra_layout_model.ts
+@@ -107,6 +107,19 @@ function signature(layout: BrowserLayout): string {
+ export function isDirty(state: LayoutDraft): boolean {
+   return signature(state.saved) !== signature(state.current);
+ }
++// Acknowledging an automatic save must not discard choices made while it was
++// in flight, or the undo/redo history of changes already saved successfully.
++export function acknowledgeSave(state: LayoutDraft, submitted: BrowserLayout,
++                                saved: BrowserLayout): LayoutDraft {
++  const rebase = (layout: BrowserLayout): BrowserLayout =>
++      ({...structuredClone(layout), revision: saved.revision});
++  return {
++    saved: structuredClone(saved),
++    current: signature(state.current) === signature(submitted) ?
++        structuredClone(saved) : rebase(state.current),
++    undo: state.undo.map(rebase), redo: state.redo.map(rebase),
++  };
++}
+ function validate(layout: BrowserLayout, caps: LayoutCapability[], previous: BrowserLayout) {
+   if (layout.items.length !== caps.length || new Set(layout.items.map(i => i.id)).size !== caps.length) {
+     throw new Error('Available controls changed. Reload the saved layout.');
+diff --git a/chrome/browser/resources/settings/appearance_page/noventra_transfer.ts b/chrome/browser/resources/settings/appearance_page/noventra_transfer.ts
+index 2d10189df4620b42255b2806ddd3ce862b41e3b4..944f118b1671a283a0a6b52d32874bc822378642 100644
+--- a/chrome/browser/resources/settings/appearance_page/noventra_transfer.ts
++++ b/chrome/browser/resources/settings/appearance_page/noventra_transfer.ts
+@@ -283,7 +283,7 @@ export class NoventraTransferElement extends CrLitElement {
+     const review = this.review_;
+     if (!review) return;
+     if (this.selection_.settings && hasPendingLayoutChanges()) {
+-      this.error_ = 'Apply or discard your layout draft first, or leave Appearance and layout unchecked.'; return;
++      this.error_ = 'Wait for layout saving to finish, or resolve its save error first, or leave Appearance and layout unchecked.'; return;
+     }
+     const result = await this.work_<Record<string, unknown>>('apply', {plan_id: review.plan_id, categories: this.selection_});
+     if (!result) return;
+diff --git a/chrome/browser/resources/settings/languages_page/spell_check_page.html.ts b/chrome/browser/resources/settings/languages_page/spell_check_page.html.ts
+index 9909c9bd3e7d4eb0e7cb4536acce8ce5a874485f..bfe51646f62e3f45ba2cf15aaa10794eea40ff2d 100644
+--- a/chrome/browser/resources/settings/languages_page/spell_check_page.html.ts
++++ b/chrome/browser/resources/settings/languages_page/spell_check_page.html.ts
+@@ -58,10 +58,12 @@ export function getHtml(this: SettingsSpellCheckPageElement) {
+                 <div ?hidden="${!this.errorsGreaterThan_(
+                     item.downloadDictionaryFailureCount, 0)}">
+                   <cr-icon icon="cr:error-filled"></cr-icon>
+-                  $i18n{languagesDictionaryDownloadError}
++                  ${this.canDownloadDictionaries_() ? html`
++                    $i18n{languagesDictionaryDownloadError}
++                  ` : html`Dictionary downloads are off. Choose a download source to get this language file.`}
+                 </div>
+-                <div ?hidden="${!this.errorsGreaterThan_(
+-                    item.downloadDictionaryFailureCount, 1)}">
++                <div ?hidden="${!this.canDownloadDictionaries_() ||
++                    !this.errorsGreaterThan_(item.downloadDictionaryFailureCount, 1)}">
+                   $i18n{languagesDictionaryDownloadErrorHelp}
+                 </div>
+               </div>
+@@ -69,7 +71,7 @@ export function getHtml(this: SettingsSpellCheckPageElement) {
+                   data-index="${index}"
+                   ?hidden="${!this.errorsGreaterThan_(
+                       item.downloadDictionaryFailureCount, 0)}">
+-                $i18n{retry}
++                ${this.canDownloadDictionaries_() ? html`$i18n{retry}` : html`Choose downloads`}
+               </cr-button>
+               ${!item.isManaged ? html`
+                 <cr-toggle @change="${this.onSpellCheckLanguageChange_}"
+diff --git a/chrome/browser/resources/settings/languages_page/spell_check_page.ts b/chrome/browser/resources/settings/languages_page/spell_check_page.ts
+index 7ff1efbb2fdcb8949682e7317df83665c858461f..9fe0f97b6c19ca3c4f37d47a98d45f08b5770cb2 100644
+--- a/chrome/browser/resources/settings/languages_page/spell_check_page.ts
++++ b/chrome/browser/resources/settings/languages_page/spell_check_page.ts
+@@ -90,6 +90,11 @@ export class SettingsSpellCheckPageElement extends
+       useSpellingServicePref_: {type: Object},
+       forcedDictionariesPref_: {type: Object},
+       blockedDictionariesPref_: {type: Object},
++      dictionaryDownloadsPref_: {type: Object},
++      customServicesEnabledPref_: {type: Object},
++      customServicesConsentPref_: {type: Object},
++      customDictionaryDownloadsPref_: {type: Object},
++      customServicesOriginPref_: {type: Object},
+     };
+   }
+ 
+@@ -101,6 +106,16 @@ export class SettingsSpellCheckPageElement extends
+       chrome.settingsPrivate.PrefObject<string[]>|undefined;
+   protected accessor blockedDictionariesPref_:
+       chrome.settingsPrivate.PrefObject<string[]>|undefined;
++  protected accessor dictionaryDownloadsPref_:
++      chrome.settingsPrivate.PrefObject<boolean>|undefined;
++  protected accessor customServicesEnabledPref_:
++      chrome.settingsPrivate.PrefObject<boolean>|undefined;
++  protected accessor customServicesConsentPref_:
++      chrome.settingsPrivate.PrefObject<boolean>|undefined;
++  protected accessor customDictionaryDownloadsPref_:
++      chrome.settingsPrivate.PrefObject<boolean>|undefined;
++  protected accessor customServicesOriginPref_:
++      chrome.settingsPrivate.PrefObject<string>|undefined;
+   // <if expr="not is_macosx">
+   protected accessor spellCheckLanguages_:
+       Array<LanguageState|SpellCheckLanguageState> = [];
+@@ -118,6 +133,11 @@ export class SettingsSpellCheckPageElement extends
+       'spellcheck.use_spelling_service': 'useSpellingServicePref_',
+       'spellcheck.forced_dictionaries': 'forcedDictionariesPref_',
+       'spellcheck.blocked_dictionaries': 'blockedDictionariesPref_',
++      'helium.downloads.spelling_dictionaries': 'dictionaryDownloadsPref_',
++      'helium.services.enabled': 'customServicesEnabledPref_',
++      'helium.services.user_consented': 'customServicesConsentPref_',
++      'helium.services.spellcheck_files': 'customDictionaryDownloadsPref_',
++      'helium.services.origin_override': 'customServicesOriginPref_',
+     });
+ 
+     // <if expr="not is_macosx">
+@@ -302,7 +322,19 @@ export class SettingsSpellCheckPageElement extends
+    * Handler to initiate another attempt at downloading the spell check
+    * dictionary for a specified language.
+    */
++  protected canDownloadDictionaries_(): boolean {
++    return this.dictionaryDownloadsPref_?.value === true ||
++        (this.customServicesEnabledPref_?.value === true &&
++         this.customServicesConsentPref_?.value === true &&
++         this.customDictionaryDownloadsPref_?.value === true &&
++         !!this.customServicesOriginPref_?.value.trim());
++  }
++
+   protected onRetryDictionaryDownloadClick_(e: Event) {
++    if (!this.canDownloadDictionaries_()) {
++      Router.getInstance().navigateTo(routes.HELIUM_SERVICES);
++      return;
++    }
+     const target = e.currentTarget as HTMLElement;
+     const index = Number(target.dataset['index']);
+     const item = this.spellCheckLanguages_[index];
+diff --git a/chrome/browser/resources/settings/privacy_page/services_page.html b/chrome/browser/resources/settings/privacy_page/services_page.html
+index 5b8f5c7eb6049a8b10234cd986dfa8306311a858..5dd2d0f45a441f6f45cebdc3f12497fde7914c1d 100644
+--- a/chrome/browser/resources/settings/privacy_page/services_page.html
++++ b/chrome/browser/resources/settings/privacy_page/services_page.html
+@@ -37,29 +37,66 @@
+         padding: calc(var(--cr-section-padding) / 2) var(--cr-section-padding);
+         justify-content: space-between;
+     }
++    #servicesIntro { margin: 0; padding: 16px var(--cr-section-padding); color: var(--cr-secondary-text-color); }
++    #advancedServices { border-top: var(--cr-separator-line); }
++    #advancedServices > summary { cursor: pointer; padding: 18px var(--cr-section-padding); }
++    #advancedServices > summary:focus-visible { outline: 2px solid var(--cr-focus-outline-color); outline-offset: -4px; }
++    #customServicesExplanation { margin: 0; padding: 0 var(--cr-section-padding) 12px; color: var(--cr-secondary-text-color); }
+ </style>
+ 
+ <settings-subpage page-title="$i18n{heliumServicesTitle}" route-path$="[[routePath]]">
+-<div class="cr-col first">
++  <div class="cr-col first">
++    <p id="servicesIntro">Choose optional downloads. You do not need an account or a custom server.</p>
+     <settings-toggle-button id="chromeWebStoreToggleButton"
+         pref="{{prefs.helium.extensions.chrome_web_store}}"
+         label="Chrome Web Store downloads"
+-        sub-label="Allow extension downloads and updates directly from Google when no extension proxy is enabled. Installing a password manager during setup turns this on.">
++        sub-label="Download and update extensions directly from Google. Installing an extension during setup enables this.">
+     </settings-toggle-button>
+-    <template is="dom-if" if="[[!prefs.helium.services.user_consented.value]]">
+-        <div class="cr-row" id="onboarding-notice">
+-            <div id="onboarding-text">
+-                  <cr-icon icon="cr:security" aria-hidden="true"></cr-icon>
+-                  <span>$i18n{heliumServicesSetupPendingText}</span>
+-            </div>
+-            <cr-button
+-                class="action-button"
+-                on-click="onServicesPendingButtonClick_">
+-                $i18n{heliumServicesSetupPendingButton}
+-            </cr-button>
++    <if expr="use_renderer_spellchecker">
++      <settings-toggle-button id="dictionaryDownloadsToggleButton"
++          pref="{{prefs.helium.downloads.spelling_dictionaries}}"
++          label="Download spelling dictionaries"
++          sub-label="Download language files from Google. Spell checking happens on your device; the text you type is not sent.">
++      </settings-toggle-button>
++      <cr-link-row id="spellingLanguagesLink" label="Spelling languages"
++          sub-label="After enabling downloads, return to Languages and retry any missing dictionary."
++          on-click="onSpellingLanguagesClick_"></cr-link-row>
++    </if>
++    <details id="advancedServices">
++      <summary>Advanced service settings</summary>
++      <p id="customServicesExplanation">For people who run or trust a compatible service. Leave this empty to use only the download choices above.</p>
++<div class="cr-row">
++  <div class="flex">
++    <div class="flex label-wrapper">
++        <div class="label">$i18n{heliumOriginOverride}</div>
++        <div class="cr-secondary-text label">
++            $i18n{heliumOriginOverrideDescription}
++            <br><br>
++            <b>$i18n{heliumOriginOverrideDescriptionWarning}</b>
+         </div>
+-    </template>
++    </div>
++    <cr-input
++        id="heliumOriginOverride"
++        placeholder="$i18n{heliumOriginOverrideLabel}"
++        value="[[prefs.helium.services.origin_override.value]]"
++        pattern="https://.*"
++        on-keydown="onOriginOverrideKeydown_"
++        on-change="onOriginOverrideChange_"
++        type="url"
++        maxlength="128"
++        aria-label="$i18n{heliumOriginOverrideLabel}"
++        auto-validate
++        error-message="$i18n{heliumOriginOverrideInvalidOrigin}"
++        spellcheck="false">
++    </cr-input>
++  </div>
++</div>
+ 
++      <settings-toggle-button id="customServicesConsentToggleButton"
++          pref="{{prefs.helium.services.user_consented}}"
++          label="Allow connections to this custom service"
++          sub-label="The service operator receives requests for the custom features you enable below.">
++      </settings-toggle-button>
+     <template is="dom-if" if="[[prefs.helium.services.user_consented.value]]">
+         <template is="dom-if" if="[[changes_.length]]">
+           <div id="changelog-notice">
+@@ -133,33 +170,7 @@
+         on-settings-control-change="onCrashReportingChange_">
+       </settings-dropdown-menu>
+     </div>
+-</div>
+ 
+-
+-<div class="cr-row">
+-  <div class="flex">
+-    <div class="flex label-wrapper">
+-        <div class="label">$i18n{heliumOriginOverride}</div>
+-        <div class="cr-secondary-text label">
+-            $i18n{heliumOriginOverrideDescription}
+-            <br><br>
+-            <b>$i18n{heliumOriginOverrideDescriptionWarning}</b>
+-        </div>
+-    </div>
+-    <cr-input
+-        id="heliumOriginOverride"
+-        placeholder="$i18n{heliumOriginOverrideLabel}"
+-        value="[[prefs.helium.services.origin_override.value]]"
+-        pattern="https://.*"
+-        on-keydown="onOriginOverrideKeydown_"
+-        on-change="onOriginOverrideChange_"
+-        type="url"
+-        maxlength="128"
+-        aria-label="$i18n{heliumOriginOverrideLabel}"
+-        auto-validate
+-        error-message="$i18n{heliumOriginOverrideInvalidOrigin}"
+-        spellcheck="false">
+-    </cr-input>
++    </details>
+   </div>
+-</div>
+ </settings-subpage>
+diff --git a/chrome/browser/resources/settings/privacy_page/services_page.ts b/chrome/browser/resources/settings/privacy_page/services_page.ts
+index acb3bd058d2c681440142499296e1072c4231586..0670c9bddf659ccfb91cd44793b756fec32b00d7 100644
+--- a/chrome/browser/resources/settings/privacy_page/services_page.ts
++++ b/chrome/browser/resources/settings/privacy_page/services_page.ts
+@@ -10,8 +10,11 @@ import 'chrome://resources/cr_elements/cr_checkbox/cr_checkbox.js';
+ import 'chrome://resources/cr_elements/cr_collapse/cr_collapse.js';
+ import 'chrome://resources/cr_elements/cr_icon/cr_icon.js';
+ import 'chrome://resources/cr_elements/cr_input/cr_input.js';
++import 'chrome://resources/cr_elements/cr_link_row/cr_link_row.js';
+ 
+ import {PrefsMixin} from '/shared/settings/prefs/prefs_mixin.js';
++import {routes} from '../route.js';
++import {Router} from '../router.js';
+ import {HelpBubbleMixin} from 'chrome://resources/cr_components/help_bubble/help_bubble_mixin.js';
+ import type {CrInputElement} from 'chrome://resources/cr_elements/cr_input/cr_input.js';
+ import {I18nMixin} from 'chrome://resources/cr_elements/i18n_mixin.js';
+@@ -172,8 +175,8 @@ export class SettingsHeliumServicesPageElement extends
+     this.setPrefValue('helium.services.origin_override', target.value);
+   }
+ 
+-  private onServicesPendingButtonClick_() {
+-    window.open('chrome://setup', '_blank');
++  private onSpellingLanguagesClick_() {
++    Router.getInstance().navigateTo(routes.LANGUAGES);
+   }
+ }
+ 
+diff --git a/chrome/browser/spellchecker/spellcheck_hunspell_dictionary.cc b/chrome/browser/spellchecker/spellcheck_hunspell_dictionary.cc
+index 1e5c78fa388a950e4a0f149b0584661ee67c1b8c..602913b13ba75998458bc9bfac30b0b99d2de619 100644
+--- a/chrome/browser/spellchecker/spellcheck_hunspell_dictionary.cc
++++ b/chrome/browser/spellchecker/spellcheck_hunspell_dictionary.cc
+@@ -290,8 +290,12 @@ GURL SpellcheckHunspellDictionary::GetDictionaryURL() {
+       goto fail;
+     }
+ 
+-    return helium::GetSpellcheckURL(*prefs)
+-            .Resolve(bdict_file);
++    const GURL base_url = helium::GetSpellcheckURL(*prefs);
++    // Chromium's direct dictionary endpoint uses lowercase filenames.
++    if (base_url.host() == "redirector.gvt1.com") {
++      bdict_file = base::ToLowerASCII(bdict_file);
++    }
++    return base_url.Resolve(bdict_file);
+   }
+ 
+ fail:
+diff --git a/chrome/browser/ui/browser_ui_prefs.cc b/chrome/browser/ui/browser_ui_prefs.cc
+index 4790a4f800674abfbf7a8dc797ed230874c6f248..d913a205b1e0f640ef749a2502225f796a8a1637 100644
+--- a/chrome/browser/ui/browser_ui_prefs.cc
++++ b/chrome/browser/ui/browser_ui_prefs.cc
+@@ -286,6 +286,7 @@ void RegisterBrowserUserPrefs(user_prefs::PrefRegistrySyncable* registry) {
+     registry->RegisterBooleanPref(prefs::kHeliumBangsEnabled, true);
+     registry->RegisterBooleanPref(prefs::kHeliumExtProxyEnabled, true);
+     registry->RegisterBooleanPref(prefs::kNoventraChromeWebStoreDownloads, false);
++    registry->RegisterBooleanPref(prefs::kNoventraDictionaryDownloads, false);
+     registry->RegisterBooleanPref(prefs::kHeliumSpellcheckEnabled, true);
+     registry->RegisterStringPref(prefs::kHeliumServicesOrigin, "");
+     registry->RegisterBooleanPref(prefs::kHeliumDidOnboarding, false);
+diff --git a/chrome/browser/ui/color/chrome_color_mixers.cc b/chrome/browser/ui/color/chrome_color_mixers.cc
+index 62f9de4768662c900c7df90fb6cd25d1f146dee9..f68d0c0f8e8a33c76f373067ed73e4eb27f9d290 100644
+--- a/chrome/browser/ui/color/chrome_color_mixers.cc
++++ b/chrome/browser/ui/color/chrome_color_mixers.cc
+@@ -41,12 +41,30 @@ void AddNoventraNeutralFrame(ui::ColorProvider* provider,
+   // theme. Only an accent source represents a chosen custom/device color.
+   const bool custom_color = key.user_color.has_value() &&
+       key.user_color_source == ui::ColorProviderKey::UserColorSource::kAccent;
+-  if (key.custom_theme || custom_color || key.app_controller ||
++  if (key.custom_theme || key.app_controller ||
+       key.contrast_mode == ui::ColorProviderKey::ContrastMode::kHigh ||
+       key.forced_colors != ui::ColorProviderKey::ForcedColors::kNone) {
+     return;
+   }
+   const bool dark = key.color_mode == ui::ColorProviderKey::ColorMode::kDark;
++  if (custom_color) {
++    ui::ColorMixer& mixer = provider->AddMixer();
++    for (const auto id : {kColorTabBackgroundActiveFrameActive,
++                          kColorTabBackgroundActiveFrameInactive,
++                          kColorTabBackgroundSelectedFrameActive,
++                          kColorTabBackgroundSelectedFrameInactive}) {
++      mixer[id] = ui::BlendTowardMaxContrast({kColorToolbar}, dark ? 40 : 24);
++    }
++    for (const auto id : {kColorTabForegroundActiveFrameActive,
++                          kColorTabForegroundActiveFrameInactive,
++                          kColorTabForegroundInactiveFrameActive,
++                          kColorTabForegroundInactiveFrameInactive,
++                          kColorNewTabButtonCRForegroundFrameActive,
++                          kColorNewTabButtonCRForegroundFrameInactive}) {
++      mixer[id] = {kColorToolbarText};
++    }
++    return;
++  }
+   const SkColor ground = dark ? SkColorSetRGB(28, 28, 28) : SK_ColorWHITE;
+   const SkColor ink = dark ? SkColorSetRGB(237, 237, 237)
+                            : SkColorSetRGB(23, 23, 23);
+@@ -57,8 +75,8 @@ void AddNoventraNeutralFrame(ui::ColorProvider* provider,
+   const SkColor muted = glass ? ink
+                               : (dark ? SkColorSetRGB(166, 166, 166)
+                                       : SkColorSetRGB(105, 105, 105));
+-  const SkColor pill = dark ? SkColorSetRGB(45, 45, 45)
+-                            : SkColorSetRGB(239, 239, 239);
++  const SkColor pill = dark ? SkColorSetRGB(54, 54, 54)
++                            : SkColorSetRGB(234, 234, 234);
+   const SkColor hover = dark ? SkColorSetRGB(38, 38, 38)
+                              : SkColorSetRGB(246, 246, 246);
+   ui::ColorMixer& mixer = provider->AddMixer();
+@@ -68,6 +86,7 @@ void AddNoventraNeutralFrame(ui::ColorProvider* provider,
+   mixer[kColorBookmarkBarBackground] = {ground};
+   mixer[kColorSidePanelBackground] = {ground};
+   mixer[kColorToolbarTextDefault] = {ink};
++  mixer[kColorToolbarText] = {ink};
+   mixer[kColorToolbarButtonIconDefault] = {muted};
+   mixer[kColorLocationBarBackground] = {pill};
+   mixer[kColorLocationBarBackgroundHovered] = {hover};
+diff --git a/chrome/browser/ui/noventra/layout_model.cc b/chrome/browser/ui/noventra/layout_model.cc
+index cf417902393c2c7f1b491267c1f95902ec698ac9..68e123e87ccded506b502a6ff82500dbc10978a8 100644
+--- a/chrome/browser/ui/noventra/layout_model.cc
++++ b/chrome/browser/ui/noventra/layout_model.cc
+@@ -680,7 +680,7 @@ BrowserLayout MakeLayoutPreset(std::string_view name, PrefService& prefs) {
+   if (name == "minimal-right") {
+     edge = DockEdge::kRight;
+   }
+-  if (name == "classic-top") {
++  if (name == "classic-top" || name == "compact-top") {
+     edge = DockEdge::kTop;
+   }
+   if (name == "sidebar-top") {
+@@ -728,10 +728,31 @@ BrowserLayout MakeLayoutPreset(std::string_view name, PrefService& prefs) {
+          (item.id == "action:bookmarks" && edge == DockEdge::kTop));
+     // A top-only preset must not reserve an otherwise empty sidebar just
+     // for its footer. Spaces remain available in Settings and in side layouts.
+-    if (name == "classic-top" && item.id == "spaces") {
++    if ((name == "classic-top" || name == "compact-top") &&
++        item.id == "spaces") {
+       item.visible = false;
+     }
+   }
++  if (name == "classic-top" || name == "compact-top") {
++    // The saved order distinguishes the conventional two-row browser from a
++    // compact single row. Existing saved layouts are never reordered here.
++    const std::vector<std::string_view> order = name == "classic-top"
++        ? std::vector<std::string_view>{"tabs", "new-tab", "back", "forward",
++                                      "reload", "address", "extensions",
++                                      "additional-actions", "profile", "menu"}
++        : std::vector<std::string_view>{"back", "forward", "reload", "address",
++                                      "tabs", "new-tab", "extensions",
++                                      "additional-actions", "profile", "menu"};
++    for (auto& item : layout.items) {
++      const auto position = std::ranges::find(order, item.id);
++      // The address field already supplies its native bookmark star. Keep
++      // secondary tools available in Settings instead of duplicating them.
++      item.visible = position != order.end();
++      item.order = position != order.end()
++                       ? position - order.begin()
++                       : 20 + static_cast<int>(&item - layout.items.data());
++    }
++  }
+   return layout;
+ }
+ 
+@@ -745,7 +766,7 @@ ApplyResult ApplyLayout(PrefService& prefs,
+   if (expected_revision != current.revision ||
+       layout.revision != expected_revision) {
+     return {"conflict",
+-            "The saved layout changed. Reload it before applying your draft.",
++            "The saved layout changed. Reload the current layout before saving your choice.",
+             current};
+   }
+   auto checked = ValidateLayout(base::Value(LayoutToValue(layout)), GetLayoutCapabilities(prefs));
+diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
+index 4b9dc95f6d21f7394f73b2b68e9ff741fcdb679c..b35009394d13d96c9c74707f1d541d836a3336aa 100644
+--- a/chrome/browser/ui/views/frame/browser_view.cc
++++ b/chrome/browser/ui/views/frame/browser_view.cc
+@@ -2078,9 +2078,13 @@ void BrowserView::UpdateZenModeRevealFromCursor() {
+ 
+   if (noventra_dock_controller_ && noventra_dock_controller_->active()) {
+     zen_last_cursor_ = cursor;
+-    if (noventra_dock_controller_->ShouldReveal(cursor)) {
++    const bool reveal_top =
++        noventra_dock_controller_->ShouldReveal(cursor, false);
++    const bool reveal_side = !reveal_top &&
++        noventra_dock_controller_->ShouldReveal(cursor, true);
++    if (reveal_top || reveal_side) {
+       zen_cursor_exit_timer_.Stop();
+-      UpdateZenModeReveal(true, true);
++      UpdateZenModeReveal(reveal_top, reveal_side);
+     } else {
+       StartZenCollapseTimer(kZenModeHoverExitGracePeriod);
+     }
+@@ -2132,8 +2136,13 @@ void BrowserView::UpdateZenModeReveal(bool reveal_top, bool reveal_side) {
+     reveal_side = true;
+   }
+ 
+-  // A tab being carried into the page must retain capture and its sidebar.
+-  reveal_side = reveal_side || noventra_tab_drag_active_;
++  // Keep only the tab strip's own edge during a captured drag.
++  if (noventra_tab_drag_active_) {
++    if (custom_docks && !noventra_dock_controller_->IsControlOnSide("tabs"))
++      reveal_top = true;
++    else
++      reveal_side = true;
++  }
+ 
+   // Pinned VTS stays visible regardless of cursor position.
+   if (IsZenModeSideChromePinned()) {
+@@ -2149,17 +2158,21 @@ void BrowserView::UpdateZenModeReveal(bool reveal_top, bool reveal_side) {
+   const bool omnibox_focused = toolbar_ && toolbar_->location_bar_view() &&
+                                toolbar_->location_bar_view()->HasFocus();
+   if (omnibox_focused) {
+-    reveal_top = true;
+-    if (custom_docks) reveal_side = true;
++    if (custom_docks && noventra_dock_controller_->IsControlOnSide("address"))
++      reveal_side = true;
++    else
++      reveal_top = true;
++  }
++  if (custom_docks) {
++    reveal_top |= noventra_dock_controller_->HasFocusedControl(false);
++    reveal_side |= noventra_dock_controller_->HasFocusedControl(true);
+   }
+ 
+   // Keep the top chrome visible while a bubble/popup anchored inside the top
+   // container or a side panel is open.
+-  if ((!reveal_top || (custom_docks && !reveal_side)) &&
+-      HasOpenBubbleFromTopContainer()) {
+-    reveal_top = true;
+-    if (custom_docks) reveal_side = true;
+-  }
++  if (!reveal_top && HasOpenBubbleFromChrome(false)) reveal_top = true;
++  if (custom_docks && !reveal_side && HasOpenBubbleFromChrome(true))
++    reveal_side = true;
+ 
+   // Menus are not BubbleDialogDelegate widgets, so handle the app menu
+   // explicitly.
+@@ -2169,13 +2182,15 @@ void BrowserView::UpdateZenModeReveal(bool reveal_top, bool reveal_side) {
+         toolbar_button_provider ? toolbar_button_provider->GetAppMenuControl()
+                                 : nullptr;
+     if (app_menu_control && app_menu_control->IsMenuShowing()) {
+-      reveal_top = true;
+-      if (custom_docks) reveal_side = true;
++      if (custom_docks && noventra_dock_controller_->IsControlOnSide("menu"))
++        reveal_side = true;
++      else
++        reveal_top = true;
+     }
+   }
+ 
+-  if (toolbar_ && toolbar_->UsesNoventraSidebarControls()) {
+-    // Menus, completion, focus and resize capture must hold the entire panel.
++  if (!custom_docks && toolbar_ && toolbar_->UsesNoventraSidebarControls()) {
++    // Legacy combined controls share one panel; custom docks have separate edges.
+     reveal_side = reveal_side || reveal_top;
+     reveal_top = reveal_side;
+   }
+@@ -2326,17 +2341,23 @@ bool IsSidePanelOpen(const SidePanel* side_panel) {
+ 
+ }  // namespace
+ 
+-bool BrowserView::HasOpenBubbleFromTopContainer() const {
+-  if (IsSidePanelOpen(side_panel_)) {
+-    return true;
++bool BrowserView::HasOpenBubbleFromChrome(bool side) const {
++  const bool custom_docks =
++      noventra_dock_controller_ && noventra_dock_controller_->active();
++  if (!custom_docks) {
++    if (side) return false;
++    if (IsSidePanelOpen(side_panel_)) return true;
+   }
+   if (!top_container_ || !GetWidget()) {
+     return false;
+   }
+   for (views::Widget* widget :
+        views::Widget::GetAllOwnedWidgets(GetWidget()->GetNativeView())) {
+-    if (IsOpenBubbleAnchoredInViewSubtree(widget,
+-          noventra_dock_controller_ && noventra_dock_controller_->active() ? static_cast<const views::View*>(this) : top_container_.get())) {
++    if (custom_docks) {
++      for (const auto* root : noventra_dock_controller_->GetChromeRoots(side)) {
++        if (IsOpenBubbleAnchoredInViewSubtree(widget, root)) return true;
++      }
++    } else if (IsOpenBubbleAnchoredInViewSubtree(widget, top_container_.get())) {
+       return true;
+     }
+   }
+@@ -2345,7 +2366,10 @@ bool BrowserView::HasOpenBubbleFromTopContainer() const {
+ 
+ void BrowserView::AppMenuShown() {
+   if (zen_mode_enabled_) {
+-    UpdateZenModeReveal(/*reveal_top=*/true, /*reveal_side=*/false);
++    const bool side = noventra_dock_controller_ &&
++        noventra_dock_controller_->active() &&
++        noventra_dock_controller_->IsControlOnSide("menu");
++    UpdateZenModeReveal(!side, side);
+   }
+ }
+ 
+@@ -3170,7 +3194,14 @@ void BrowserView::SetFocusToLocationBar(bool is_user_initiated) {
+   // and can receive focus.  A synchronous layout is required so the toolbar
+   // has non-zero height before FocusLocation runs.
+   if (zen_mode_enabled_) {
+-    RevealZenModeTopChromeImmediately();
++    if (noventra_dock_controller_ && noventra_dock_controller_->active() &&
++        noventra_dock_controller_->IsControlOnSide("address")) {
++      UpdateZenModeReveal(false, true);
++      InvalidateLayout();
++      DeprecatedLayoutImmediately();
++    } else {
++      RevealZenModeTopChromeImmediately();
++    }
+   }
+ 
+   LocationBar* location_bar = GetLocationBar();
+diff --git a/chrome/browser/ui/views/frame/browser_view.h b/chrome/browser/ui/views/frame/browser_view.h
+index c4774d963dcade066ddb1ab5d7377671e0c9d9da..ddbe43128577621c9ffabd11d410e7f5ab76470c 100644
+--- a/chrome/browser/ui/views/frame/browser_view.h
++++ b/chrome/browser/ui/views/frame/browser_view.h
+@@ -984,7 +984,7 @@ class BrowserView : public BrowserWindow,
+   bool IsPointInZenSideTrigger(const gfx::Point& point) const;
+   bool IsPointInZenTopChromeBounds(const gfx::Point& point) const;
+   bool IsPointInZenSideChromeBounds(const gfx::Point& point) const;
+-  bool HasOpenBubbleFromTopContainer() const;
++  bool HasOpenBubbleFromChrome(bool side) const;
+   bool GetCursorLocationInBrowserView(gfx::Point* cursor_location) const;
+ 
+   // Callback for the loading animation(s) associated with this view.
+diff --git a/chrome/browser/ui/views/frame/browser_widget.cc b/chrome/browser/ui/views/frame/browser_widget.cc
+index d16232533eacf85af214a23eec5004f72f24f77b..bcbf0dbc50176c8b6c59552e3c9bba9f2f1ab294 100644
+--- a/chrome/browser/ui/views/frame/browser_widget.cc
++++ b/chrome/browser/ui/views/frame/browser_widget.cc
+@@ -559,7 +559,7 @@ ui::ColorProviderKey BrowserWidget::GetColorProviderKey() const {
+ #endif
+ 
+   if (auto* const glass_frame_service = GlassFrameService::GetInstance()) {
+-    if ((!space_theme || space_theme->glass) &&
++    if (helium::WantsNoventraGlass(browser_view_) &&
+         glass_frame_service->IsBrowserWindowEligible(
+             browser_view_->browser())) {
+       key.frame_style = ui::ColorProviderKey::FrameStyle::kGlass;
+@@ -568,6 +568,10 @@ ui::ColorProviderKey BrowserWidget::GetColorProviderKey() const {
+ 
+   if (helium::ShouldUseNativeFrameMaterials(browser_view_)) {
+     key.frame_style = ui::ColorProviderKey::FrameStyle::kGlass;
++  } else if (!helium::WantsNoventraGlass(browser_view_) &&
++             key.frame_style == ui::ColorProviderKey::FrameStyle::kGlass) {
++    // An explicit Solid choice wins over the legacy global glass backend.
++    key.frame_style = ui::ColorProviderKey::FrameStyle::kDefault;
+   }
+ 
+   return key;
+diff --git a/chrome/browser/ui/views/frame/horizontal_tab_strip_region_view.cc b/chrome/browser/ui/views/frame/horizontal_tab_strip_region_view.cc
+index 65ae6dd31903cbdac887291f4b3d0770425516b1..d2340e04aebfbb68b2d6b16c369247ebe784f065 100644
+--- a/chrome/browser/ui/views/frame/horizontal_tab_strip_region_view.cc
++++ b/chrome/browser/ui/views/frame/horizontal_tab_strip_region_view.cc
+@@ -164,7 +164,10 @@ bool ShouldShowNewTabButton(BrowserWindowInterface* browser) {
+   }
+   if (browser) {
+     auto* view = BrowserView::GetBrowserViewForBrowser(browser);
+-    if (view && view->noventra_dock_controller() && view->noventra_dock_controller()->active()) return false;
++    if (view && view->noventra_dock_controller() &&
++        view->noventra_dock_controller()->active()) {
++      return view->noventra_dock_controller()->UsesNativeTopNewTabButton();
++    }
+   }
+   if (!CanCreateNewTabButton(browser)) {
+     return false;
+diff --git a/chrome/browser/ui/views/frame/noventra_bookmarks_view.cc b/chrome/browser/ui/views/frame/noventra_bookmarks_view.cc
+index 69b58d3b6c966d2035a53548e91951d8088a8d76..dbfb12b4b9592b8376c2b36d0c38cfd447055539 100644
+--- a/chrome/browser/ui/views/frame/noventra_bookmarks_view.cc
++++ b/chrome/browser/ui/views/frame/noventra_bookmarks_view.cc
+@@ -5,10 +5,12 @@
+ #include <algorithm>
+ #include <optional>
+ #include <set>
++#include <string>
+ 
+ #include "base/functional/bind.h"
+ #include "base/i18n/rtl.h"
+ #include "base/memory/ptr_util.h"
++#include "base/strings/string_util.h"
+ #include "base/strings/utf_string_conversions.h"
+ #include "base/task/single_thread_task_runner.h"
+ #include "chrome/app/chrome_command_ids.h"
+@@ -61,6 +63,7 @@
+ #include "ui/views/controls/textfield/textfield_controller.h"
+ #include "ui/views/focus/focus_manager.h"
+ #include "ui/views/layout/box_layout.h"
++#include "ui/views/style/typography.h"
+ #include "ui/views/widget/widget.h"
+ 
+ namespace {
+@@ -136,6 +139,29 @@ bool IsLibraryCommand(int id) {
+          id == IDC_SHOW_BOOKMARK_SIDE_PANEL;
+ }
+ 
++// Imported titles sometimes contain the complete URL. Keep those model
++// values intact, but show a quiet hostname instead of a long address in a row.
++std::u16string BookmarkDisplayTitle(const bookmarks::BookmarkNode& node) {
++  const auto& title = node.GetTitle();
++  if (node.is_folder()) {
++    return title.empty() ? u"Bookmark folder" : title;
++  }
++  const std::string text = base::UTF16ToUTF8(title);
++  const bool address_title =
++      title.empty() ||
++      base::StartsWith(text, "https://",
++                       base::CompareCase::INSENSITIVE_ASCII) ||
++      base::StartsWith(text, "http://", base::CompareCase::INSENSITIVE_ASCII);
++  if (!address_title || node.url().host().empty()) {
++    return title.empty() ? base::UTF8ToUTF16(node.url().spec()) : title;
++  }
++  std::string host(node.url().host());
++  if (base::StartsWith(host, "www.")) {
++    host.erase(0, 4);
++  }
++  return base::UTF8ToUTF16(host);
++}
++
+ ui::ImageModel BookmarkIcon(bookmarks::BookmarkModel& model,
+                             const bookmarks::BookmarkNode& node) {
+   if (node.is_url()) {
+@@ -320,24 +346,26 @@ class NoventraBookmarksView::BookmarkPopup : public views::BubbleDialogDelegate,
+     SetTitle(u"Bookmarks");
+     SetShowTitle(true);
+     SetShowCloseButton(true);
+-    set_margins(gfx::Insets(12));
++    set_margins(gfx::Insets::TLBR(8, 10, 10, 10));
++    set_corner_radius(12);
+     set_close_on_deactivate(true);
+     SetUseAnchorWindowBounds(true);
+ 
+     auto contents = std::make_unique<views::View>();
+     contents->GetViewAccessibility().SetName(u"Searchable bookmarks");
+     contents->SetLayoutManager(std::make_unique<views::BoxLayout>(
+-        views::BoxLayout::Orientation::kVertical, gfx::Insets(), 8));
++        views::BoxLayout::Orientation::kVertical, gfx::Insets(), 6));
+     search_ = contents->AddChildView(std::make_unique<views::Textfield>());
+     search_->SetAccessibleName(u"Search bookmarks");
+     search_->SetPlaceholderText(u"Search bookmarks");
+     search_->SetDefaultWidthInChars(20);
++    search_->SetCornerRadius(8);
+     search_->set_controller(this);
+     SetInitiallyFocusedView(search_);
+ 
+     back_ = contents->AddChildView(std::make_unique<views::MdTextButton>(
+         base::BindRepeating(&BookmarkPopup::Back, weak_factory_.GetWeakPtr()),
+-        u"All bookmarks"));
++        u"All bookmarks", views::style::CONTEXT_LABEL));
+     back_->SetStyle(ui::ButtonStyle::kText);
+     back_->SetHorizontalAlignment(gfx::ALIGN_TO_HEAD);
+     back_->SetCustomPadding(gfx::Insets::VH(4, 4));
+@@ -355,14 +383,15 @@ class NoventraBookmarksView::BookmarkPopup : public views::BubbleDialogDelegate,
+     empty_->SetPreferredSize(gfx::Size(0, 48));
+     more_ = contents->AddChildView(std::make_unique<views::MdTextButton>(
+         base::BindRepeating(&BookmarkPopup::Manage, weak_factory_.GetWeakPtr()),
+-        u"More bookmarks — open bookmark manager"));
++        u"Open bookmark manager", views::style::CONTEXT_LABEL));
+     more_->SetStyle(ui::ButtonStyle::kText);
+     more_->SetHorizontalAlignment(gfx::ALIGN_TO_HEAD);
+     more_->SetAccessibleName(u"Open bookmark manager");
+     more_->SetTooltipText(
+         u"First 100 results shown. Refine your search or open the bookmark "
+         u"manager to see all bookmarks.");
+-    more_->SetVisible(false);
++    more_->SetCustomPadding(gfx::Insets::VH(6, 8));
++    more_->SetCornerRadius(6);
+     SetContentsView(std::move(contents));
+     UpdateSizeLimits();
+     Refresh();
+@@ -553,14 +582,19 @@ class NoventraBookmarksView::BookmarkPopup : public views::BubbleDialogDelegate,
+         }
+       }
+     }
+-    if (nodes.size() <= kMaximumPopupRows && more_->HasFocus()) {
+-      search_->RequestFocus();
+-    }
+-    more_->SetVisible(nodes.size() > kMaximumPopupRows);
++    more_->SetText(nodes.size() > kMaximumPopupRows
++                       ? u"More bookmarks — open bookmark manager"
++                       : u"Open bookmark manager");
++    more_->SetTooltipText(
++        nodes.size() > kMaximumPopupRows
++            ? u"First 100 results shown. Refine your search or "
++              u"open the bookmark manager to see all bookmarks."
++            : u"Organize, edit or remove saved bookmarks");
+     if (nodes.size() > kMaximumPopupRows) {
+       nodes.resize(kMaximumPopupRows);
+     }
+-    back_->SetText(folder ? folder->GetTitle() : u"All bookmarks");
++    back_->SetVisible(folder != nullptr || !query.empty());
++    back_->SetText(folder ? BookmarkDisplayTitle(*folder) : u"Search results");
+     back_->SetAccessibleName(folder ? u"Back to parent bookmark folder"
+                                     : u"All bookmarks");
+     back_->SetTooltipText(!query.empty() ? u"Search results from all bookmarks"
+@@ -580,26 +614,28 @@ class NoventraBookmarksView::BookmarkPopup : public views::BubbleDialogDelegate,
+       present.insert(id);
+       order_.push_back(id);
+       if (!buttons_.contains(id)) {
+-        auto button = std::make_unique<views::MdTextButton>(
++        auto button = std::make_unique<BookmarkRowButton>(
+             base::BindRepeating(&BookmarkPopup::Open,
+                                 weak_factory_.GetWeakPtr(), id),
+-            u"");
++            u"", views::style::CONTEXT_LABEL);
+         button->SetStyle(ui::ButtonStyle::kText);
+         button->SetBgColorOverrideDeprecated(SK_ColorTRANSPARENT);
+         button->SetHorizontalAlignment(gfx::ALIGN_TO_HEAD);
+         button->SetEnabledTextColors(ui::kColorLabelForeground);
+         button->SetCustomPadding(gfx::Insets::VH(6, 8));
+         button->SetMinSize(gfx::Size(0, 0));
++        button->SetCornerRadius(6);
+         button->SetPreferredSize(gfx::Size(0, kBookmarkRowHeight));
+         button->SetTriggerableEventFlags(ui::EF_LEFT_MOUSE_BUTTON |
+                                          ui::EF_MIDDLE_MOUSE_BUTTON);
+         buttons_[id] = rows_->AddChildView(std::move(button));
+       }
+       auto* button = buttons_.at(id).get();
+-      const auto title = !node->GetTitle().empty() ? node->GetTitle()
+-                         : node->is_folder()
+-                             ? std::u16string(u"Bookmark folder")
+-                             : base::UTF8ToUTF16(node->url().spec());
++      const auto title = BookmarkDisplayTitle(*node);
++      static_cast<BookmarkRowButton*>(button)->SetDisclosure(
++          node->is_folder(), false);
++      button->SetCustomPadding(
++          gfx::Insets::TLBR(6, 8, 6, node->is_folder() ? 28 : 8));
+       button->SetText(title);
+       button->SetAccessibleName(title);
+       button->SetTooltipText(
+@@ -1029,7 +1065,7 @@ void NoventraBookmarksView::Refresh() {
+       auto button = std::make_unique<BookmarkRowButton>(
+           base::BindRepeating(&NoventraBookmarksView::OpenNode,
+                               base::Unretained(this), id),
+-          u"");
++          u"", views::style::CONTEXT_LABEL);
+       button->SetStyle(ui::ButtonStyle::kText);
+       button->SetBgColorIdOverride(kColorToolbar);
+       button->SetMinSize(gfx::Size(0, 0));
+@@ -1052,12 +1088,7 @@ void NoventraBookmarksView::Refresh() {
+       }
+     }
+     auto* button = buttons_.at(id).get();
+-    const auto title = !node->GetTitle().empty() ? node->GetTitle()
+-                       : node->is_folder()
+-                           ? std::u16string(u"Bookmark folder")
+-                           : base::UTF8ToUTF16(node->url().host().empty()
+-                                                   ? node->url().spec()
+-                                                   : node->url().host());
++    const auto title = BookmarkDisplayTitle(*node);
+     const bool inline_folder = inline_folders_ && node->is_folder();
+     const bool expanded = expanded_folders_.contains(id);
+     static_cast<BookmarkRowButton*>(button)->SetDisclosure(inline_folder,
+diff --git a/chrome/browser/ui/views/frame/noventra_dock_controller.cc b/chrome/browser/ui/views/frame/noventra_dock_controller.cc
+index 5040005663423b95180f7b6612854def454b6edb..e79a01c9c854c9a17adae1cdbea6ec938fcd2b8c 100644
+--- a/chrome/browser/ui/views/frame/noventra_dock_controller.cc
++++ b/chrome/browser/ui/views/frame/noventra_dock_controller.cc
+@@ -162,6 +162,14 @@ void NoventraDockController::Apply(const noventra::BrowserLayout& layout) {
+   const bool restore_popup = restore_address && location_bar->GetOmniboxPopupView() &&
+       location_bar->GetOmniboxPopupView()->IsOpen();
+   active_ = true;
++  std::vector<const noventra::LayoutItem*> top_items;
++  for (const auto& item : layout.items) {
++    if (item.visible && item.edge == noventra::DockEdge::kTop)
++      top_items.push_back(&item);
++  }
++  std::ranges::sort(top_items, {}, [](const auto* item) { return item->order; });
++  native_top_new_tab_ = top_items.size() >= 2 &&
++      top_items[0]->id == "tabs" && top_items[1]->id == "new-tab";
+   browser_->toolbar()->SetNoventraDockingActive();
+   for (const auto edge : {noventra::DockEdge::kTop, noventra::DockEdge::kBottom,
+                           noventra::DockEdge::kLeft, noventra::DockEdge::kRight}) {
+@@ -263,7 +271,8 @@ void NoventraDockController::Apply(const noventra::BrowserLayout& layout) {
+       view->SetVisible(
+           item.visible &&
+           (item.id != "new-tab" ||
+-           !noventra::WindowMirrorService::IsEnabled(browser_->GetProfile())));
++           (!native_top_new_tab_ &&
++            !noventra::WindowMirrorService::IsEnabled(browser_->GetProfile()))));
+     }
+     if (item.visible && !was_visible) {
+       // Native extension animations require a fresh layout when their host
+@@ -424,11 +433,8 @@ gfx::Rect NoventraDockController::Layout(const gfx::Rect& client_bounds) {
+   gfx::Rect remaining = client_bounds;
+   gfx::Rect content = client_bounds;
+   const bool zen = browser_->IsZenModeEnabledForLayout();
+-  bool focused = address_requested_;
+-  auto* focus = browser_->GetFocusManager()->GetFocusedView();
+-  for (const auto& [edge, dock] : docks_) focused |= dock->Contains(focus);
+-  if (address_view_) focused |= address_view_->Contains(focus);
+-  force_reveal_ = focused;
++  force_reveal_top_ = HasFocusedControl(false);
++  force_reveal_side_ = HasFocusedControl(true);
+   for (const auto edge : {noventra::DockEdge::kTop, noventra::DockEdge::kBottom,
+                           noventra::DockEdge::kLeft, noventra::DockEdge::kRight}) {
+     auto* dock = docks_.at(edge).get();
+@@ -508,7 +514,7 @@ void NoventraDockController::PositionDock(const DockGeometry& geometry) {
+   if (geometry.floating) {
+     const bool side = edge == noventra::DockEdge::kLeft ||
+                       edge == noventra::DockEdge::kRight;
+-    const float reveal = force_reveal_ ? 1.f :
++    const float reveal = (side ? force_reveal_side_ : force_reveal_top_) ? 1.f :
+         (side ? browser_->GetSideChromeRevealRatio() :
+                 browser_->GetTopChromeRevealRatio());
+     const int cross = side ? bounds.width() : bounds.height();
+@@ -796,12 +802,48 @@ bool NoventraDockController::IsVisibleCaptionPoint(const gfx::Point& point) cons
+       (leading_caption_bounds_.Contains(point) || trailing_caption_bounds_.Contains(point));
+ }
+ 
+-bool NoventraDockController::ShouldReveal(const gfx::Point& point) const {
+-  if (ContainsPoint(point)) return true;
++std::vector<const views::View*> NoventraDockController::GetChromeRoots(
++    bool side) const {
++  std::vector<const views::View*> roots;
+   for (const auto& [edge, dock] : docks_) {
+-    if (!dock->HasVisibleControls()) continue;
+-    // Captions retain their frame hit targets but belong to the revealed
+-    // header's hover area, so moving onto Close must not collapse the bar.
++    const bool side_dock = edge == noventra::DockEdge::kLeft ||
++                           edge == noventra::DockEdge::kRight;
++    if (side_dock == side) roots.push_back(dock.get());
++  }
++  if (address_pane_ && IsControlOnSide("address") == side)
++    roots.push_back(address_pane_);
++  return roots;
++}
++
++bool NoventraDockController::IsControlOnSide(std::string_view id) const {
++  const auto control = controls_.find(std::string(id));
++  if (control == controls_.end()) return false;
++  for (const auto edge : {noventra::DockEdge::kLeft,
++                          noventra::DockEdge::kRight}) {
++    if (docks_.at(edge)->Contains(control->second)) return true;
++  }
++  return false;
++}
++
++bool NoventraDockController::HasFocusedControl(bool side) const {
++  auto* focus = browser_->GetFocusManager()->GetFocusedView();
++  for (const auto* root : GetChromeRoots(side)) {
++    if (root->Contains(focus)) return true;
++  }
++  return address_requested_ && IsControlOnSide("address") == side;
++}
++
++bool NoventraDockController::ShouldReveal(const gfx::Point& point,
++                                          bool side) const {
++  if (address_pane_ && address_pane_->GetVisible() &&
++      IsControlOnSide("address") == side &&
++      views::View::ConvertRectToTarget(address_pane_, browser_,
++                                       address_pane_->GetLocalBounds())
++          .Contains(point)) return true;
++  for (const auto& [edge, dock] : docks_) {
++    const bool side_dock = edge == noventra::DockEdge::kLeft ||
++                           edge == noventra::DockEdge::kRight;
++    if (side_dock != side || !dock->HasVisibleControls()) continue;
+     if (dock->GetVisible() && views::View::ConvertRectToTarget(
+             dock, browser_, dock->GetLocalBounds()).Contains(point)) return true;
+     if ((edge == noventra::DockEdge::kTop && point.y() < 3) ||
+@@ -809,7 +851,7 @@ bool NoventraDockController::ShouldReveal(const gfx::Point& point) const {
+         (edge == noventra::DockEdge::kLeft && point.x() < 3) ||
+         (edge == noventra::DockEdge::kRight && point.x() >= browser_->width() - 3)) return true;
+   }
+-  return false;
++  return !side && IsVisibleCaptionPoint(point);
+ }
+ void NoventraDockController::AppendAccessiblePanes(std::vector<views::View*>& panes) const {
+   if (address_pane_ && address_pane_->GetVisible()) panes.push_back(address_pane_);
+@@ -863,7 +905,8 @@ void NoventraDockController::OnDidChangeFocus(views::View* before, views::View*
+       was_in_dock |= dock->Contains(before);
+       in_dock |= dock->Contains(now);
+     }
+-    dock_focus_changed = was_in_dock != in_dock;
++    dock_focus_changed = was_in_dock != in_dock ||
++                         (was_in_dock && in_dock && before != now);
+   }
+   if (was_editing != editing) address_requested_ = editing;
+   if (was_editing != editing || dock_focus_changed) browser_->InvalidateLayout();
+diff --git a/chrome/browser/ui/views/frame/noventra_dock_controller.h b/chrome/browser/ui/views/frame/noventra_dock_controller.h
+index 080f0b5744939a62b26903700fd8f18f437eaf8f..e44083608c13b1c62a81a6e85f29279397408a6c 100644
+--- a/chrome/browser/ui/views/frame/noventra_dock_controller.h
++++ b/chrome/browser/ui/views/frame/noventra_dock_controller.h
+@@ -4,6 +4,8 @@
+ #define CHROME_BROWSER_UI_VIEWS_FRAME_NOVENTRA_DOCK_CONTROLLER_H_
+ #include <map>
+ #include <memory>
++#include <string_view>
++#include <vector>
+ 
+ #include "base/memory/raw_ptr.h"
+ #include "base/memory/weak_ptr.h"
+@@ -44,6 +46,7 @@ class NoventraDockController : public views::FocusChangeListener,
+   void OnBatterySaverModeManagerDestroyed() override;
+   bool active() const { return active_; }
+   bool IsCommandPopupVisible() const { return command_popup_visible_; }
++  bool UsesNativeTopNewTabButton() const { return native_top_new_tab_; }
+   // Strip resets can run synchronously in another window's pref callback.
+   void RestoreEmbeddedBookmarks();
+   // Client-owned material, excluding frame-owned caption controls. Coordinates
+@@ -52,7 +55,10 @@ class NoventraDockController : public views::FocusChangeListener,
+   bool HasSidebarLibrary() const;
+   bool ContainsPoint(const gfx::Point& point) const;
+   bool IsVisibleCaptionPoint(const gfx::Point& point) const;
+-  bool ShouldReveal(const gfx::Point& point) const;
++  bool ShouldReveal(const gfx::Point& point, bool side) const;
++  bool IsControlOnSide(std::string_view id) const;
++  bool HasFocusedControl(bool side) const;
++  std::vector<const views::View*> GetChromeRoots(bool side) const;
+   void AppendAccessiblePanes(std::vector<views::View*>& panes) const;
+  private:
+   struct DockGeometry {
+@@ -93,10 +99,12 @@ class NoventraDockController : public views::FocusChangeListener,
+   gfx::Rect leading_caption_bounds_;
+   gfx::Rect trailing_caption_bounds_;
+   std::vector<DockGeometry> dock_geometry_;
+-  bool force_reveal_ = false;
++  bool force_reveal_top_ = false;
++  bool force_reveal_side_ = false;
+   bool has_layout_ = false;
+   bool address_requested_ = false;
+   bool command_popup_visible_ = false;
++  bool native_top_new_tab_ = false;
+   bool active_ = false;
+   bool pending_ = false;
+   base::WeakPtrFactory<NoventraDockController> weak_factory_{this};
+diff --git a/chrome/browser/ui/views/frame/noventra_dock_view.cc b/chrome/browser/ui/views/frame/noventra_dock_view.cc
+index 02158d2a0d431dcc6a86201d4434aa3a252946a1..92fa7b9a53338173ee0c8ab2356586eb877ec120 100644
+--- a/chrome/browser/ui/views/frame/noventra_dock_view.cc
++++ b/chrome/browser/ui/views/frame/noventra_dock_view.cc
+@@ -27,6 +27,7 @@
+ #include "ui/compositor/layer.h"
+ #include "ui/gfx/canvas.h"
+ #include "ui/gfx/geometry/rect_f.h"
++#include "ui/gfx/geometry/rounded_corners_f.h"
+ #include "ui/gfx/geometry/skia_conversions.h"
+ #include "ui/views/accessibility/view_accessibility.h"
+ #include "ui/views/background.h"
+@@ -312,7 +313,7 @@ struct HorizontalDockLayout {
+ };
+ HorizontalDockLayout HorizontalDockBounds(const NoventraDockView& dock,
+                                           int width,
+-                                          bool tabs_first) {
++                                          bool top_edge) {
+   const int control_height =
+       std::max(GetLayoutConstant(LayoutConstant::kToolbarButtonHeight),
+                GetLayoutConstant(LayoutConstant::kLocationBarHeight));
+@@ -330,7 +331,14 @@ HorizontalDockLayout HorizontalDockBounds(const NoventraDockView& dock,
+       tabs = child;
+     }
+   }
+-  if (tabs && tabs_first) {
++  views::View* first = nullptr;
++  for (views::View* child : dock.children()) {
++    if (OccupiesDockSpace(child)) { first = child; break; }
++  }
++  // A tabs-first top layout is the normal two-row browser. Navigation-first
++  // top layouts retain the compact single row when their native controls fit.
++  const bool tabs_first = top_edge && tabs && first == tabs;
++  if (tabs && top_edge && !tabs_first) {
+     const auto insets = dock.CaptionInsetsForRow(0) + padding;
+     const int available = std::max(0, width - insets.width());
+     // Respect the native tab strip's minimum rather than clipping its close,
+@@ -429,7 +437,8 @@ HorizontalDockLayout HorizontalDockBounds(const NoventraDockView& dock,
+         // trailing controls. Spare space surrounds the field, so the menu and
+         // extension region still reach the end of the row.
+         constexpr int kMaximumAddressWidth = 720;
+-        address_margin = std::max(0, extent - kMaximumAddressWidth);
++        address_margin = tabs_first ? 0 :
++            std::max(0, extent - kMaximumAddressWidth);
+         extent -= address_margin;
+         x += address_margin / 2;
+       }
+@@ -481,6 +490,8 @@ void NoventraDockView::SetFloatingGlass(bool floating) {
+     return;
+   }
+   floating_glass_ = floating;
++  layer()->SetRoundedCornerRadius(gfx::RoundedCornersF(floating ? 8.f : 0.f));
++  layer()->SetIsFastRoundedCorner(true);
+   UpdateGlassBlur();
+ }
+ 
+diff --git a/chrome/browser/ui/views/tabs/common/vertical_tab_style_views.cc b/chrome/browser/ui/views/tabs/common/vertical_tab_style_views.cc
+index 2d42cb807bf43f94816cd54c1d1f0490ba4ef721..56feb06f1b5d5ed883a5f9cc3d36e745c385e76e 100644
+--- a/chrome/browser/ui/views/tabs/common/vertical_tab_style_views.cc
++++ b/chrome/browser/ui/views/tabs/common/vertical_tab_style_views.cc
+@@ -192,6 +192,17 @@ void VerticalTabStyleViews::PaintTabBackgroundFill(
+                            delegate_->GetView()->height() * scale);
+     }
+   }
++  if (selection_state != TabStyle::TabSelectionState::kInactive &&
++      delegate_->GetView()->GetNativeTheme()->preferred_contrast() !=
++          ui::NativeTheme::PreferredContrast::kMore) {
++    cc::PaintFlags stroke;
++    stroke.setAntiAlias(true);
++    stroke.setStyle(cc::PaintFlags::kStroke_Style);
++    stroke.setStrokeWidth(scale);
++    stroke.setColor(SkColorSetA(delegate_->GetView()->GetColorProvider()->GetColor(
++        kColorTabForegroundActiveFrameActive), 56));
++    canvas->DrawPath(fill_path, stroke);
++  }
+ }
+ 
+ bool VerticalTabStyleViews::ShouldPaintTabBackgroundColor(
+@@ -225,18 +236,20 @@ bool VerticalTabStyleViews::ShouldPaintTabBackgroundColor(
+ 
+ SkColor VerticalTabStyleViews::GetCurrentTabBackgroundColor(
+     TabStyle::TabSelectionState selection_state) const {
+-  if (const auto* view = delegate_->GetView();
+-      view->GetNativeTheme()->preferred_contrast() !=
+-      ui::NativeTheme::PreferredContrast::kMore) {
+-    const bool dark =
+-        view->GetWidget() && view->GetWidget()->GetColorMode() ==
+-                                 ui::ColorProviderKey::ColorMode::kDark;
++  const auto* view = delegate_->GetView();
++  const bool material = helium::ShouldUseNativeFrameMaterials(
++      delegate_->GetBrowserWindowInterface());
++  if (material && view->GetNativeTheme()->preferred_contrast() !=
++                      ui::NativeTheme::PreferredContrast::kMore) {
+     if (selection_state != TabStyle::TabSelectionState::kInactive) {
+-      return SkColorSetA(SK_ColorWHITE, dark ? 46 : 204);
++      // Use the palette's selected surface instead of white over white glass.
++      return SkColorSetA(view->GetColorProvider()->GetColor(
++          kColorTabBackgroundActiveFrameActive), 238);
+     }
+     if (delegate_->IsPinned()) {
+       return SkColorSetA(view->GetColorProvider()->GetColor(kColorToolbarText),
+-                         dark ? 38 : 20);
++                         view->GetWidget()->GetColorMode() ==
++                                 ui::ColorProviderKey::ColorMode::kDark ? 38 : 20);
+     }
+   }
+   if (helium::ShouldUseNativeFrameMaterials(
+@@ -274,9 +287,8 @@ TabStyle::TabSelectionState VerticalTabStyleViews::GetSelectionState() const {
+ }
+ 
+ SkScalar VerticalTabStyleViews::GetCornerRadius() const {
+-  return SkIntToScalar(
+-      GetLayoutConstant(LayoutConstant::kVerticalTabCornerRadius) +
+-      (delegate_->IsSplit() ? delegate_->GetView()->GetInsets().height() : 0));
++  // Match the browser's control and content corners instead of a full pill.
++  return 8.f;
+ }
+ 
+ gfx::Insets VerticalTabStyleViews::GetContentsInsets() const {
+diff --git a/chrome/browser/ui/views/tabs/tab/tab_icon.cc b/chrome/browser/ui/views/tabs/tab/tab_icon.cc
+index e42b86f66976d8cb77e0fdcb9f012347cc29a470..c11645cf4d35ad096df0c5b76ad9e76e5a5108a4 100644
+--- a/chrome/browser/ui/views/tabs/tab/tab_icon.cc
++++ b/chrome/browser/ui/views/tabs/tab/tab_icon.cc
+@@ -131,7 +131,7 @@ void TabIcon::SetNoventraForegroundColor(SkColor color) {
+   }
+   // Parent tab views call this on frame activation changes, including when
+   // their foreground is unchanged. Refresh the logo against the new surface.
+-  if (should_themify_favicon_) {
++  if (should_themify_favicon_ || !GetNonDefaultFavicon()) {
+     UpdateThemedFavicon();
+   }
+ }
+@@ -496,9 +496,10 @@ void TabIcon::MaybePaintFavicon(gfx::Canvas* canvas,
+ }
+ 
+ bool TabIcon::GetNonDefaultFavicon() const {
+-  const auto default_favicon =
+-      favicon::GetDefaultFaviconModel(kColorTabBackgroundActiveFrameActive);
+-  return !favicon_.IsEmpty() && favicon_ != default_favicon;
++  // TabUIHelper supplies the fallback globe as a cached image generator whose
++  // callback resolves the tab background. Comparing it with a freshly bound
++  // generator never matches; real page and app favicons are raster images.
++  return !favicon_.IsEmpty() && !favicon_.IsImageGenerator();
+ }
+ 
+ void TabIcon::SetIcon(const ui::ImageModel& icon, bool should_themify_favicon) {
+@@ -636,8 +637,9 @@ void TabIcon::UpdateThemedFavicon() {
+     themed_favicon_ = gfx::ImageSkiaOperations::CreateColorMask(
+         favicon_.Rasterize(GetColorProvider()), color_utils::PickContrastingColor(SK_ColorBLACK, SK_ColorWHITE, surface));
+   } else if (!GetNonDefaultFavicon()) {
+-    themed_favicon_ = tabs::ThemeFaviconForTab(
+-        favicon_.Rasterize(GetColorProvider()), *GetColorProvider());
++    // Default site glyphs need the same readable ink as the native tab title.
++    themed_favicon_ = gfx::ImageSkiaOperations::CreateColorMask(
++        favicon_.Rasterize(GetColorProvider()), noventra_foreground_);
+   } else if (is_monochrome_favicon_) {
+     themed_favicon_ = tabs::ThemeMonochromeFaviconForTab(
+         favicon_.Rasterize(GetColorProvider()), *GetColorProvider(),
+diff --git a/chrome/browser/ui/webui/settings/appearance_handler.cc b/chrome/browser/ui/webui/settings/appearance_handler.cc
+index 4e990764786e3f366f5b7d746ace7247d1f7b084..5465dd41813e0aa6facd326194e5153fae3c0793 100644
+--- a/chrome/browser/ui/webui/settings/appearance_handler.cc
++++ b/chrome/browser/ui/webui/settings/appearance_handler.cc
+@@ -176,7 +176,8 @@ base::DictValue AppearanceHandler::NoventraLayoutState() {
+     capability.Set("members", std::move(members));
+   }
+   base::DictValue presets;
+-  for (const char* name : {"sidebar-top", "minimal-left", "minimal-right", "classic-top"})
++  for (const char* name : {"sidebar-top", "minimal-left", "minimal-right",
++                           "classic-top", "compact-top"})
+     presets.Set(name, noventra::LayoutToValue(noventra::MakeLayoutPreset(name, prefs)));
+   return base::DictValue().Set("layout", noventra::LayoutToValue(layout))
+       .Set("capabilities", std::move(capabilities)).Set("presets", std::move(presets));
+diff --git a/components/helium_onboarding/src/NoventraOnboarding.svelte b/components/helium_onboarding/src/NoventraOnboarding.svelte
+index 65660c2b47b41c196d12e4820b4b6aa145f43170..5bbcb6ba23a1b3efdaf169b0a83d8e92692a805c 100644
+--- a/components/helium_onboarding/src/NoventraOnboarding.svelte
++++ b/components/helium_onboarding/src/NoventraOnboarding.svelte
+@@ -4,7 +4,7 @@
+     import { IconWorld } from '@imput/helium-prism';
+     import IconKey from './icons/tabler/IconKey.svelte';
+     import IconTransferIn from './icons/tabler/IconTransferIn.svelte';
+-    import { browserIcons } from './lib/nonfree-icons';
++    import { browserIcons, searchEngineIcons } from './lib/nonfree-icons';
+     import NoventraPasswordManagers from './components/NoventraPasswordManagers.svelte';
+     import { passwordManagers } from './lib/password-managers';
+     import { getBoolean } from './lib/strings';
+@@ -14,13 +14,14 @@
+     import { addWebUiListener, removeWebUiListener, sendWithPromise } from './lib/cr';
+     import { ImportDataBrowserProxyImpl, ImportDataStatus, type BrowserProfile } from './lib/cr/import_data_browser_proxy';
+ 
+-    const steps = ['Welcome', 'Data', 'Password manager', 'Ready'];
++    const steps = ['Welcome', 'Data', 'Password manager', 'Search engine', 'Ready'];
+     const importer = ImportDataBrowserProxyImpl.getInstance();
+     const showMacImportNotice = getBoolean('showMacImportPermissionNotice');
+     const canImportBrowserPasswords = getBoolean('canImportBrowserPasswords');
+     const searchProxy = SearchEnginesBrowserProxyImpl.getInstance();
+     const defaultProxy = DefaultBrowserBrowserProxyImpl.getInstance();
+-    const choiceKey = 'noventra.setup.imports.v1';
++    const choiceKey = 'noventra.setup.imports.v2';
++    const legacyChoiceKey = 'noventra.setup.imports.v1';
+     type DataKind = 'bookmarks' | 'history' | 'passwords';
+     type Choices = Record<DataKind, boolean>;
+     type Completed = Record<number, DataKind[]>;
+@@ -29,11 +30,11 @@
+     const validId = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+     const validCount = (value: unknown): number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : 0;
+ 
+-    function restoreChoices(): { id?: number; data: Choices; completed: Completed; bookmarks: number; history: number; passwords: number; interrupted: boolean; csv: boolean; restorable: boolean } {
+-        const empty = { data: { bookmarks: true, history: true, passwords: true }, completed: {} as Completed, bookmarks: 0, history: 0, passwords: 0, interrupted: false, csv: false, restorable: false };
++    function restoreChoices(): { id?: number; data: Choices; completed: Completed; bookmarks: number; history: number; passwords: number; interrupted: boolean; csv: boolean; restorable: boolean; version: number; searchId?: number; searchChanged: boolean; makeDefault: boolean } {
++        const empty = { data: { bookmarks: true, history: true, passwords: true }, completed: {} as Completed, bookmarks: 0, history: 0, passwords: 0, interrupted: false, csv: false, restorable: false, version: 0, searchId: undefined as number | undefined, searchChanged: false, makeDefault: false };
+         try {
+-            const value = JSON.parse(sessionStorage.getItem(choiceKey) ?? 'null');
+-            if (!value || value.version !== 1) return empty;
++            const value = JSON.parse(sessionStorage.getItem(choiceKey) ?? sessionStorage.getItem(legacyChoiceKey) ?? 'null');
++            if (!value || ![1, 2].includes(value.version)) return empty;
+             const completed: Completed = {};
+             if (value.completed && typeof value.completed === 'object') {
+                 for (const [id, imported] of Object.entries(value.completed)) {
+@@ -43,13 +44,18 @@
+             return { id: validId(value.id) ? value.id : undefined,
+                 data: Object.fromEntries(kinds.map(kind => [kind, value.data?.[kind] === true])) as Choices,
+                 completed, bookmarks: validCount(value.bookmarks), history: validCount(value.history), passwords: validCount(value.passwords),
+-                interrupted: value.inFlight === true || value.interrupted === true, csv: value.csv === true, restorable: true };
++                interrupted: value.inFlight === true || value.interrupted === true, csv: value.csv === true, restorable: true,
++                version: value.version, searchId: value.version === 2 && validId(value.searchId) ? value.searchId : undefined,
++                searchChanged: value.version === 2 && value.searchChanged === true && validId(value.searchId),
++                makeDefault: value.version === 2 && value.makeDefault === true };
+         } catch { return empty; }
+     }
+ 
+     const restored = restoreChoices();
+-    // Old unversioned step indexes belonged to the previous five-step flow.
+-    const savedStep = restored.restorable ? Number(sessionStorage.getItem('noventra.setup.step') ?? 0) : 0;
++    // Version 1 used four steps; its Ready index moves past the new search step.
++    const storedStep = restored.restorable ? Number(sessionStorage.getItem('noventra.setup.step') ?? 0) : 0;
++    const savedStep = restored.version === 1 && storedStep === 3 ? 4 : storedStep;
++    if (savedStep !== storedStep) sessionStorage.setItem('noventra.setup.step', String(savedStep));
+     if (!restored.restorable) sessionStorage.removeItem('noventra.setup.step');
+     let step = $state(Number.isInteger(savedStep) && savedStep >= 0 && savedStep < steps.length ? savedStep : 0);
+     let profiles = $state<BrowserProfile[]>([]);
+@@ -78,12 +84,12 @@
+     let defaultsLoading = $state(false);
+     let defaultsLoaded = false;
+     let searchEngines = $state<SearchEngine[]>([]);
+-    let selectedSearchEngineId = $state<number>();
+-    let searchChanged = $state(false);
++    let selectedSearchEngineId = $state<number | undefined>(restored.searchId);
++    let searchChanged = $state(restored.searchChanged);
+     let searchLoadError = $state(false);
+     let defaultBrowserInfo = $state<DefaultBrowserInfo>();
+     let defaultLoadError = $state(false);
+-    let makeDefault = $state(false);
++    let makeDefault = $state(restored.makeDefault);
+     let defaultRequestSent = false;
+     let defaultsApplyFailed = $state(false);
+     let discoveryPromise: Promise<void> | undefined;
+@@ -104,9 +110,11 @@
+ 
+     $effect(() => {
+         try {
+-            sessionStorage.setItem(choiceKey, JSON.stringify({ version: 1, id: selectedId, data: selectedData,
++            sessionStorage.setItem(choiceKey, JSON.stringify({ version: 2, id: selectedId, data: selectedData,
+                 completed: importedProfileData, bookmarks: bookmarkImports, history: historyImports, passwords: passwordImports,
+-                inFlight: importInFlight, interrupted: interruptedImport, csv: passwordOpened }));
++                inFlight: importInFlight, interrupted: interruptedImport, csv: passwordOpened,
++                searchId: selectedSearchEngineId, searchChanged, makeDefault }));
++            sessionStorage.removeItem(legacyChoiceKey);
+         } catch { /* Storage restrictions must not prevent an explicitly requested import. */ }
+     });
+ 
+@@ -145,7 +153,7 @@
+         await tick();
+         title?.focus();
+         if (step === 1 && discovery === 'initial') await refreshBrowserProfiles();
+-        if (step === steps.length - 1 && !defaultsLoaded) void loadDefaults();
++        if (step >= 3 && !defaultsLoaded) void loadDefaults();
+     }
+ 
+     function scanBrowserProfiles(): Promise<void> {
+@@ -174,6 +182,20 @@
+         });
+     }
+ 
++    function searchIcon(engine: SearchEngine): string | undefined {
++        if (!engine.isPrepopulated) return undefined;
++        const name = engine.name.toLowerCase().replace(/[^a-z]/g, '');
++        const known = Object.keys(searchEngineIcons).find(key => name.includes(key));
++        return known ? searchEngineIcons[known] : undefined;
++    }
++
++    function keepCurrentSearch() {
++        searchChanged = false;
++        selectedSearchEngineId = searchEngines.find(engine => engine.default)?.id;
++        importError = '';
++        defaultsApplyFailed = false;
++    }
++
+     async function loadDefaults() {
+         if (defaultsLoading) return;
+         defaultsLoading = true;
+@@ -195,11 +217,10 @@
+             if (searchChanged && selectedSearchEngineId !== undefined) {
+                 const fresh = eligibleEngines(await searchProxy.getSearchEnginesList());
+                 searchEngines = fresh;
+-                searchEngines = fresh;
+                 const selected = fresh.find(engine => engine.id === selectedSearchEngineId);
+                 if (!selected || fresh.some(engine => engine.default && engine.isManaged) || (!selected.default && (!selected.canBeDefault || selected.isManaged))) {
+                     defaultsApplyFailed = true;
+-                    importError = 'Your search choice is unavailable. Review Browsing defaults and try again.';
++                    importError = 'Your search choice is unavailable. Review Search engine and try again.';
+                     return false;
+                 }
+                 if (!selected.default) searchProxy.setDefaultSearchEngine(selected.id, ChoiceMadeLocation.OTHER, null);
+@@ -207,7 +228,7 @@
+                 searchEngines = verified;
+                 if (!verified.some(engine => engine.id === selectedSearchEngineId && engine.default)) {
+                     defaultsApplyFailed = true;
+-                    importError = 'The search engine could not be changed. Review Browsing defaults and try again.';
++                    importError = 'The search engine could not be changed. Review Search engine and try again.';
+                     return false;
+                 }
+                 searchChanged = false;
+@@ -248,6 +269,7 @@
+             await sendWithPromise('setPref', 'completed_onboarding', true);
+             sessionStorage.removeItem('noventra.setup.step');
+             sessionStorage.removeItem(choiceKey);
++            sessionStorage.removeItem(legacyChoiceKey);
+             location.assign('chrome://newtab/');
+         } catch { saveError = true; }
+         finally { saving = false; }
+@@ -342,7 +364,7 @@
+     onMount(() => {
+         document.title = 'Set up Noventra';
+         if (step === 1 || selectedId !== undefined) void scanBrowserProfiles();
+-        if (step === steps.length - 1) void loadDefaults();
++        if (step >= 3) void loadDefaults();
+         const extensionListener = addWebUiListener('extension-state-changed', (diff: ExtensionStatus) => { managerExtensions = { ...managerExtensions, ...diff }; });
+         void refreshManagerExtensions().catch(() => {});
+         const listener = addWebUiListener('import-data-status-changed', (value: ImportDataStatus) => {
+@@ -363,8 +385,13 @@
+                 resolveImport?.(false);
+             }
+         });
++        const searchListener = addWebUiListener('search-engines-changed', (info: SearchEnginesInfo) => {
++            searchEngines = eligibleEngines(info);
++            if (!searchChanged) selectedSearchEngineId = searchEngines.find(engine => engine.default)?.id;
++            searchLoadError = false;
++        });
+         const defaultListener = addWebUiListener('browser-default-state-changed', (state: DefaultBrowserInfo) => { defaultBrowserInfo = state; });
+-        return () => { removeWebUiListener(listener); removeWebUiListener(extensionListener); removeWebUiListener(defaultListener); };
++        return () => { removeWebUiListener(listener); removeWebUiListener(extensionListener); removeWebUiListener(defaultListener); removeWebUiListener(searchListener); };
+     });
+ </script>
+ 
+@@ -438,6 +465,24 @@
+                     <h1 id="step-title" tabindex="-1" bind:this={title}>Keep your password manager.</h1>
+                     <p class="intro">Add an extension, then sign in as usual.</p>
+                     <NoventraPasswordManagers bind:extensions={managerExtensions} bind:installing={managerInstalling} refreshExtensions={refreshManagerExtensions} />
++                {:else if step === 3}
++                    <h1 id="step-title" tabindex="-1" bind:this={title}>Choose your search engine.</h1>
++                    <p class="intro">Search from the address bar. Your choice takes effect when you finish setup.</p>
++                    {#if defaultsLoading}<p class="import-message" role="status">Loading search engines…</p>{/if}
++                    {#if searchManaged}<p class="privacy-hint">Your search engine is managed. Your current choice will be kept.</p>{/if}
++                    <fieldset id="setup-search-engine" class="search-engines" disabled={busy || defaultsLoading || searchLoadError || searchManaged || !searchEngines.length}>
++                        <legend class="sr-only">Default search engine</legend>
++                        {#each searchEngines as engine (engine.id)}
++                            <label class="search-engine-card" class:selected={selectedSearchEngineId === engine.id} data-search-id={engine.id}>
++                                <input type="radio" name="setup-search-engine" value={engine.id} checked={selectedSearchEngineId === engine.id} disabled={!engine.default && (!engine.canBeDefault || engine.isManaged)} onchange={() => { selectedSearchEngineId = engine.id; searchChanged = true; importError = ''; }} />
++                                <span class="source-icon" aria-hidden="true">{#if searchIcon(engine)}<img src={searchIcon(engine)} alt="" />{:else}<IconWorld />{/if}</span>
++                                <span class="source-name"><strong>{engine.name}</strong>{#if engine.default}<span>Current search engine</span>{/if}</span>
++                            </label>
++                        {/each}
++                    </fieldset>
++                    {#if searchLoadError || (!defaultsLoading && !searchEngines.length)}<p class="error" role="alert">Search engines could not be loaded. Keep your current engine or try again.</p>{/if}
++                    <div class="discovery-actions"><button id="refresh-search-engines" class="quiet" disabled={busy || defaultsLoading} onclick={loadDefaults}>Refresh search engines</button>{#if searchChanged}<button id="keep-current-search" class="quiet" disabled={busy || defaultsLoading} onclick={keepCurrentSearch}>Keep current search engine</button>{/if}</div>
++                    <p class="privacy-hint">You can change this later in Settings → Search engine.</p>
+                 {:else}
+                     <div class="finish-symbol" aria-hidden="true"><NoventraLogo height="42px" /></div>
+                     <h1 id="step-title" tabindex="-1" bind:this={title}>You’re ready to browse.</h1>
+@@ -445,19 +490,13 @@
+                     <div class="summary-row" id="data-import-summary"><div><strong>Browser data</strong><p>{stagedKinds.length ? `${sourceLabel}: ${stagedDescription}.` : bookmarkImports || historyImports || passwordImports ? 'Selected browser imports finished.' : 'Import later in Settings.'}</p></div><span class="summary-tag">{importError ? 'Check needed' : stagedKinds.length ? 'Queued' : bookmarkImports || historyImports || passwordImports ? 'Finished' : 'Optional'}</span></div>
+                     {#if passwordOpened}<div class="summary-row" id="password-import-summary"><div><strong>Password CSV</strong><p>Check the results in your password manager tab.</p></div><span class="summary-tag">Opened</span></div>{/if}
+                     <div class="summary-row"><div><strong>Password manager</strong><p role="status">{managerLoading ? 'Checking extensions…' : managerCheckFailed ? 'Couldn’t check extensions. Go back to retry.' : enabledManagers.length ? `${enabledManagers.join(', ')} installed. Sign in through the extension.` : 'Add an extension later.'}</p></div><span class="summary-tag">{managerLoading ? 'Checking' : managerCheckFailed ? 'Check needed' : enabledManagers.length ? 'Installed' : 'Optional'}</span></div>
+-                    <details id="browsing-defaults" class="import-details browsing-defaults"><summary>Browsing defaults</summary>
+-                        <label for="setup-search-engine">Search engine</label>
+-                        <select id="setup-search-engine" value={selectedSearchEngineId ?? ''} disabled={busy || defaultsLoading || searchLoadError || searchManaged || !searchEngines.length} onchange={event => { selectedSearchEngineId = Number(event.currentTarget.value); searchChanged = true; importError = ''; }}>
+-                            {#each searchEngines as engine (engine.id)}<option value={engine.id} disabled={!engine.default && (!engine.canBeDefault || engine.isManaged)}>{engine.name}{engine.default ? ' (current)' : ''}</option>{/each}
+-                        </select>
+-                        {#if searchChanged}<button id="keep-current-search" class="quiet" disabled={busy} onclick={() => { selectedSearchEngineId = searchEngines.find(engine => engine.default)?.id; searchChanged = false; importError = ''; }}>Keep current search engine</button>{/if}
+-                        {#if searchManaged}<p>Your search engine is managed.</p>{/if}
+-                        {#if searchLoadError || !searchEngines.length}<p><a href="chrome://settings/search" target="_blank" rel="noopener noreferrer">Choose a search engine in Settings</a></p>{/if}
++                    <div id="browsing-defaults" class="browsing-defaults">
++                        <div class="summary-row" id="search-engine-summary"><div><strong>Search engine</strong><p>{searchEngines.find(engine => engine.id === selectedSearchEngineId)?.name || 'Keep current search engine'}</p></div><span class="summary-tag">{searchChanged ? 'Selected' : 'Current'}</span></div>
+                         {#if defaultBrowserInfo?.isDefault}<p id="already-default-browser">Noventra is already your default browser.</p>
+                         {:else}<label class="default-browser-choice"><input id="setup-make-default" type="checkbox" checked={makeDefault} disabled={busy || defaultsLoading || (!makeDefault && (defaultLoadError || !defaultBrowserInfo?.canBeDefault || defaultBrowserInfo?.isDisabledByPolicy || defaultBrowserInfo?.isUnknownError))} onchange={event => { makeDefault = event.currentTarget.checked; importError = ''; }} />Make Noventra my default browser</label><p>Your operating system may ask you to confirm.</p>{/if}
+                         {#if defaultLoadError || defaultBrowserInfo?.isDisabledByPolicy || defaultBrowserInfo?.isUnknownError}<p><a href="chrome://settings/defaultBrowser" target="_blank" rel="noopener noreferrer">Check default browser settings</a></p>{/if}
+                         {#if searchChanged || makeDefault || defaultsApplyFailed}<button id="setup-keep-current-defaults" class="quiet" disabled={busy || defaultsLoading} onclick={keepCurrentDefaults}>Keep current browsing defaults</button>{/if}
+-                    </details>
++                    </div>
+                     {#if finishing}<p id="setup-import-progress" class="import-message" role="status" aria-live="polite">{importProgress || 'Saving setup…'} Keep this page open.</p>{/if}
+                     {#if importError}<p id="setup-import-error" class="error" role="alert">{importError}</p>{/if}
+                     {#if interruptedImport && !finishing}<p id="interrupted-import-warning" class="error" role="alert">An import was interrupted. Some data may already have been copied. Check your data before retrying.</p>{/if}
+@@ -506,7 +545,10 @@
+     .source-icon { display:grid;place-items:center;width:32px;height:32px;flex-shrink:0; }.source-icon img { width:28px;height:28px;object-fit:contain; }.source-icon :global(svg) { width:24px;height:24px; }
+     .source-name { display:flex;flex-direction:column;gap:3px;flex:1;min-width:0;text-align:left; }.source-name strong { font-size:13px;font-weight:600;overflow-wrap:anywhere; }.source-name>span { font-size:11px;color:var(--muted);overflow-wrap:anywhere; }.source-kind { color:var(--muted);font-size:10px; }
+     .empty { display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;border:1px dashed var(--line);border-radius:10px;padding:23px 16px;text-align:center;font-size:12px;color:var(--muted); }.empty strong { color:var(--ink);font-size:13px;font-weight:500; }.empty p { margin:0;line-height:1.5; }
+-    .browsing-defaults label { display:block;margin:10px 0 6px; }.browsing-defaults select { width:100%;max-width:360px;border:1px solid var(--line);border-radius:7px;padding:8px;color:var(--ink);background:var(--surface);font:inherit; }.browsing-defaults .default-browser-choice { display:flex;align-items:center;gap:8px; }.browsing-defaults input { accent-color:var(--ink); }
++    .search-engines { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;border:0;padding:0;margin:0;max-height:340px;overflow:auto; }
++    .search-engine-card { display:flex;align-items:center;gap:10px;padding:12px;border:1px solid var(--line);border-radius:10px;cursor:pointer;min-height:44px; }.search-engine-card.selected { border-color:var(--ink);background:var(--soft); }.search-engine-card input { margin:0;accent-color:var(--ink); }.search-engine-card:has(input:disabled) { opacity:.65;cursor:default; }
++    @media(max-width:600px) { .search-engines { grid-template-columns:1fr;max-height:360px; } }
++    .browsing-defaults label { display:block;margin:10px 0 6px; }.browsing-defaults .default-browser-choice { display:flex;align-items:center;gap:8px; }.browsing-defaults input { accent-color:var(--ink); }
+     .file-fallbacks .file-card { margin-top:10px; }.file-fallbacks p { margin-bottom:10px; }
+     .file-card { border:1px solid var(--line);padding:10px 12px;border-radius:10px;width:100%;justify-content:flex-start;gap:10px;text-align:left; }.file-card:hover:not(:disabled) { background:var(--soft); }
+     .mac-import-notice { border:1px dashed var(--line);border-radius:10px;padding:10px 12px;margin-top:10px; }.mac-import-notice p { color:var(--muted);font-size:12px;line-height:1.5;margin:0; }.mac-import-notice .quiet { margin-top:5px;min-height:36px;padding-left:0;font-size:12px; }
+diff --git a/components/helium_services/helium_services_helpers.cc b/components/helium_services/helium_services_helpers.cc
+index 192359c08bc33535afcc4bf74b9d23e2b37e3a02..0ccec2a20bb8fd4c66abd4e47c924bca0fb106ee 100644
+--- a/components/helium_services/helium_services_helpers.cc
++++ b/components/helium_services/helium_services_helpers.cc
+@@ -89,8 +89,9 @@ bool ShouldAccessExtensionService(const PrefService& prefs) {
+ }
+ 
+ bool ShouldAccessDictionaryService(const PrefService& prefs) {
+-    return ShouldAccessServices(prefs) &&
+-            prefs.GetBoolean(prefs::kHeliumSpellcheckEnabled);
++    return (ShouldAccessServices(prefs) &&
++            prefs.GetBoolean(prefs::kHeliumSpellcheckEnabled)) ||
++           prefs.GetBoolean(prefs::kNoventraDictionaryDownloads);
+ }
+ 
+ bool ShouldFetchBangs(const PrefService& prefs) {
+@@ -147,11 +148,14 @@ GURL GetWebstoreSnippetURL(const PrefService& prefs, std::string_view id) {
+ }
+ 
+ GURL GetSpellcheckURL(const PrefService& prefs) {
+-    if (!ShouldAccessDictionaryService(prefs)) {
+-        return GetDummyURL();
++    if (ShouldAccessServices(prefs) &&
++        prefs.GetBoolean(prefs::kHeliumSpellcheckEnabled)) {
++        return GetServicesBaseURL(prefs).Resolve("/dict/");
+     }
+-
+-    return GetServicesBaseURL(prefs).Resolve("/dict/");
++    if (prefs.GetBoolean(prefs::kNoventraDictionaryDownloads)) {
++        return GURL("https://redirector.gvt1.com/edgedl/chrome/dict/");
++    }
++    return GetDummyURL();
+ }
+ 
+ GURL GetBrowserUpdateURL(const PrefService& prefs) {
+diff --git a/components/helium_services/pref_names.h b/components/helium_services/pref_names.h
+index 47c631cbe27eeaacfcd984ea705f5515bdc287fb..6821c158fbefca2b7d0d3c38992982213676c7af 100644
+--- a/components/helium_services/pref_names.h
++++ b/components/helium_services/pref_names.h
+@@ -34,6 +34,10 @@ inline constexpr char kHeliumExtProxyEnabled[] =
+ inline constexpr char kNoventraChromeWebStoreDownloads[] =
+     "helium.extensions.chrome_web_store";
+ 
++// Explicit opt-in for direct dictionary downloads without a service proxy.
++inline constexpr char kNoventraDictionaryDownloads[] =
++    "helium.downloads.spelling_dictionaries";
++
+ inline constexpr char kHeliumBangsEnabled[] =
+     "helium.services.bangs";
+ 

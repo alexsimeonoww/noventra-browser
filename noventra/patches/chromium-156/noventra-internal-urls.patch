@@ -1,0 +1,301 @@
+--- a/chrome/browser/autocomplete/chrome_autocomplete_scheme_classifier.cc
++++ b/chrome/browser/autocomplete/chrome_autocomplete_scheme_classifier.cc
+@@ -69,7 +69,8 @@
+     return metrics::OmniboxInputType::EMPTY;
+   }
+   if (base::IsStringASCII(scheme) &&
+-      (ProfileIOData::IsHandledProtocol(scheme) ||
++      (base::EqualsCaseInsensitiveASCII(scheme, "noventra") ||
++       ProfileIOData::IsHandledProtocol(scheme) ||
+        base::EqualsCaseInsensitiveASCII(scheme, content::kViewSourceScheme) ||
+        base::EqualsCaseInsensitiveASCII(scheme, url::kTraceScheme) ||
+        base::EqualsCaseInsensitiveASCII(scheme, url::kJavaScriptScheme) ||
+--- a/chrome/browser/ui/navigator/browser_navigator.cc
++++ b/chrome/browser/ui/navigator/browser_navigator.cc
+@@ -816,7 +816,21 @@
+   }
+ #endif  // BUILDFLAG(IS_CHROMEOS)
+ 
+-  if (params->url.scheme() == content::kHeliumUIScheme) {
++  const bool noventra_alias = params->url.SchemeIs("noventra");
++  // Only browser-owned entries can turn this input alias into a WebUI URL.
++  // Renderer/opener/worker relationships retain their original restrictions.
++  if (noventra_alias &&
++      (params->is_renderer_initiated || params->source_site_instance ||
++       params->initiator_frame_token || params->initiator_origin ||
++       params->initiator_base_url || params->initiator_navigation_state ||
++       params->initiator_process_id !=
++           content::ChildProcessHost::kInvalidUniqueID ||
++       params->opener || params->opened_by_another_window ||
++       params->is_service_worker_open_window || params->frame_tree_node_id ||
++       params->post_data || !params->redirect_chain.empty())) {
++    return nullptr;
++  }
++  if (noventra_alias || params->url.scheme() == content::kHeliumUIScheme) {
+     GURL::Replacements replacements;
+     replacements.SetSchemeStr(content::kChromeUIScheme);
+     params->url = params->url.ReplaceComponents(replacements);
+--- a/chrome/browser/ui/noventra/BUILD.gn
++++ b/chrome/browser/ui/noventra/BUILD.gn
+@@ -23,3 +23,14 @@
+   sources = [ "lock_metrics_policy_probe.cc" ]
+   deps = [ "//base" ]
+ }
++
++executable("internal_urls_probe") {
++  testonly = true
++  sources = [ "internal_urls_probe.cc" ]
++  deps = [
++    "//base",
++    "//base:i18n",
++    "//components/url_formatter",
++    "//url",
++  ]
++}
+--- /dev/null
++++ b/chrome/browser/ui/noventra/internal_urls_probe.cc
+@@ -0,0 +1,118 @@
++// Copyright 2026 The Noventra Authors. All rights reserved.
++
++#include <cstdio>
++#include <string>
++#include <vector>
++
++#include "base/at_exit.h"
++#include "base/command_line.h"
++#include "base/feature_list.h"
++#include "base/i18n/icu_util.h"
++#include "base/strings/utf_offset_string_conversions.h"
++#include "base/strings/utf_string_conversions.h"
++#include "components/url_formatter/url_fixer.h"
++#include "components/url_formatter/url_formatter.h"
++#include "url/gurl.h"
++#include "url/url_util.h"
++
++namespace {
++int failures = 0;
++void Check(bool condition, const char* label) {
++  if (!condition) {
++    std::fprintf(stderr, "FAIL: %s\n", label);
++    ++failures;
++  }
++}
++}  // namespace
++
++int main(int argc, char** argv) {
++  base::AtExitManager at_exit;
++  base::CommandLine::Init(argc, argv);
++  base::FeatureList::InitInstance("", "");
++  if (!base::i18n::InitializeICU()) {
++    return 2;
++  }
++  // Match existing content registration, without registering or granting any
++  // network privileges to the new display/input alias.
++  url::AddStandardScheme("chrome", url::SCHEME_WITH_HOST);
++  url::AddStandardScheme("helium", url::SCHEME_WITH_HOST);
++  struct FixupCase {
++    const char* input;
++    const char* expected;
++  };
++  constexpr FixupCase kCases[] = {
++      {"noventra://settings", "chrome://settings/"},
++      {"NOVENTRA://settings/system/shortcuts?search=keys#edit",
++       "chrome://settings/system/shortcuts?search=keys#edit"},
++      {"noventra:settings/privacy", "chrome://settings/privacy"},
++      {"noventra://downloads", "chrome://downloads/"},
++      {"chrome://settings/system/shortcuts",
++       "chrome://settings/system/shortcuts"},
++      {"helium://settings/privacy", "helium://settings/privacy"},
++      {"https://example.test/noventra://settings",
++       "https://example.test/noventra://settings"},
++  };
++  for (const auto& test : kCases) {
++    Check(url_formatter::FixupURL(test.input, "") == GURL(test.expected),
++          test.input);
++  }
++  for (const auto* scheme : {"chrome", "helium", "about"}) {
++    Check(url_formatter::IsEquivalentScheme("noventra", scheme),
++          "alias equivalence");
++    Check(url_formatter::IsEquivalentScheme(scheme, "noventra"),
++          "reverse alias equivalence");
++  }
++
++  const GURL internal("chrome://settings/system/shortcuts?search=keys#edit");
++  url::Parsed parsed;
++  size_t prefix_end = 0;
++  base::OffsetAdjuster::Adjustments adjustments;
++  const auto formatted = url_formatter::FormatUrlWithAdjustments(
++      internal, url_formatter::kFormatReplaceChromeProtocol,
++      base::UnescapeRule::NONE, &parsed, &prefix_end, &adjustments);
++  Check(formatted == u"noventra://settings/system/shortcuts?search=keys#edit",
++        "displayed branded URL");
++  Check(parsed.scheme.AsViewOn(formatted) == u"noventra",
++        "display scheme component");
++  Check(parsed.host.AsViewOn(formatted) == u"settings",
++        "display host component");
++  Check(parsed.path.AsViewOn(formatted) == u"/system/shortcuts",
++        "display path component");
++  Check(parsed.query.AsViewOn(formatted) == u"search=keys",
++        "display query component");
++  Check(parsed.ref.AsViewOn(formatted) == u"edit",
++        "display fragment component");
++  Check(prefix_end == 11, "display host begins after noventra://");
++  const auto& original = internal.parsed_for_possibly_invalid_spec();
++  std::vector<size_t> offsets = {static_cast<size_t>(original.host.begin),
++                                 static_cast<size_t>(original.path.begin),
++                                 static_cast<size_t>(original.query.begin),
++                                 static_cast<size_t>(original.ref.begin),
++                                 internal.spec().size()};
++  const auto before = offsets;
++  base::OffsetAdjuster::AdjustOffsets(adjustments, &offsets);
++  for (size_t i = 0; i < offsets.size(); ++i) {
++    Check(offsets[i] == before[i] + 2, "scheme-length selection offset");
++  }
++  base::OffsetAdjuster::UnadjustOffsets(adjustments, &offsets);
++  Check(offsets == before, "selection offsets round-trip");
++  Check(url_formatter::FormatUrl(internal, 0, base::UnescapeRule::NONE, nullptr,
++                                 nullptr,
++                                 nullptr) == base::UTF8ToUTF16(internal.spec()),
++        "canonical formatting remains opt-in");
++  const GURL web("https://example.test/a?q=x#ref");
++  Check(
++      url_formatter::FormatUrl(web, url_formatter::kFormatReplaceChromeProtocol,
++                               base::UnescapeRule::NONE, nullptr, nullptr,
++                               nullptr) == base::UTF8ToUTF16(web.spec()),
++      "web URLs stay unchanged");
++  Check(
++      url_formatter::FormatUrl(GURL("view-source:chrome://settings/"),
++                               url_formatter::kFormatReplaceChromeProtocol,
++                               base::UnescapeRule::NONE, nullptr, nullptr,
++                               nullptr) == u"view-source:noventra://settings/",
++      "view-source branded formatting");
++  std::printf("Internal URL policy: %s (%d failures)\n",
++              failures ? "FAIL" : "PASS", failures);
++  return failures ? 1 : 0;
++}
+--- a/chrome/browser/ui/startup/startup_tab_provider.cc
++++ b/chrome/browser/ui/startup/startup_tab_provider.cc
+@@ -325,6 +325,11 @@
+     if (!was_stripped || !arg.empty()) {
+       const base::FilePath arg_path(arg);
+       GURL url(arg_path.MaybeAsASCII());
++      if (url.SchemeIs("noventra")) {
++        // Normalize trusted command-line aliases before the existing launch
++        // validation and handled-protocol filtering. Preserve deep links.
++        url = url_formatter::FixupURL(url.spec(), std::string());
++      }
+ 
+       // This call can (in rare circumstances) block the UI thread.
+       // FixupRelativeFile may access to current working directory, which is a
+--- a/components/omnibox/browser/omnibox_text_util.cc
++++ b/components/omnibox/browser/omnibox_text_util.cc
+@@ -168,7 +168,7 @@
+ 
+     if (url_from_text->scheme() == content::kChromeUIScheme) {
+       GURL::Replacements replacements;
+-      replacements.SetSchemeStr(content::kHeliumUIScheme);
++      replacements.SetSchemeStr("noventra");
+       *url_from_text = url_from_text->ReplaceComponents(replacements);
+     }
+ 
+--- a/components/url_formatter/url_fixer.cc
++++ b/components/url_formatter/url_fixer.cc
+@@ -40,6 +40,7 @@
+ // Hardcode these constants to avoid dependences on //chrome and //content.
+ const char kChromeUIScheme[] = "chrome";
+ const char kHeliumUIScheme[] = "helium";
++const char kNoventraUIScheme[] = "noventra";
+ const char kDevToolsScheme[] = "devtools";
+ const char kChromeUIDefaultHost[] = "version";
+ const char kViewSourceScheme[] = "view-source";
+@@ -448,7 +449,7 @@
+       if (GetValidScheme(*text, &parts->scheme, &scheme) &&
+           (url::IsStandard(scheme) || scheme == url::kAboutScheme ||
+            scheme == kChromeUIScheme || scheme == kHeliumUIScheme ||
+-           scheme == url::kFileScheme)) {
++           scheme == kNoventraUIScheme || scheme == url::kFileScheme)) {
+         found_scheme = true;
+       } else {
+         (*text)[semicolon] = ';';
+@@ -464,8 +465,8 @@
+   // Proceed with about, chrome, and devtools schemes,
+   // but not file or nonstandard schemes.
+   if ((scheme != url::kAboutScheme) && (scheme != kChromeUIScheme) &&
+-      (scheme != kHeliumUIScheme) && (scheme != kDevToolsScheme) &&
+-      !url::IsStandard(scheme)) {
++      (scheme != kHeliumUIScheme) && (scheme != kNoventraUIScheme) &&
++      (scheme != kDevToolsScheme) && !url::IsStandard(scheme)) {
+     return scheme;
+   }
+ 
+@@ -622,13 +623,15 @@
+ 
+   // For some schemes whose layouts we understand, we rebuild the URL.
+   bool chrome_url =
+-      (scheme == url::kAboutScheme)
+-      || (scheme == kChromeUIScheme)
+-      || (scheme == kHeliumUIScheme);
++      (scheme == url::kAboutScheme) || (scheme == kChromeUIScheme) ||
++      (scheme == kHeliumUIScheme) || (scheme == kNoventraUIScheme);
+   bool devtools_url = (scheme == kDevToolsScheme);
+   if (chrome_url || devtools_url || url::IsStandard(scheme)) {
+-    // Replace the about: scheme with the chrome: scheme.
+-    std::string url(scheme == url::kAboutScheme ? kChromeUIScheme : scheme);
++    // Noventra is a browser-input alias. Keep the actual WebUI origin and
++    // navigation/security checks on Chromium's canonical scheme.
++    std::string url((scheme == url::kAboutScheme || scheme == kNoventraUIScheme)
++                        ? kChromeUIScheme
++                        : scheme);
+     url.append(url::kStandardSchemeSeparator);
+ 
+     // We need to check whether the |username| is valid because it is our
+@@ -751,13 +754,13 @@
+ 
+ bool IsEquivalentScheme(const std::string& scheme1,
+                         const std::string& scheme2) {
+-  return scheme1 == scheme2 ||
+-         (scheme1 == url::kAboutScheme && scheme2 == kChromeUIScheme) ||
+-         (scheme1 == kChromeUIScheme && scheme2 == url::kAboutScheme) ||
+-         (scheme1 == kHeliumUIScheme && scheme2 == url::kAboutScheme) ||
+-         (scheme1 == url::kAboutScheme && scheme2 == kHeliumUIScheme) ||
+-         (scheme1 == kHeliumUIScheme && scheme2 == kChromeUIScheme)   ||
+-         (scheme1 == kChromeUIScheme && scheme2 == kHeliumUIScheme);
++  const bool first_internal =
++      scheme1 == url::kAboutScheme || scheme1 == kChromeUIScheme ||
++      scheme1 == kHeliumUIScheme || scheme1 == kNoventraUIScheme;
++  const bool second_internal =
++      scheme2 == url::kAboutScheme || scheme2 == kChromeUIScheme ||
++      scheme2 == kHeliumUIScheme || scheme2 == kNoventraUIScheme;
++  return scheme1 == scheme2 || (first_internal && second_internal);
+ }
+ 
+ }  // namespace url_formatter
+--- a/components/url_formatter/url_formatter.cc
++++ b/components/url_formatter/url_formatter.cc
+@@ -625,9 +625,6 @@
+                                prefix_end, adjustments);
+   }
+ 
+-  // Noventra keeps canonical chrome:// addresses for internal pages. Legacy
+-  // helium:// input remains supported by the URL fixer and navigator.
+-
+   // We handle both valid and invalid URLs (this will give us the spec
+   // regardless of validity).
+   const std::string& spec = url.possibly_invalid_spec();
+@@ -639,6 +636,16 @@
+   std::u16string url_string;
+   url_string.insert(url_string.end(), spec.begin(), spec.begin() + scheme_size);
+   new_parsed->scheme = parsed.scheme;
++  if ((format_types & kFormatReplaceChromeProtocol) != 0 &&
++      url.SchemeIs(content::kChromeUIScheme)) {
++    constexpr std::u16string_view kNoventraScheme = u"noventra";
++    url_string.replace(parsed.scheme.begin, parsed.scheme.len, kNoventraScheme);
++    new_parsed->scheme.len = kNoventraScheme.size();
++    // Later component adjustments retain offsets into the original URL, while
++    // their displayed positions follow url_string. Account for the longer name.
++    adjustments->emplace_back(parsed.scheme.begin, parsed.scheme.len,
++                              kNoventraScheme.size());
++  }
+ 
+   // Username & password.
+   if (((format_types & kFormatUrlOmitUsernamePassword) != 0) ||

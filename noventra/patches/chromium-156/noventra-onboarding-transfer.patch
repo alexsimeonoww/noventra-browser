@@ -1,0 +1,362 @@
+--- a/chrome/browser/resources/settings/appearance_page/noventra_peer_transfer.ts
++++ b/chrome/browser/resources/settings/appearance_page/noventra_peer_transfer.ts
+@@ -299,7 +299,7 @@
+     channel.onopen = () => {
+       if (generation !== this.generation || channel !== this.channel) return;
+       window.clearTimeout(this.connectionTimer);
+-      this.update({phase: 'connected', message: 'Compare the words below on both PCs, then confirm on each device.'});
++      this.update({phase: 'connected', message: 'Compare the device code below on both PCs, then confirm on each device.'});
+     };
+     channel.onclose = () => {
+       if (this.channel === channel && !['sent', 'received', 'closed', 'error'].includes(this.state.phase))
+--- a/chrome/browser/ui/noventra/portable_data.cc
++++ b/chrome/browser/ui/noventra/portable_data.cc
+@@ -67,6 +67,9 @@
+                                              "blue",    "purple", "pink"};
+ constexpr std::string_view kSpaceIcons[] = {
+     "default", "work", "home", "code", "book", "globe", "music", "star"};
++constexpr std::string_view kSpaceThemes[] = {
++    "browser",     "white-glass", "black-glass", "solid-white",
++    "solid-black", "forest",      "ocean",       "sand"};
+ constexpr std::string_view kBooleanPreferences[] = {
+     "noventra.browser.glass_enabled",
+     "noventra.browser.window_mirroring",
+@@ -431,14 +434,18 @@
+   for (const auto& id : ids) {
+     const auto* name = prefs.GetDict(kSpacesPref).FindString(id);
+     const auto appearance = GetSpaceAppearance(profile, id);
+-    spaces.Append(base::DictValue()
+-                      .Set("id", id)
+-                      .Set("name", name         ? *name
+-                                   : id.empty() ? "Personal"
+-                                                : "Account space")
+-                      .Set("archived", IsSpaceArchived(profile, id))
+-                      .Set("color", appearance.color)
+-                      .Set("icon", appearance.icon));
++    base::DictValue space;
++    space.Set("id", id);
++    space.Set("name", name ? *name : id.empty() ? "Personal" : "Account space");
++    space.Set("archived", IsSpaceArchived(profile, id));
++    space.Set("color", appearance.color);
++    space.Set("icon", appearance.icon);
++    // Inheriting Spaces keep the original five-field shape. Older transfers
++    // remain readable; only an explicit Space theme needs the optional field.
++    if (Selected(*selected, "spaces") && appearance.theme != "browser") {
++      space.Set("theme", appearance.theme);
++    }
++    spaces.Append(std::move(space));
+   }
+   if (Selected(*selected, "spaces")) {
+     for (const auto& route : GetWorkspaceRoutes(profile)) {
+@@ -596,14 +603,18 @@
+     const auto* space_id = space ? space->FindString("id") : nullptr;
+     const auto* color = space ? space->FindString("color") : nullptr;
+     const auto* icon = space ? space->FindString("icon") : nullptr;
++    const auto* theme = space ? space->FindString("theme") : nullptr;
++    const bool has_theme = space && space->contains("theme");
+     const auto archived = space ? space->FindBool("archived") : std::nullopt;
+-    if (!space || space->size() != 5 || !space_id ||
++    if (!space || space->size() != 5u + (has_theme ? 1u : 0u) || !space_id ||
+         (!space_id->empty() && !IsUUID(*space_id)) ||
+         !space_ids.insert(*space_id).second ||
+         !IsName(space->FindString("name"), 160) || !archived ||
+         (space_id->empty() && *archived) || !color || !icon ||
+         std::ranges::find(kSpaceColors, *color) == std::end(kSpaceColors) ||
+-        std::ranges::find(kSpaceIcons, *icon) == std::end(kSpaceIcons)) {
++        std::ranges::find(kSpaceIcons, *icon) == std::end(kSpaceIcons) ||
++        (has_theme && (!theme || std::ranges::find(kSpaceThemes, *theme) ==
++                                     std::end(kSpaceThemes)))) {
+       return base::unexpected(
+           "The transfer contains an invalid or duplicate Space.");
+     }
+@@ -778,6 +789,20 @@
+   const auto wants = [&](std::string_view category) {
+     return Selected(*selected, category) && !done(category);
+   };
++  // Named Space themes are explicit appearance requests. Do not silently save
++  // a choice that the destination's appearance policy forbids. This check runs
++  // before any category is applied and leaves the review available for retry.
++  if (wants("spaces") && !CanCustomizeSpaceTheme(browser) &&
++      std::ranges::any_of(*snapshot.FindList("spaces"), [](const auto& value) {
++        const auto& space = value.GetDict();
++        const auto* theme = space.FindString("theme");
++        return !space.FindString("id")->empty() && theme && *theme != "browser";
++      })) {
++    return base::unexpected(
++        "Space themes cannot be changed in this browser. Leave Spaces "
++        "unchecked "
++        "or use a window where appearance can be changed.");
++  }
+   const int restored_tabs = entry.FindInt("tabs_completed").value_or(0);
+   if (restored_tabs < 0 ||
+       static_cast<size_t>(restored_tabs) > snapshot.FindList("tabs")->size()) {
+@@ -830,9 +855,14 @@
+       if (*space.FindBool("archived")) {
+         archived.Append(local);
+       }
+-      appearance.Set(local, base::DictValue()
+-                                .Set("color", *space.FindString("color"))
+-                                .Set("icon", *space.FindString("icon")));
++      base::DictValue imported_appearance;
++      imported_appearance.Set("color", *space.FindString("color"));
++      imported_appearance.Set("icon", *space.FindString("icon"));
++      if (const auto* theme = space.FindString("theme");
++          theme && *theme != "browser") {
++        imported_appearance.Set("theme", *theme);
++      }
++      appearance.Set(local, std::move(imported_appearance));
+       ++added_spaces;
+     }
+     if (names.size() > kMaximumSpaces * 2) {
+--- a/chrome/browser/ui/noventra/portable_data_unittest.cc
++++ b/chrome/browser/ui/noventra/portable_data_unittest.cc
+@@ -155,6 +155,48 @@
+   EXPECT_FALSE(ValidatePortableData(snapshot).has_value());
+ }
+ 
++TEST(PortableDataTest, AcceptsLegacySpacesAndOptionalThemePresets) {
++  auto legacy = Snapshot();
++  legacy.FindDict("categories")->Set("spaces", true);
++  ASSERT_TRUE(ValidatePortableData(legacy).has_value());
++  for (const char* theme :
++       {"browser", "white-glass", "black-glass", "solid-white", "solid-black",
++        "forest", "ocean", "sand"}) {
++    auto snapshot = legacy.Clone();
++    auto named = snapshot.FindList("spaces")->front().Clone();
++    named.GetDict().Set("id", "238e0b5e-1959-49ba-9f71-22967faab7f0");
++    named.GetDict().Set("name", "Work");
++    named.GetDict().Set("theme", theme);
++    snapshot.FindList("spaces")->Append(std::move(named));
++    auto result = ValidatePortableData(snapshot);
++    ASSERT_TRUE(result.has_value()) << theme << ": " << result.error();
++    EXPECT_EQ(result->FindInt("spaces"), 1);
++    EXPECT_FALSE(result->contains("theme"));
++    EXPECT_FALSE(result->contains("space_appearance"));
++  }
++}
++
++TEST(PortableDataTest, RejectsInvalidOptionalSpaceThemeOrUnknownFields) {
++  for (const char* theme :
++       {"", "default", "custom-theme", "https://theme.invalid"}) {
++    auto snapshot = Snapshot();
++    snapshot.FindDict("categories")->Set("spaces", true);
++    snapshot.FindList("spaces")->front().GetDict().Set("theme", theme);
++    EXPECT_FALSE(ValidatePortableData(snapshot).has_value()) << theme;
++  }
++  auto snapshot = Snapshot();
++  snapshot.FindList("spaces")->front().GetDict().Set("theme", 1);
++  EXPECT_FALSE(ValidatePortableData(snapshot).has_value());
++  snapshot = Snapshot();
++  snapshot.FindList("spaces")->front().GetDict().Set("unknown", "forest");
++  EXPECT_FALSE(ValidatePortableData(snapshot).has_value());
++  snapshot = Snapshot();
++  auto& space = snapshot.FindList("spaces")->front().GetDict();
++  space.Set("theme", "forest");
++  space.Set("unknown", "forest");
++  EXPECT_FALSE(ValidatePortableData(snapshot).has_value());
++}
++
+ TEST(PortableDataTest, RejectsCrossSpaceReferencesAndNoncanonicalRoutes) {
+   auto snapshot = Snapshot();
+   snapshot.FindDict("categories")->Set("spaces", true);
+--- a/components/helium_onboarding/src/NoventraOnboarding.svelte
++++ b/components/helium_onboarding/src/NoventraOnboarding.svelte
+@@ -14,12 +14,12 @@
+     const savedStep = Number(sessionStorage.getItem('noventra.setup.step') ?? 0);
+     let step = $state(Number.isInteger(savedStep) && savedStep >= 0 && savedStep < steps.length ? savedStep : 0);
+     let profiles = $state<BrowserProfile[]>([]);
+-    let loading = $state(true);
+-    let detectionFailed = $state(false);
+-    let selected = $state(-1);
++    let discovery = $state<'initial' | 'loading' | 'loaded' | 'error'>('initial');
++    let selectedId = $state<number>();
+     let status = $state<'idle' | 'choosing' | 'importing' | 'success' | 'error'>('idle');
+     let bookmarkImports = $state(0);
+-    let importedProfiles = $state<number[]>([]);
++    let importedProfileIds = $state<number[]>([]);
++    let importingProfileId: number | undefined;
+     let passwordOpened = $state(false);
+     let saving = $state(false);
+     let saveError = $state(false);
+@@ -31,8 +31,8 @@
+     const enabledManagers = $derived(['bitwarden', 'onePassword', 'icloudPasswords']
+         .filter(id => managerExtensions[passwordManagers[id].extensionId])
+         .map(id => passwordManagers[id].title));
+-    const busy = $derived(status === 'importing' || saving || managerInstalling);
+-    const chosenProfile = $derived(profiles.find(p => p.index === selected));
++    const busy = $derived(discovery === 'loading' || status === 'importing' || saving || managerInstalling);
++    const chosenProfile = $derived(discovery === 'loaded' ? profiles.find(p => p.id === selectedId) : undefined);
+ 
+     async function refreshManagerExtensions() {
+         managerLoading = true;
+@@ -70,7 +70,8 @@
+     }
+ 
+     function importBookmarks() {
+-        if (busy || loading || !chosenProfile?.favorites || importedProfiles.includes(selected)) return;
++        if (busy || !chosenProfile?.favorites || importedProfileIds.includes(chosenProfile.id)) return;
++        importingProfileId = chosenProfile.id;
+         status = 'importing';
+         const types = {
+             import_dialog_bookmarks: true,
+@@ -80,12 +81,15 @@
+             import_dialog_autofill_form_data: false,
+             import_dialog_extensions: false,
+         };
+-        importer.importData(selected, types);
++        // Discovery indexes can change after a refresh. Resolve the current
++        // index from the stable native profile ID only when starting an import.
++        importer.importData(chosenProfile.index, types);
+     }
+ 
+     function importFile() {
+         if (busy) return;
+-        selected = -1;
++        selectedId = undefined;
++        importingProfileId = undefined;
+         // Cancellation does not emit a native import event. Stay navigable until
+         // the handler actually starts processing a selected file.
+         status = 'choosing';
+@@ -97,28 +101,22 @@
+         passwordOpened = true;
+     }
+ 
+-    const profileIdentity = (profile: BrowserProfile) =>
+-        JSON.stringify([profile.id, profile.name, profile.profileName]);
+-
+     async function refreshBrowserProfiles() {
+-        // Native imports refer to discovery indexes. Never refresh while an
+-        // import is running, and require a new selection after re-discovery.
+-        if (busy || loading) return;
+-        const imported = new Set(profiles.filter(profile =>
+-            importedProfiles.includes(profile.index)).map(profileIdentity));
+-        loading = true;
+-        selected = -1;
++        if (busy) return;
++        discovery = 'loading';
++        selectedId = undefined;
++        status = 'idle';
++        importingProfileId = undefined;
+         try {
+             const list = await importer.initializeImportDialog();
++            // The native API appends its bookmarks-file entry last. The file
++            // card below remains available without allowing profile detection.
+             profiles = list.slice(0, -1).filter(profile => profile.favorites);
+-            importedProfiles = profiles.filter(profile =>
+-                imported.has(profileIdentity(profile))).map(profile => profile.index);
+-            detectionFailed = false;
++            discovery = 'loaded';
+         } catch {
+-            // Keep the last discovered list, as the upstream refresh flow does.
+-            detectionFailed = true;
+-        } finally {
+-            loading = false;
++            // Keep the last list visible, but don't import using its stale
++            // indexes. A successful retry makes its profiles selectable again.
++            discovery = 'error';
+         }
+     }
+ 
+@@ -139,18 +137,11 @@
+             if (value === ImportDataStatus.SUCCEEDED && status === 'importing') {
+                 status = 'success';
+                 bookmarkImports += 1;
+-                if (selected >= 0) importedProfiles = [...importedProfiles, selected];
++                if (importingProfileId !== undefined && !importedProfileIds.includes(importingProfileId)) {
++                    importedProfileIds = [...importedProfileIds, importingProfileId];
++                }
+             }
+             if (value === ImportDataStatus.FAILED) status = 'error';
+-        });
+-        importer.initializeImportDialog().then(list => {
+-            // The native API appends its bookmarks-file entry last. The file
+-            // card below is always available, regardless of detection results.
+-            profiles = list.slice(0, -1).filter(p => p.favorites);
+-            loading = false;
+-        }).catch(() => {
+-            loading = false;
+-            detectionFailed = true;
+         });
+         return () => {
+             removeWebUiListener(listener);
+@@ -187,7 +178,7 @@
+                 {#if step === 0}
+                     <h1 id="step-title" tabindex="-1" bind:this={title}>Make yourself at home.</h1>
+                     <p class="intro">A fresh browser doesn’t have to mean starting over. Bring your bookmarks and saved passwords to Noventra.</p>
+-                    <p class="intro"><a href="chrome://settings/appearance?section=data" target="_blank" rel="noopener noreferrer">Moving from another PC? Restore a Noventra transfer file or connect directly.</a></p>
++                    <p class="intro"><a href="chrome://settings/dataDevices" target="_blank" rel="noopener noreferrer">Moving from another PC? Restore a Noventra transfer file or connect directly.</a></p>
+                     <div class="welcome-visual" aria-hidden="true">
+                         <div class="mini-toolbar"><span></span><span></span><span></span><div class="mini-address">A little more room for what matters</div></div>
+                         <div class="mini-browser">
+@@ -199,35 +190,39 @@
+                 {:else if step === 1}
+                     <h1 id="step-title" tabindex="-1" bind:this={title}>Bring your favorite places.</h1>
+                     <p class="intro">Choose a browser profile to copy bookmarks from, or use a bookmarks HTML file. Your original bookmarks stay where they are.</p>
+-                    <div class="source-heading"><strong>From another browser</strong><span>{loading ? 'Looking for profiles…' : `${profiles.length} available`}</span></div>
+-                    {#if loading}
+-                        <div class="empty"><span class="spinner" aria-hidden="true"></span>Looking for browser profiles on this device…</div>
++                    <div class="source-heading"><strong>From another browser</strong><span>{discovery === 'initial' ? 'Optional' : discovery === 'loading' ? 'Looking for profiles…' : discovery === 'error' ? 'Check needed' : `${profiles.length} available`}</span></div>
++                    {#if discovery === 'initial'}
++                        <div class="empty"><span aria-hidden="true">▤</span><strong>Look for bookmarks on this device?</strong><p>Choose Find browsers to let Noventra look for local browser profiles. Nothing is imported until you choose a profile and start an import.</p></div>
++                    {:else if discovery === 'loading'}
++                        <div class="empty" role="status"><span class="spinner" aria-hidden="true"></span>Looking for browser profiles on this device…</div>
+                     {:else if profiles.length === 0}
+-                        <div class="empty"><span aria-hidden="true">▤</span><strong>{detectionFailed ? 'We couldn’t check your browser profiles.' : 'No browser profiles found.'}</strong><p>You can still import a bookmarks file below, or do this later in Settings.</p></div>
++                        <div class="empty" role={discovery === 'error' ? 'alert' : undefined}><span aria-hidden="true">▤</span><strong>{discovery === 'error' ? 'We couldn’t check your browser profiles.' : 'No browser profiles found.'}</strong><p>You can refresh this list, use a bookmarks file below, or do this later in Settings.</p></div>
+                     {:else}
+-                        <fieldset class="profile-list" disabled={busy}>
++                        <fieldset class="profile-list" disabled={busy || discovery === 'error'}>
+                             <legend class="sr-only">Choose a browser profile</legend>
+-                            {#each profiles as profile (profile.index)}
+-                                <label class="profile-card" class:selected={selected === profile.index} class:imported={importedProfiles.includes(profile.index)}>
+-                                    <input type="radio" name="source-profile" value={profile.index} bind:group={selected} disabled={busy || importedProfiles.includes(profile.index)} onchange={() => { status = 'idle'; }} />
++                            {#each profiles as profile (profile.id)}
++                                <label class="profile-card" class:selected={selectedId === profile.id} class:imported={importedProfileIds.includes(profile.id)}>
++                                    <input type="radio" name="source-profile" value={profile.id} bind:group={selectedId} disabled={busy || discovery === 'error' || importedProfileIds.includes(profile.id)} onchange={() => { status = 'idle'; }} />
+                                     <span class="source-icon" aria-hidden="true">▤</span>
+                                     <span class="source-name"><strong>{profile.name}</strong><span>{profile.profileName || 'Default profile'}</span></span>
+-                                    <span class="source-kind">{importedProfiles.includes(profile.index) ? 'Imported ✓' : 'Bookmarks'}</span>
++                                    <span class="source-kind">{importedProfileIds.includes(profile.id) ? 'Imported ✓' : 'Bookmarks'}</span>
+                                 </label>
+                             {/each}
+                         </fieldset>
+                     {/if}
++                    <div class="discovery-actions">
++                        <button id={discovery === 'initial' ? 'find-import-profiles' : 'refresh-import-profiles'} class="quiet" disabled={busy} onclick={refreshBrowserProfiles}>{discovery === 'initial' ? 'Find browsers' : discovery === 'loading' ? 'Looking for browsers…' : discovery === 'error' ? 'Try again' : 'Refresh browsers'}</button>
++                    </div>
++                    {#if discovery === 'error' && profiles.length > 0}<p class="error" role="alert">We couldn’t refresh browser profiles. Try again before choosing a profile, or use a bookmarks file below.</p>{/if}
+                     {#if showMacImportNotice}
+                         <aside class="mac-import-notice" aria-label="Browser import access">
+                             <p>If a browser is missing, allow Noventra to access its data in macOS Files and Folders settings, then refresh this list.</p>
+                             <div>
+                                 <button id="mac-import-settings" class="quiet" disabled={busy} onclick={openMacImportSettings}>Open Files and Folders settings</button>
+-                                <button id="refresh-import-profiles" class="quiet" disabled={busy || loading} onclick={refreshBrowserProfiles}>{loading ? 'Refreshing…' : 'Refresh browsers'}</button>
+                             </div>
+-                            {#if detectionFailed}<p class="error" role="alert">We couldn’t refresh browser profiles. You can still use a bookmarks file.</p>{/if}
+                         </aside>
+                     {/if}
+-                    <button id="import-bookmarks" class="primary full" onclick={importBookmarks} disabled={busy || loading || !chosenProfile || importedProfiles.includes(selected)}>{status === 'importing' ? 'Importing bookmarks…' : 'Import selected bookmarks'}<span aria-hidden="true">↓</span></button>
++                    <button id="import-bookmarks" class="primary full" onclick={importBookmarks} disabled={busy || !chosenProfile || importedProfileIds.includes(chosenProfile.id)}>{status === 'importing' ? 'Importing bookmarks…' : 'Import selected bookmarks'}<span aria-hidden="true">↓</span></button>
+                     <div class="divider"><span>or use a file</span></div>
+                     <button id="bookmark-file" class="file-card" onclick={importFile} disabled={busy}><span class="source-icon" aria-hidden="true">↥</span><span class="source-name"><strong>Choose a bookmarks file</strong><span>HTML export from your previous browser</span></span><span aria-hidden="true">↗</span></button>
+                     <div class="import-message" role="status" aria-live="polite">
+@@ -305,6 +300,7 @@
+     .feature-row { display:grid;grid-template-columns:1fr 1fr;gap:20px; }.feature-row>div { display:grid;grid-template-columns:26px 1fr;align-items:center;gap:5px 8px; }.feature-icon { grid-row:span 2;font-size:21px; }.feature-row strong { font-size:12px;font-weight:600; }.feature-row p { color:var(--muted);font-size:11px;margin:0; }
+     footer { display:flex;align-items:center;justify-content:space-between;gap:16px;padding:20px 30px;border-top:1px solid var(--line);background:var(--soft); }.footer-note { font-size:11px;color:var(--muted); }.primary { background:var(--ink);color:var(--surface);padding:12px 20px;font-size:13px;font-weight:550; }.primary:hover:not(:disabled) { opacity:.86; }.primary.full { width:100%;margin-top:14px;justify-content:space-between; }
+     .source-heading { display:flex;justify-content:space-between;gap:16px;font-size:12px;margin:10px 0; }.source-heading span { color:var(--muted);font-size:11px; }
++    .discovery-actions { display:flex;justify-content:flex-end;margin-top:8px; }
+     .profile-list { display:grid;gap:8px;border:0;padding:0;margin:0;max-height:230px;overflow:auto; }.profile-card { display:flex;align-items:center;gap:12px;padding:13px;border:1px solid var(--line);border-radius:12px;cursor:pointer; }.profile-card.selected { border-color:var(--ink);background:var(--soft); }.profile-card.imported { opacity:.6;cursor:default; }.profile-card input { accent-color:var(--ink);margin:0; }.source-icon { display:grid;place-items:center;font-size:21px;width:38px;height:38px;border-radius:9px;background:var(--soft);flex-shrink:0; }.source-name { display:flex;flex-direction:column;gap:4px;flex:1;min-width:0;text-align:left; }.source-name strong { font-size:13px;font-weight:600;overflow-wrap:anywhere; }.source-name>span { font-size:11px;color:var(--muted);overflow-wrap:anywhere; }.source-kind { color:var(--muted);font-size:10px; }.empty { display:flex;align-items:center;justify-content:center;flex-direction:column;gap:9px;border:1px dashed var(--line);border-radius:12px;padding:24px 16px;text-align:center;font-size:12px;color:var(--muted); }.empty>span { font-size:24px; }.empty strong { color:var(--ink);font-size:13px;font-weight:500; }.empty p { margin:0;max-width:300px;line-height:1.6; }
+     .divider { display:flex;align-items:center;gap:12px;color:var(--muted);font-size:10px;margin:22px 0; }.divider::before,.divider::after { content:'';height:1px;flex:1;background:var(--line); }.file-card { border:1px solid var(--line);padding:13px 16px;border-radius:12px;width:100%;justify-content:flex-start;gap:12px; }.file-card:hover:not(:disabled) { background:var(--soft); }.file-card>.source-icon { background:var(--soft); }
+     .mac-import-notice { border:1px dashed var(--line);border-radius:12px;padding:12px 14px;margin-top:14px; }
+--- a/chrome/browser/ui/webui/settings/import_data_handler.cc
++++ b/chrome/browser/ui/webui/settings/import_data_handler.cc
+@@ -207,6 +207,9 @@
+     const base::ListValue& args) {
+   DCHECK_CURRENTLY_ON(BrowserThread::UI);
+ 
++  // File imports can start before optional browser-profile discovery.
++  AllowJavascript();
++
+   if (select_file_dialog_) {
+     return;
+   }

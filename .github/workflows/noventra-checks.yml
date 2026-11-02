@@ -1,0 +1,41 @@
+name: Noventra source checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: noventra-source-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release-tools:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Use Node 24
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - name: Check package and signed delivery tools
+        run: |
+          python3 --version
+          openssl version
+          python3 -B -m unittest discover -s tests/noventra -p test_package_distribution.py -v
+          python3 -B -m unittest discover -s tests/noventra -p test_package_installer.py -v
+          python3 -B -m unittest discover -s tests/noventra -p test_update_delivery.py -v
+          python3 -B -m unittest discover -s tests/noventra -p test_desktop_updater.py -v
+          python3 -B -m unittest discover -s tests/noventra -p test_atomic_update_recovery.py -v
+          python3 -B -m unittest discover -s tests/noventra -p test_publish_release.py -v
+          python3 -B -m unittest discover -s tests/noventra -p test_github_release.py -v
+      - name: Check public hosting and temporary signed upload bridge
+        run: node --test tests/noventra/test_release_site.mjs tests/noventra/test_release_upload_worker.mjs

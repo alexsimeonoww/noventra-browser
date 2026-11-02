@@ -1,0 +1,2524 @@
+--- a/chrome/browser/importer/chrome_importer_list.cc
++++ b/chrome/browser/importer/chrome_importer_list.cc
+@@ -6,6 +6,7 @@
+ #include "chrome/browser/importer/importer_list.h"
+ 
+ #include <algorithm>
++#include <initializer_list>
+ 
+ #include "base/check.h"
+ #include "base/files/file_path.h"
+@@ -66,113 +67,171 @@
+     std::vector<user_data_importer::SourceProfile>* profiles) {
+   base::ScopedBlockingCall scoped_blocking_call(FROM_HERE,
+                                                 base::BlockingType::WILL_BLOCK);
+-  AddChromeToProfiles(
+-      profiles,
+-      GetChromeSourceProfiles(GetChromeUserDataFolder().Append(
+-          base::FilePath::StringType(FILE_PATH_LITERAL("Local State")))),
+-      GetChromeUserDataFolder(), kGoogleChromeBrowser,
+-      user_data_importer::TYPE_CHROME);
+-  AddChromeToProfiles(
+-      profiles,
+-      GetChromeSourceProfiles(GetChromeBetaUserDataFolder().Append(
+-          base::FilePath::StringType(FILE_PATH_LITERAL("Local State")))),
+-      GetChromeBetaUserDataFolder(), kGoogleChromeBrowserBeta,
+-      user_data_importer::TYPE_CHROME);
+-  AddChromeToProfiles(
+-      profiles,
+-      GetChromeSourceProfiles(GetChromeDevUserDataFolder().Append(
+-          base::FilePath::StringType(FILE_PATH_LITERAL("Local State")))),
+-      GetChromeDevUserDataFolder(), kGoogleChromeBrowserDev,
+-      user_data_importer::TYPE_CHROME);
+-#if !BUILDFLAG(IS_LINUX)
+-  AddChromeToProfiles(
+-      profiles,
+-      GetChromeSourceProfiles(GetCanaryUserDataFolder().Append(
+-          base::FilePath::StringType(FILE_PATH_LITERAL("Local State")))),
+-      GetCanaryUserDataFolder(), kGoogleChromeBrowserCanary,
+-      user_data_importer::TYPE_CHROME);
+-
+-  AddChromeToProfiles(
+-      profiles,
+-      GetChromeSourceProfiles(GetArcUserDataFolder().Append(
+-          base::FilePath::StringType(FILE_PATH_LITERAL("Local State")))),
+-      GetArcUserDataFolder(), kArcBrowser, user_data_importer::TYPE_ARC);
+-#endif
+-#if BUILDFLAG(IS_MAC)
+-  AddChromeToProfiles(
+-      profiles,
+-      GetChromeSourceProfiles(GetDiaUserDataFolder().Append(
+-          base::FilePath::StringType(FILE_PATH_LITERAL("Local State")))),
+-      GetDiaUserDataFolder(), kDiaBrowser, user_data_importer::TYPE_DIA);
+-#endif
+-#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
+-  AddChromeToProfiles(
+-      profiles,
+-      GetChromeSourceProfiles(GetCometUserDataFolder().Append(
+-          base::FilePath::StringType(FILE_PATH_LITERAL("Local State")))),
+-      GetCometUserDataFolder(), kPerplexityCometBrowser, user_data_importer::TYPE_PERPLEXITY_COMET);
+-#endif
+-  AddChromeToProfiles(
+-      profiles,
+-      GetChromeSourceProfiles(GetChromiumUserDataFolder().Append(
+-          base::FilePath::StringType(FILE_PATH_LITERAL("Local State")))),
+-      GetChromiumUserDataFolder(), kChromiumBrowser,
+-      user_data_importer::TYPE_CHROME);
+-
+-  AddChromeToProfiles(
+-      profiles,
+-      GetChromeSourceProfiles(GetEdgeUserDataFolder().Append(
+-          base::FilePath::StringType(FILE_PATH_LITERAL("Local State")))),
+-      GetEdgeUserDataFolder(), kMicrosoftEdgeBrowser,
+-      user_data_importer::TYPE_EDGE_CHROMIUM);
+-
+-  AddChromeToProfiles(
+-      profiles,
+-      GetChromeSourceProfiles(GetVivaldiUserDataFolder().Append(
+-          base::FilePath::StringType(FILE_PATH_LITERAL("Local State")))),
+-      GetVivaldiUserDataFolder(), kVivaldiBrowser,
+-      user_data_importer::TYPE_VIVALDI);
+-
+-  AddChromeToProfiles(
+-      profiles,
+-      GetChromeSourceProfiles(GetOperaUserDataFolder().Append(
+-          base::FilePath::StringType(FILE_PATH_LITERAL("Local State")))),
+-      GetOperaUserDataFolder(), kOperaBrowser, user_data_importer::TYPE_OPERA);
+-
+-  AddChromeToProfiles(
+-      profiles,
+-      GetChromeSourceProfiles(GetYandexUserDataFolder().Append(
+-          base::FilePath::StringType(FILE_PATH_LITERAL("Local State")))),
+-      GetYandexUserDataFolder(), kYandexBrowser,
+-      user_data_importer::TYPE_YANDEX);
+-
+-  AddChromeToProfiles(
+-      profiles,
+-      GetChromeSourceProfiles(GetWhaleUserDataFolder().Append(
+-          base::FilePath::StringType(FILE_PATH_LITERAL("Local State")))),
+-      GetWhaleUserDataFolder(), kWhaleBrowser, user_data_importer::TYPE_WHALE);
+-
+-  AddChromeToProfiles(
+-    profiles,
+-    GetChromeSourceProfiles(GetBraveUserDataFolder().Append(
+-        base::FilePath::StringType(FILE_PATH_LITERAL("Local State")))),
+-    GetBraveUserDataFolder(), kBraveBrowser, user_data_importer::TYPE_BRAVE);
+-
+-#if BUILDFLAG(IS_LINUX)
+   auto add_location = [&](const base::FilePath& root, const std::string& brand,
+                           user_data_importer::ImporterType type) {
+     if (!root.IsAbsolute()) {
+       return;
+     }
+-    AddChromeToProfiles(profiles,
+-                        GetChromeSourceProfiles(root.AppendASCII("Local State")),
+-                        root, brand, type);
++    AddChromeToProfiles(
++        profiles, GetChromeSourceProfiles(root.AppendASCII("Local State")),
++        root, brand, type);
+   };
++  AddChromeToProfiles(
++      profiles,
++      GetChromeSourceProfiles(GetChromeUserDataFolder().Append(
++          base::FilePath::StringType(FILE_PATH_LITERAL("Local State")))),
++      GetChromeUserDataFolder(), kGoogleChromeBrowser,
++      user_data_importer::TYPE_CHROME);
++  AddChromeToProfiles(
++      profiles,
++      GetChromeSourceProfiles(GetChromeBetaUserDataFolder().Append(
++          base::FilePath::StringType(FILE_PATH_LITERAL("Local State")))),
++      GetChromeBetaUserDataFolder(), kGoogleChromeBrowserBeta,
++      user_data_importer::TYPE_CHROME);
++  AddChromeToProfiles(
++      profiles,
++      GetChromeSourceProfiles(GetChromeDevUserDataFolder().Append(
++          base::FilePath::StringType(FILE_PATH_LITERAL("Local State")))),
++      GetChromeDevUserDataFolder(), kGoogleChromeBrowserDev,
++      user_data_importer::TYPE_CHROME);
++#if !BUILDFLAG(IS_LINUX)
++  AddChromeToProfiles(
++      profiles,
++      GetChromeSourceProfiles(GetCanaryUserDataFolder().Append(
++          base::FilePath::StringType(FILE_PATH_LITERAL("Local State")))),
++      GetCanaryUserDataFolder(), kGoogleChromeBrowserCanary,
++      user_data_importer::TYPE_CHROME);
++
++  AddChromeToProfiles(
++      profiles,
++      GetChromeSourceProfiles(GetArcUserDataFolder().Append(
++          base::FilePath::StringType(FILE_PATH_LITERAL("Local State")))),
++      GetArcUserDataFolder(), kArcBrowser, user_data_importer::TYPE_ARC);
++#endif
++#if BUILDFLAG(IS_MAC)
++  AddChromeToProfiles(
++      profiles,
++      GetChromeSourceProfiles(GetDiaUserDataFolder().Append(
++          base::FilePath::StringType(FILE_PATH_LITERAL("Local State")))),
++      GetDiaUserDataFolder(), kDiaBrowser, user_data_importer::TYPE_DIA);
++#endif
++#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
++  AddChromeToProfiles(
++      profiles,
++      GetChromeSourceProfiles(GetCometUserDataFolder().Append(
++          base::FilePath::StringType(FILE_PATH_LITERAL("Local State")))),
++      GetCometUserDataFolder(), kPerplexityCometBrowser, user_data_importer::TYPE_PERPLEXITY_COMET);
++#endif
++  AddChromeToProfiles(
++      profiles,
++      GetChromeSourceProfiles(GetChromiumUserDataFolder().Append(
++          base::FilePath::StringType(FILE_PATH_LITERAL("Local State")))),
++      GetChromiumUserDataFolder(), kChromiumBrowser,
++      user_data_importer::TYPE_CHROME);
++
++  AddChromeToProfiles(
++      profiles,
++      GetChromeSourceProfiles(GetEdgeUserDataFolder().Append(
++          base::FilePath::StringType(FILE_PATH_LITERAL("Local State")))),
++      GetEdgeUserDataFolder(), kMicrosoftEdgeBrowser,
++      user_data_importer::TYPE_EDGE_CHROMIUM);
++
++  AddChromeToProfiles(
++      profiles,
++      GetChromeSourceProfiles(GetVivaldiUserDataFolder().Append(
++          base::FilePath::StringType(FILE_PATH_LITERAL("Local State")))),
++      GetVivaldiUserDataFolder(), kVivaldiBrowser,
++      user_data_importer::TYPE_VIVALDI);
++
++  AddChromeToProfiles(
++      profiles,
++      GetChromeSourceProfiles(GetOperaUserDataFolder().Append(
++          base::FilePath::StringType(FILE_PATH_LITERAL("Local State")))),
++      GetOperaUserDataFolder(), kOperaBrowser, user_data_importer::TYPE_OPERA);
++
++  AddChromeToProfiles(
++      profiles,
++      GetChromeSourceProfiles(GetYandexUserDataFolder().Append(
++          base::FilePath::StringType(FILE_PATH_LITERAL("Local State")))),
++      GetYandexUserDataFolder(), kYandexBrowser,
++      user_data_importer::TYPE_YANDEX);
++
++  AddChromeToProfiles(
++      profiles,
++      GetChromeSourceProfiles(GetWhaleUserDataFolder().Append(
++          base::FilePath::StringType(FILE_PATH_LITERAL("Local State")))),
++      GetWhaleUserDataFolder(), kWhaleBrowser, user_data_importer::TYPE_WHALE);
++
++  struct BraveVariant {
++    const char* directory;
++    const char* name;
++  };
++  constexpr BraveVariant kBraveVariants[] = {
++      {"Brave-Browser", kBraveBrowser},
++      {"Brave-Browser-Beta", "Brave Beta"},
++      {"Brave-Browser-Dev", "Brave Dev"},
++      {"Brave-Browser-Nightly", "Brave Nightly"},
++      {"Brave-Origin", "Brave Origin"},
++      {"Brave-Origin-Beta", "Brave Origin Beta"},
++      {"Brave-Origin-Dev", "Brave Origin Dev"},
++      {"Brave-Origin-Nightly", "Brave Origin Nightly"},
++  };
++  // Origin and release channels keep independent user-data directories. On
++  // Windows the profile root is an extra User Data level below each product.
++  auto brave_parent = GetBraveUserDataFolder().DirName();
++#if BUILDFLAG(IS_WIN)
++  brave_parent = brave_parent.DirName();
++#endif
++  for (const auto& variant : kBraveVariants) {
++    auto root = brave_parent.AppendASCII(variant.directory);
++#if BUILDFLAG(IS_WIN)
++    root = root.AppendASCII("User Data");
++#endif
++    add_location(root, variant.name, user_data_importer::TYPE_BRAVE);
++  }
++
++#if BUILDFLAG(IS_WIN)
++  const auto local = GetChromiumUserDataFolder().DirName().DirName();
++  add_location(local.AppendASCII("Helium").AppendASCII("User Data"), "Helium",
++               user_data_importer::TYPE_CHROME);
++  const auto edge_parent = GetEdgeUserDataFolder().DirName().DirName();
++  add_location(edge_parent.AppendASCII("Edge Beta").AppendASCII("User Data"),
++               "Microsoft Edge Beta", user_data_importer::TYPE_EDGE_CHROMIUM);
++  add_location(edge_parent.AppendASCII("Edge Dev").AppendASCII("User Data"),
++               "Microsoft Edge Dev", user_data_importer::TYPE_EDGE_CHROMIUM);
++  add_location(edge_parent.AppendASCII("Edge SxS").AppendASCII("User Data"),
++               "Microsoft Edge Canary", user_data_importer::TYPE_EDGE_CHROMIUM);
++  add_location(
++      GetOperaUserDataFolder().DirName().AppendASCII("Opera GX Stable"),
++      "Opera GX", user_data_importer::TYPE_OPERA);
++#elif BUILDFLAG(IS_MAC)
++  const auto support = GetChromiumUserDataFolder().DirName();
++  add_location(support.AppendASCII("net.imput.helium"), "Helium",
++               user_data_importer::TYPE_CHROME);
++  add_location(support.AppendASCII("Helium"), "Helium",
++               user_data_importer::TYPE_CHROME);
++  add_location(support.AppendASCII("Microsoft Edge Beta"),
++               "Microsoft Edge Beta", user_data_importer::TYPE_EDGE_CHROMIUM);
++  add_location(support.AppendASCII("Microsoft Edge Dev"), "Microsoft Edge Dev",
++               user_data_importer::TYPE_EDGE_CHROMIUM);
++  add_location(support.AppendASCII("Microsoft Edge Canary"),
++               "Microsoft Edge Canary", user_data_importer::TYPE_EDGE_CHROMIUM);
++  add_location(support.AppendASCII("com.operasoftware.OperaGX"), "Opera GX",
++               user_data_importer::TYPE_OPERA);
++#endif
++
++#if BUILDFLAG(IS_LINUX)
+   const auto config = GetChromiumUserDataFolder().DirName();
+   add_location(config.AppendASCII("net.imput.helium"), "Helium",
+                user_data_importer::TYPE_CHROME);
+   add_location(config.AppendASCII("helium"), "Helium",
+                user_data_importer::TYPE_CHROME);
++  add_location(config.AppendASCII("microsoft-edge-beta"), "Microsoft Edge Beta",
++               user_data_importer::TYPE_EDGE_CHROMIUM);
++  add_location(config.AppendASCII("microsoft-edge-dev"), "Microsoft Edge Dev",
++               user_data_importer::TYPE_EDGE_CHROMIUM);
++  add_location(config.AppendASCII("vivaldi-snapshot"), "Vivaldi Snapshot",
++               user_data_importer::TYPE_VIVALDI);
+   base::FilePath home;
+   if (base::PathService::Get(base::DIR_HOME, &home)) {
+     add_location(home.AppendASCII(".var/app/net.imput.helium/config/net.imput.helium"),
+@@ -181,14 +240,34 @@
+                  kChromiumBrowser, user_data_importer::TYPE_CHROME);
+     add_location(home.AppendASCII(".var/app/com.google.Chrome/config/google-chrome"),
+                  kGoogleChromeBrowser, user_data_importer::TYPE_CHROME);
+-    add_location(home.AppendASCII(".var/app/com.brave.Browser/config/BraveSoftware/Brave-Browser"),
+-                 kBraveBrowser, user_data_importer::TYPE_BRAVE);
++    for (const char* location :
++         {".var/app/com.brave.Browser/config/BraveSoftware",
++          "snap/brave/current/.config/BraveSoftware",
++          "snap/brave/common/.config/BraveSoftware"}) {
++      for (const auto& variant : kBraveVariants) {
++        add_location(home.AppendASCII(location).AppendASCII(variant.directory),
++                     variant.name, user_data_importer::TYPE_BRAVE);
++      }
++    }
++    add_location(
++        home.AppendASCII(".var/app/com.vivaldi.Vivaldi/config/vivaldi"),
++        kVivaldiBrowser, user_data_importer::TYPE_VIVALDI);
++    add_location(home.AppendASCII(".var/app/com.opera.Opera/config/opera"),
++                 kOperaBrowser, user_data_importer::TYPE_OPERA);
++    add_location(home.AppendASCII(
++                     ".var/app/io.github.ungoogled_software.ungoogled_chromium/"
++                     "config/chromium"),
++                 kChromiumBrowser, user_data_importer::TYPE_CHROME);
+     add_location(home.AppendASCII(".var/app/com.microsoft.Edge/config/microsoft-edge"),
+                  kMicrosoftEdgeBrowser, user_data_importer::TYPE_EDGE_CHROMIUM);
+     add_location(home.AppendASCII("snap/chromium/common/chromium"),
+                  kChromiumBrowser, user_data_importer::TYPE_CHROME);
+     add_location(home.AppendASCII("snap/chromium/common/.config/chromium"),
+                  kChromiumBrowser, user_data_importer::TYPE_CHROME);
++    add_location(home.AppendASCII("snap/chromium/current/.config/chromium"),
++                 kChromiumBrowser, user_data_importer::TYPE_CHROME);
++    add_location(home.AppendASCII("snap/opera/common/.config/opera"),
++                 kOperaBrowser, user_data_importer::TYPE_OPERA);
+   }
+   // Installed via snap Opera has different profile path.
+   AddChromeToProfiles(
+--- a/chrome/browser/importer/importer_list.cc
++++ b/chrome/browser/importer/importer_list.cc
+@@ -37,7 +37,8 @@
+   uint16_t blocked = user_data_importer::PASSWORDS |
+                      user_data_importer::AUTOFILL_FORM_DATA;
+ #if BUILDFLAG(IS_LINUX) && BUILDFLAG(USE_DBUS)
+-  if (profile.importer_type == user_data_importer::TYPE_CHROME) {
++  if (profile.importer_type == user_data_importer::TYPE_CHROME ||
++      profile.importer_type == user_data_importer::TYPE_BRAVE) {
+     blocked &= ~user_data_importer::PASSWORDS;
+   }
+ #endif
+@@ -133,15 +134,14 @@
+     zen.profile = detail.name;
+     zen.importer_type = user_data_importer::TYPE_ZEN;
+     zen.source_path = detail.path;
+-#if BUILDFLAG(IS_WIN)
+-    zen.app_path = GetFirefoxInstallPathFromRegistry();
+-#endif
++    zen.app_path = app_path;
++#if BUILDFLAG(IS_WIN)
+     if (zen.app_path.empty()) {
+-      if (app_path.empty()) {
+-        continue;
+-      }
+-
+-      zen.app_path = app_path;
++      zen.app_path = GetFirefoxInstallPathFromRegistry();
++    }
++#endif
++    if (zen.app_path.empty()) {
++      continue;
+     }
+ 
+     zen.services_supported =
+@@ -167,32 +167,34 @@
+   const std::string firefox_install_id;
+ #endif  // BUILDFLAG(IS_WIN)
+   std::vector<FirefoxDetail> details = GetFirefoxDetails(firefox_install_id);
+-  if (details.empty())
++  if (details.empty()) {
+     return;
++  }
+ 
+   for (const auto& detail : details) {
+     base::FilePath app_path;
+-    if (detail.path.empty())
++    if (detail.path.empty()) {
+       continue;
++    }
+ 
+     int version = 0;
+-#if BUILDFLAG(IS_WIN)
+-    version = GetCurrentFirefoxMajorVersionFromRegistry();
+-#endif
+-
++    GetFirefoxVersionAndPathFromProfile(detail.path, &version, &app_path);
++#if BUILDFLAG(IS_WIN)
++    // A machine can have several Firefox-based browsers and channels. Prefer
++    // this profile's application, not another installation's registry entry.
+     if (version < 2) {
+-      GetFirefoxVersionAndPathFromProfile(detail.path, &version, &app_path);
+-      // Note that |version| is re-assigned above.
+-      if (version < 48) {
+-        // While this cutoff (and the removal of outdated code) should depend on
+-        // the usage percent of different versions of Firefox (see
+-        // https://en.wikipedia.org/wiki/Firefox_version_history), the reality
+-        // is that the current cutoff of at least Firefox 48 is mostly due to
+-        // the fact that there's a Firefox 48 profile for testing in
+-        // firefox_importer_unittest.cc. TODO(crbug.com/40169760): Add
+-        // more modern Firefox test profiles, and roll the cutoff version.
+-        continue;
+-      }
++      version = GetCurrentFirefoxMajorVersionFromRegistry();
++    }
++#endif
++    if (version < 48) {
++      // While this cutoff (and the removal of outdated code) should depend on
++      // the usage percent of different versions of Firefox (see
++      // https://en.wikipedia.org/wiki/Firefox_version_history), the reality
++      // is that the current cutoff of at least Firefox 48 is mostly due to
++      // the fact that there's a Firefox 48 profile for testing in
++      // firefox_importer_unittest.cc. TODO(crbug.com/40169760): Add
++      // more modern Firefox test profiles, and roll the cutoff version.
++      continue;
+     }
+ 
+     user_data_importer::SourceProfile firefox;
+@@ -200,11 +202,12 @@
+     firefox.profile = detail.name;
+     firefox.importer_type = user_data_importer::TYPE_FIREFOX;
+     firefox.source_path = detail.path;
+-#if BUILDFLAG(IS_WIN)
+-    firefox.app_path = GetFirefoxInstallPathFromRegistry();
+-#endif
+-    if (firefox.app_path.empty())
+-      firefox.app_path = app_path;
++    firefox.app_path = app_path;
++#if BUILDFLAG(IS_WIN)
++    if (firefox.app_path.empty()) {
++      firefox.app_path = GetFirefoxInstallPathFromRegistry();
++    }
++#endif
+     firefox.services_supported = user_data_importer::HISTORY |
+                                  user_data_importer::FAVORITES |
+                                  user_data_importer::AUTOFILL_FORM_DATA;
+--- a/chrome/browser/ui/startup/startup_browser_creator_impl.cc
++++ b/chrome/browser/ui/startup/startup_browser_creator_impl.cc
+@@ -669,7 +669,9 @@
+       base::CommandLine::ForCurrentProcess()->HasSwitch(switches::kNoFirstRun);
+   if (!is_incognito_or_guest && !no_first_run) {
+     if (!profile_->GetPrefs()->GetBoolean(prefs::kHeliumDidOnboarding)) {
+-      UrlsToTabs({GURL(chrome::kHeliumSetupURL)}, &tabs);
++      // A link can trigger the first launch. Keep setup in front while
++      // retaining the requested pages in background tabs.
++      PrependTabs({StartupTab(GURL(chrome::kHeliumSetupURL))}, &tabs);
+       return {tabs, LaunchResult::kWithGivenUrls};
+     }
+   }
+--- a/chrome/browser/ui/webui/settings/brave_import_data_handler.cc
++++ b/chrome/browser/ui/webui/settings/brave_import_data_handler.cc
+@@ -164,7 +164,8 @@
+     return;
+   }
+ #if BUILDFLAG(IS_LINUX) && BUILDFLAG(USE_DBUS)
+-  if (source_profile.importer_type == user_data_importer::TYPE_CHROME &&
++  if ((source_profile.importer_type == user_data_importer::TYPE_CHROME ||
++       source_profile.importer_type == user_data_importer::TYPE_BRAVE) &&
+       (imported_items & user_data_importer::PASSWORDS)) {
+     // Inspect the destination before opening the source. Imported passwords
+     // must not replace credentials that are already saved in Noventra.
+--- a/chrome/common/importer/chrome_importer_utils.cc
++++ b/chrome/common/importer/chrome_importer_utils.cc
+@@ -259,9 +259,10 @@
+   }
+ 
+ #if BUILDFLAG(IS_LINUX) && BUILDFLAG(USE_DBUS)
+-  // The native reader supports these Chrome/Chromium-family encryption keys.
++  // The native reader supports these Chrome/Chromium and Brave keys.
+   // Other platforms and brands retain their existing import capabilities.
+-  if (type == user_data_importer::TYPE_CHROME &&
++  if ((type == user_data_importer::TYPE_CHROME ||
++       type == user_data_importer::TYPE_BRAVE) &&
+       (base::PathExists(profile.AppendASCII("Login Data")) ||
+        base::PathExists(profile.AppendASCII("Login Data For Account")))) {
+     *services_supported |= user_data_importer::PASSWORDS;
+--- a/chrome/common/importer/firefox_importer_utils.cc
++++ b/chrome/common/importer/firefox_importer_utils.cc
+@@ -8,11 +8,17 @@
+ 
+ #include <algorithm>
+ #include <map>
++#include <set>
+ #include <string>
+ #include <string_view>
+-
++#include <utility>
++
++#include "base/base_paths.h"
++#include "base/environment.h"
++#include "base/files/file_enumerator.h"
+ #include "base/files/file_util.h"
+ #include "base/logging.h"
++#include "base/path_service.h"
+ #include "base/strings/string_number_conversions.h"
+ #include "base/strings/string_split.h"
+ #include "base/strings/string_util.h"
+@@ -24,6 +30,10 @@
+ #include "chrome/grit/generated_resources.h"
+ #include "ui/base/l10n/l10n_util.h"
+ #include "url/gurl.h"
++
++#if BUILDFLAG(IS_WIN)
++#include "base/base_paths_win.h"
++#endif
+ 
+ namespace {
+ 
+@@ -69,15 +79,135 @@
+                                          ini_file.DirName());
+ }
+ 
++namespace {
++
++std::vector<base::FilePath> MozillaProfileINIs(bool zen) {
++  std::vector<base::FilePath> paths;
++  paths.push_back(zen ? GetZenProfilesINI() : GetProfilesINI());
++  base::FilePath home;
++  base::PathService::Get(base::DIR_HOME, &home);
++  auto add = [&](const base::FilePath& root, const char* subpath) {
++    if (root.IsAbsolute()) {
++      paths.push_back(root.Append(base::FilePath::FromUTF8Unsafe(subpath)));
++    }
++  };
++#if BUILDFLAG(IS_LINUX)
++  base::FilePath config;
++  auto env = base::Environment::Create();
++  if (const auto value = env->GetVar("XDG_CONFIG_HOME"); value) {
++    config = base::FilePath(*value);
++  }
++  if (!config.IsAbsolute() && !home.empty()) {
++    config = home.AppendASCII(".config");
++  }
++  if (zen) {
++    add(config, "zen/profiles.ini");
++    add(home, ".zen/profiles.ini");
++    add(home, ".var/app/app.zen_browser.zen/.zen/profiles.ini");
++    add(home, ".var/app/app.zen_browser.zen/config/zen/profiles.ini");
++  } else {
++    add(config, "mozilla/firefox/profiles.ini");
++    add(home, ".mozilla/firefox/profiles.ini");
++    add(home, "snap/firefox/common/.mozilla/firefox/profiles.ini");
++    add(home, ".var/app/org.mozilla.firefox/.mozilla/firefox/profiles.ini");
++    add(home,
++        ".var/app/org.mozilla.firefox/config/mozilla/firefox/profiles.ini");
++    add(config, "librewolf/librewolf/profiles.ini");
++    add(home, ".librewolf/profiles.ini");
++    add(home, ".var/app/io.gitlab.librewolf-community/.librewolf/profiles.ini");
++    add(home,
++        ".var/app/io.gitlab.librewolf-community/config/librewolf/librewolf/"
++        "profiles.ini");
++    add(config, "waterfox/waterfox/profiles.ini");
++    add(config, "waterfox/profiles.ini");
++    add(home, ".waterfox/profiles.ini");
++    add(config, "floorp/floorp/profiles.ini");
++    add(config, "floorp/profiles.ini");
++    add(home, ".floorp/profiles.ini");
++    add(home, ".var/app/one.ablaze.floorp/.floorp/profiles.ini");
++  }
++#elif BUILDFLAG(IS_MAC)
++  base::FilePath app_data;
++  if (base::PathService::Get(base::DIR_APP_DATA, &app_data)) {
++    add(app_data, zen ? "zen/profiles.ini" : "Firefox/profiles.ini");
++    if (!zen) {
++      add(app_data, "LibreWolf/profiles.ini");
++      add(app_data, "librewolf/profiles.ini");
++      add(app_data, "Waterfox/profiles.ini");
++      add(app_data, "Floorp/profiles.ini");
++      add(app_data, "floorp/profiles.ini");
++    }
++  }
++  if (!zen) {
++    add(home, ".librewolf/profiles.ini");
++  }
++#elif BUILDFLAG(IS_WIN)
++  base::FilePath roaming;
++  if (base::PathService::Get(base::DIR_ROAMING_APP_DATA, &roaming)) {
++    add(roaming, zen ? "zen/profiles.ini" : "Mozilla/Firefox/profiles.ini");
++    if (!zen) {
++      add(roaming, "LibreWolf/profiles.ini");
++      add(roaming, "librewolf/profiles.ini");
++      add(roaming, "Waterfox/profiles.ini");
++      add(roaming, "Floorp/profiles.ini");
++    }
++  }
++  if (!zen) {
++    add(home, ".librewolf/profiles.ini");
++    base::FilePath local;
++    if (base::PathService::Get(base::DIR_LOCAL_APP_DATA, &local)) {
++      // Microsoft Store Firefox keeps a separate current-user profile root.
++      base::FileEnumerator packages(local.AppendASCII("Packages"), false,
++                                    base::FileEnumerator::DIRECTORIES,
++                                    FILE_PATH_LITERAL("Mozilla.Firefox*"));
++      for (base::FilePath package = packages.Next(); !package.empty();
++           package = packages.Next()) {
++        add(package, "LocalCache/Roaming/Mozilla/Firefox/profiles.ini");
++      }
++    }
++  }
++#endif
++  return paths;
++}
++
++std::vector<FirefoxDetail> AllMozillaDetails(const std::string& install_id,
++                                             bool zen) {
++  std::vector<FirefoxDetail> profiles;
++  std::set<base::FilePath> seen;
++  for (const auto& ini : MozillaProfileINIs(zen)) {
++    if (!ini.IsAbsolute() || !base::PathExists(ini)) {
++      continue;
++    }
++    for (auto& profile : GetFirefoxDetailsImpl(install_id, ini)) {
++      if (!base::DirectoryExists(profile.path)) {
++        continue;
++      }
++      const auto canonical = base::MakeAbsoluteFilePath(profile.path);
++      if (!canonical.empty() && seen.insert(canonical).second) {
++        profile.path = canonical;
++        profiles.push_back(std::move(profile));
++      }
++    }
++  }
++  if (profiles.size() > 1) {
++    for (auto& profile : profiles) {
++      if (profile.name.empty()) {
++        profile.name = profile.path.BaseName().LossyDisplayName();
++      }
++    }
++  }
++  return profiles;
++}
++
++}  // namespace
++
+ std::vector<FirefoxDetail> GetFirefoxDetails(
+     const std::string& firefox_install_id) {
+-  base::FilePath ini_file = GetProfilesINI();
+-  return GetFirefoxDetailsImpl(firefox_install_id, ini_file);
++  return AllMozillaDetails(firefox_install_id, false);
+ }
+ 
+ std::vector<FirefoxDetail> GetZenDetails(const std::string& zen_install_id) {
+-  base::FilePath ini_file = GetZenProfilesINI();
+-  return GetFirefoxDetailsImpl(zen_install_id, ini_file);
++  return AllMozillaDetails(zen_install_id, true);
+ }
+ 
+ std::vector<FirefoxDetail> GetFirefoxDetailsFromDictionary(
+@@ -86,16 +216,27 @@
+     const base::FilePath& base_dir) {
+   std::vector<FirefoxDetail> profile_details;
+ 
+-  for (int i = 0; ; ++i) {
+-    std::string current_profile = base::StringPrintf("Profile%d", i);
+-    if (!root.Find(current_profile)) {
+-      // Profiles are contiguously numbered. So we exit when we can't
+-      // find the i-th one.
+-      break;
+-    }
+-
+-    if (!root.FindByDottedPath(current_profile + ".Path"))
++  std::vector<std::pair<int, std::string>> sections;
++  for (const auto [key, value] : root) {
++    if (!value.is_dict() || !base::StartsWith(key, "Profile")) {
+       continue;
++    }
++    const auto suffix = std::string_view(key).substr(7);
++    int index;
++    if (!suffix.empty() &&
++        std::ranges::all_of(suffix,
++                            [](char c) { return c >= '0' && c <= '9'; }) &&
++        base::StringToInt(suffix, &index)) {
++      sections.emplace_back(index, key);
++    }
++  }
++  std::ranges::sort(sections);
++  for (const auto& section : sections) {
++    const std::string& current_profile = section.second;
++
++    if (!root.FindByDottedPath(current_profile + ".Path")) {
++      continue;
++    }
+ 
+     FirefoxDetail details;
+     details.path = GetProfilePath(root, current_profile, base_dir);
+@@ -345,6 +486,13 @@
+   }
+ 
+   branding_name = base::ToLowerASCII(branding_name);
++  // Firefox-compatible forks retain their own name in the source picker.
++  if (branding_name == "librewolf")
++    return u"LibreWolf";
++  if (branding_name == "waterfox" || branding_name == "waterfox classic")
++    return u"Waterfox";
++  if (branding_name == "floorp")
++    return u"Floorp";
+   if (branding_name.find("iceweasel") != std::string::npos)
+     return l10n_util::GetStringUTF16(IDS_IMPORT_FROM_ICEWEASEL);
+   return l10n_util::GetStringUTF16(IDS_IMPORT_FROM_FIREFOX);
+--- /dev/null
++++ b/chrome/common/importer/noventra_browser_discovery_unittest.cc
+@@ -0,0 +1,133 @@
++// Copyright 2026 Noventra contributors
++// SPDX-License-Identifier: GPL-3.0-only
++
++#include <memory>
++#include <set>
++#include <string>
++
++#include "base/base_paths.h"
++#include "base/files/file_util.h"
++#include "base/files/scoped_temp_dir.h"
++#include "base/scoped_environment_variable_override.h"
++#include "base/strings/utf_string_conversions.h"
++#include "base/test/scoped_path_override.h"
++#include "build/build_config.h"
++#include "chrome/common/importer/chrome_importer_utils.h"
++#include "chrome/common/importer/firefox_importer_utils.h"
++#include "testing/gtest/include/gtest/gtest.h"
++
++#if BUILDFLAG(IS_LINUX)
++namespace {
++class NoventraBrowserDiscoveryTest : public testing::Test {
++ protected:
++  void SetUp() override {
++    ASSERT_TRUE(home_.CreateUniqueTempDir());
++    home_override_ = std::make_unique<base::ScopedPathOverride>(
++        base::DIR_HOME, home_.GetPath());
++    config_override_ =
++        std::make_unique<base::ScopedEnvironmentVariableOverride>(
++            "XDG_CONFIG_HOME", home_.GetPath().AppendASCII("config").value());
++  }
++
++  base::FilePath Seed(const char* ini_subpath, const char* profile_name) {
++    auto ini = home_.GetPath().AppendASCII(ini_subpath);
++    auto profile = ini.DirName().AppendASCII(profile_name);
++    EXPECT_TRUE(base::CreateDirectory(profile));
++    EXPECT_TRUE(base::WriteFile(
++        ini,
++        std::string("[Profile0]\nName=Owned profile\nIsRelative=1\nPath=") +
++            profile_name + "\n"));
++    return profile;
++  }
++
++  std::set<base::FilePath> Paths(const std::vector<FirefoxDetail>& profiles) {
++    std::set<base::FilePath> paths;
++    for (const auto& profile : profiles) {
++      paths.insert(profile.path);
++    }
++    return paths;
++  }
++
++  base::ScopedTempDir home_;
++  std::unique_ptr<base::ScopedPathOverride> home_override_;
++  std::unique_ptr<base::ScopedEnvironmentVariableOverride> config_override_;
++};
++
++TEST_F(NoventraBrowserDiscoveryTest, AllFirefoxInstallationsRemainVisible) {
++  std::set<base::FilePath> wanted;
++  wanted.insert(Seed("config/mozilla/firefox/profiles.ini", "xdg"));
++  wanted.insert(Seed(".mozilla/firefox/profiles.ini", "native"));
++  wanted.insert(
++      Seed("snap/firefox/common/.mozilla/firefox/profiles.ini", "snap"));
++  wanted.insert(Seed(
++      ".var/app/org.mozilla.firefox/.mozilla/firefox/profiles.ini", "flatpak"));
++  EXPECT_EQ(Paths(GetFirefoxDetails("")), wanted);
++}
++
++TEST_F(NoventraBrowserDiscoveryTest, AllZenInstallationsRemainVisible) {
++  std::set<base::FilePath> wanted;
++  wanted.insert(Seed("config/zen/profiles.ini", "xdg"));
++  wanted.insert(Seed(".zen/profiles.ini", "native"));
++  wanted.insert(
++      Seed(".var/app/app.zen_browser.zen/.zen/profiles.ini", "flatpak"));
++  EXPECT_EQ(Paths(GetZenDetails("")), wanted);
++}
++
++TEST_F(NoventraBrowserDiscoveryTest, StalePrimaryDoesNotHideOtherInstall) {
++  auto stale = Seed("config/mozilla/firefox/profiles.ini", "removed");
++  ASSERT_TRUE(base::DeletePathRecursively(stale));
++  auto available = Seed(".mozilla/firefox/profiles.ini", "available");
++  EXPECT_EQ(Paths(GetFirefoxDetails("")),
++            std::set<base::FilePath>({available}));
++}
++
++TEST_F(NoventraBrowserDiscoveryTest, DuplicateProfileRootsAreListedOnce) {
++  auto profile = Seed("config/mozilla/firefox/profiles.ini", "owned");
++  auto alias = home_.GetPath().AppendASCII(".mozilla/firefox/profiles.ini");
++  ASSERT_TRUE(base::CreateDirectory(alias.DirName()));
++  ASSERT_TRUE(base::WriteFile(
++      alias, "[Profile0]\nName=Same profile\nIsRelative=0\nPath=" +
++                 profile.value() + "\n"));
++  EXPECT_EQ(GetFirefoxDetails("").size(), 1u);
++}
++
++TEST_F(NoventraBrowserDiscoveryTest,
++       RemovedProfileNumberDoesNotHideLaterProfile) {
++  auto first = Seed("config/mozilla/firefox/profiles.ini", "first");
++  auto later = first.DirName().AppendASCII("later");
++  ASSERT_TRUE(base::CreateDirectory(later));
++  ASSERT_TRUE(
++      base::AppendToFile(first.DirName().AppendASCII("profiles.ini"),
++                         "[Profile2]\nName=Later\nIsRelative=1\nPath=later\n"));
++  EXPECT_EQ(Paths(GetFirefoxDetails("")),
++            std::set<base::FilePath>({first, later}));
++}
++
++TEST_F(NoventraBrowserDiscoveryTest, RelativeXdgFallsBackToHomeConfig) {
++  base::ScopedEnvironmentVariableOverride relative("XDG_CONFIG_HOME",
++                                                   "relative");
++  auto profile = Seed(".config/mozilla/firefox/profiles.ini", "fallback");
++  EXPECT_EQ(Paths(GetFirefoxDetails("")), std::set<base::FilePath>({profile}));
++}
++
++TEST_F(NoventraBrowserDiscoveryTest,
++       FlatBrowserDataIsNotLostWithoutLocalState) {
++  auto root = home_.GetPath().AppendASCII("opera-profile");
++  ASSERT_TRUE(base::CreateDirectory(root));
++  ASSERT_TRUE(base::WriteFile(root.AppendASCII("Bookmarks"), "{}"));
++  auto profiles = GetChromeSourceProfiles(root.AppendASCII("Local State"));
++  ASSERT_EQ(profiles.size(), 1u);
++  EXPECT_EQ(*profiles[0].GetDict().FindString("id"), "");
++}
++
++TEST_F(NoventraBrowserDiscoveryTest, KnownFirefoxForksKeepTheirOwnNames) {
++  for (const auto* name : {"LibreWolf", "Waterfox", "Floorp"}) {
++    auto app = home_.GetPath().AppendASCII(name);
++    ASSERT_TRUE(base::CreateDirectory(app));
++    ASSERT_TRUE(base::WriteFile(app.AppendASCII("application.ini"),
++                                std::string("[App]\nName=") + name + "\n"));
++    EXPECT_EQ(GetFirefoxImporterName(app), base::UTF8ToUTF16(name));
++  }
++}
++}  // namespace
++#endif
+--- a/chrome/common/importer/scoped_copy_file.cc
++++ b/chrome/common/importer/scoped_copy_file.cc
+@@ -5,16 +5,162 @@
+ 
+ #include "chrome/common/importer/scoped_copy_file.h"
+ 
+-#include "base/files/file_path.h"
++#include <algorithm>
++#include <array>
++#include <optional>
++#include <utility>
++#include <vector>
++
++#include "base/containers/span.h"
++#include "base/files/file.h"
+ #include "base/files/file_util.h"
++#include "base/functional/callback.h"
++#include "build/build_config.h"
+ 
+-ScopedCopyFile::ScopedCopyFile(const base::FilePath& original_file_path) {
++namespace {
++
++// Large histories are copied in fixed-size chunks, never retained in memory.
++// Cap the combined on-disk snapshot instead of exhausting temporary storage.
++constexpr int64_t kMaximumDatabaseBytes = int64_t{2} * 1024 * 1024 * 1024;
++
++bool SameFileState(const base::File::Info& first,
++                   const base::File::Info& second) {
++  return !second.is_directory && !second.is_symbolic_link &&
++         first.size == second.size &&
++         first.last_modified == second.last_modified;
++}
++
++bool CopyBoundedFile(const base::FilePath& source,
++                     const base::FilePath& destination,
++                     const base::File::Info& before) {
++  uint32_t read_flags = base::File::FLAG_OPEN | base::File::FLAG_READ |
++                        base::File::FLAG_WIN_SHARE_DELETE;
++#if BUILDFLAG(IS_POSIX)
++  read_flags |= base::File::FLAG_NO_FOLLOW;
++#endif
++  base::File input(source, read_flags);
++  base::File output(destination,
++                    base::File::FLAG_CREATE | base::File::FLAG_WRITE);
++  base::File::Info opened;
++  if (!input.IsValid() || !output.IsValid() || !input.GetInfo(&opened) ||
++      !SameFileState(before, opened)) {
++    return false;
++  }
++  std::array<uint8_t, 64 * 1024> bytes;
++  for (int64_t remaining = before.size; remaining > 0;) {
++    const size_t length = static_cast<size_t>(
++        std::min(remaining, static_cast<int64_t>(bytes.size())));
++    const auto block = base::span(bytes).first(length);
++    if (!input.ReadAtCurrentPosAndCheck(block) ||
++        !output.WriteAtCurrentPosAndCheck(block)) {
++      return false;
++    }
++    remaining -= static_cast<int64_t>(length);
++  }
++  std::array<uint8_t, 1> extra;
++  const auto count = input.ReadAtCurrentPos(extra);
++  if (!count || *count != 0) {
++    return false;
++  }
++#if BUILDFLAG(IS_POSIX)
++  if (!base::SetPosixFilePermissions(destination, 0600)) {
++    return false;
++  }
++#endif
++  return true;
++}
++
++bool SnapshotDatabase(const base::FilePath& source,
++                      const base::FilePath& destination,
++                      base::OnceClosure before_verification_for_testing) {
++  struct Part {
++    base::FilePath source;
++    base::FilePath destination;
++    std::optional<base::File::Info> before;
++  };
++  std::vector<Part> parts;
++  int64_t total_bytes = 0;
++  for (const auto* suffix : {FILE_PATH_LITERAL(""), FILE_PATH_LITERAL("-wal"),
++                             FILE_PATH_LITERAL("-journal")}) {
++    const base::FilePath path(source.value() + suffix);
++    Part part{path, base::FilePath(destination.value() + suffix), std::nullopt};
++    if (base::PathExists(path)) {
++      base::File::Info info;
++      if (base::IsLink(path) || !base::GetFileInfo(path, &info) ||
++          info.is_directory || info.is_symbolic_link || info.size < 0 ||
++          info.size > kMaximumDatabaseBytes - total_bytes) {
++        return false;
++      }
++      total_bytes += info.size;
++      part.before = info;
++    } else if (suffix[0] == 0) {
++      return false;
++    }
++    parts.push_back(std::move(part));
++  }
++  for (const auto& part : parts) {
++    if (part.before &&
++        !CopyBoundedFile(part.source, part.destination, *part.before)) {
++      return false;
++    }
++  }
++  if (before_verification_for_testing) {
++    std::move(before_verification_for_testing).Run();
++  }
++  for (const auto& part : parts) {
++    if (base::PathExists(part.source) != part.before.has_value()) {
++      return false;
++    }
++    if (part.before) {
++      base::File::Info after;
++      if (base::IsLink(part.source) ||
++          !base::GetFileInfo(part.source, &after) ||
++          !SameFileState(*part.before, after) ||
++          !base::ContentsEqual(part.source, part.destination) ||
++          !base::GetFileInfo(part.source, &after) ||
++          !SameFileState(*part.before, after)) {
++        return false;
++      }
++    }
++  }
++  return true;
++}
++
++}  // namespace
++
++ScopedCopyFile::ScopedCopyFile(const base::FilePath& original_file_path,
++                               Mode mode)
++    : ScopedCopyFile(original_file_path, mode, {}) {}
++
++ScopedCopyFile::ScopedCopyFile(
++    const base::FilePath& original_file_path,
++    Mode mode,
++    base::OnceClosure before_verification_for_testing) {
++  if (mode == Mode::kSqliteDatabase) {
++    if (!copied_directory_.CreateUniqueTempDir()) {
++      return;
++    }
++#if BUILDFLAG(IS_POSIX)
++    if (!base::SetPosixFilePermissions(copied_directory_.GetPath(), 0700)) {
++      return;
++    }
++#endif
++    copied_file_path_ =
++        copied_directory_.GetPath().Append(original_file_path.BaseName());
++    copy_success_ =
++        SnapshotDatabase(original_file_path, copied_file_path_,
++                         std::move(before_verification_for_testing));
++    return;
++  }
+   DCHECK(base::PathExists(original_file_path));
+-  if (base::CreateTemporaryFile(&copied_file_path_))
++  if (base::CreateTemporaryFile(&copied_file_path_)) {
+     copy_success_ = base::CopyFile(original_file_path, copied_file_path_);
++  }
+ }
+ 
+ ScopedCopyFile::~ScopedCopyFile() {
+-  if (base::PathExists(copied_file_path_))
++  // ScopedTempDir also removes any SQLite recovery/shared-memory sidecars.
++  if (!copied_directory_.IsValid() && base::PathExists(copied_file_path_)) {
+     base::DeleteFile(copied_file_path_);
++  }
+ }
+--- a/chrome/common/importer/scoped_copy_file.h
++++ b/chrome/common/importer/scoped_copy_file.h
+@@ -1,4 +1,4 @@
+-/* Copyright 2020 The Brave Authors. All rights reserved.
++/* Copyright 2020 The Brave Authors, 2025 imput. All rights reserved.
+  * This Source Code Form is subject to the terms of the Mozilla Public
+  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+  * You can obtain one at http://mozilla.org/MPL/2.0/. */
+@@ -7,10 +7,21 @@
+ #define BRAVE_COMMON_IMPORTER_SCOPED_COPY_FILE_H_
+ 
+ #include "base/files/file_path.h"
++#include "base/files/scoped_temp_dir.h"
++#include "base/functional/callback_forward.h"
++#include "base/gtest_prod_util.h"
+ 
+ class ScopedCopyFile {
+  public:
+-  explicit ScopedCopyFile(const base::FilePath& original_file_path);
++  enum class Mode {
++    kFile,
++    // Snapshot the main file plus WAL/journal into a private directory. Never
++    // open the original in SQLite; reject sources that change during copying.
++    kSqliteDatabase,
++  };
++
++  explicit ScopedCopyFile(const base::FilePath& original_file_path,
++                          Mode mode = Mode::kFile);
+   ~ScopedCopyFile();
+ 
+   ScopedCopyFile(const ScopedCopyFile&) = delete;
+@@ -20,8 +31,17 @@
+   base::FilePath copied_file_path() const { return copied_file_path_; }
+ 
+  private:
++  FRIEND_TEST_ALL_PREFIXES(ScopedCopyFileTest,
++                           SourceChangingDuringCopyIsRejected);
++  FRIEND_TEST_ALL_PREFIXES(ScopedCopyFileTest,
++                           SidecarAppearingDuringCopyIsRejected);
++  ScopedCopyFile(const base::FilePath& original_file_path,
++                 Mode mode,
++                 base::OnceClosure before_verification_for_testing);
++
+   bool copy_success_ = false;
+   base::FilePath copied_file_path_;
++  base::ScopedTempDir copied_directory_;
+ };
+ 
+ #endif  // BRAVE_COMMON_IMPORTER_SCOPED_COPY_FILE_H_
+--- /dev/null
++++ b/chrome/common/importer/scoped_copy_file_unittest.cc
+@@ -0,0 +1,173 @@
++// Copyright 2026 Noventra contributors
++// SPDX-License-Identifier: GPL-3.0-only
++
++#include "chrome/common/importer/scoped_copy_file.h"
++
++#include <map>
++#include <string>
++#include <utility>
++
++#include "base/files/file.h"
++#include "base/files/file_util.h"
++#include "base/files/scoped_temp_dir.h"
++#include "base/test/bind.h"
++#include "base/test/task_environment.h"
++#include "build/build_config.h"
++#include "sql/database.h"
++#include "sql/statement.h"
++#include "sql/test/test_helpers.h"
++#include "testing/gtest/include/gtest/gtest.h"
++
++class ScopedCopyFileTest : public testing::Test {
++ protected:
++  void SetUp() override { ASSERT_TRUE(source_.CreateUniqueTempDir()); }
++
++  base::FilePath Source() const {
++    return source_.GetPath().AppendASCII("History");
++  }
++
++  auto SourceBytes() {
++    std::map<base::FilePath::StringType, std::string> result;
++    for (const auto* suffix :
++         {FILE_PATH_LITERAL(""), FILE_PATH_LITERAL("-wal"),
++          FILE_PATH_LITERAL("-journal"), FILE_PATH_LITERAL("-shm")}) {
++      const base::FilePath path(Source().value() + suffix);
++      if (base::PathExists(path)) {
++        std::string data;
++        EXPECT_TRUE(base::ReadFileToString(path, &data));
++        result[path.BaseName().value()] = std::move(data);
++      }
++    }
++    return result;
++  }
++
++  base::test::TaskEnvironment task_environment_;
++  base::ScopedTempDir source_;
++};
++
++TEST_F(ScopedCopyFileTest, DefaultModeRemainsSingleFile) {
++  ASSERT_TRUE(base::WriteFile(Source(), "owned main"));
++  ASSERT_TRUE(base::WriteFile(
++      base::FilePath(Source().value() + FILE_PATH_LITERAL("-wal")),
++      "owned sidecar"));
++  base::FilePath copied;
++  {
++    ScopedCopyFile copy(Source());
++    ASSERT_TRUE(copy.copy_success());
++    copied = copy.copied_file_path();
++    EXPECT_TRUE(base::ContentsEqual(Source(), copied));
++    EXPECT_FALSE(base::PathExists(
++        base::FilePath(copied.value() + FILE_PATH_LITERAL("-wal"))));
++  }
++  EXPECT_FALSE(base::PathExists(copied));
++}
++
++TEST_F(ScopedCopyFileTest, MissingDatabaseFailsWithoutCreatingSource) {
++  ScopedCopyFile copy(Source(), ScopedCopyFile::Mode::kSqliteDatabase);
++  EXPECT_FALSE(copy.copy_success());
++  EXPECT_FALSE(base::PathExists(Source()));
++}
++
++TEST_F(ScopedCopyFileTest, WalOnlyCommittedRowsAreCopiedAndSourceIsUnchanged) {
++  sql::Database source(
++      sql::DatabaseOptions().set_wal_mode(true).set_exclusive_locking(false),
++      sql::test::kTestTag);
++  ASSERT_TRUE(source.Open(Source()));
++  ASSERT_TRUE(source.Execute("PRAGMA wal_autocheckpoint=0"));
++  ASSERT_TRUE(source.Execute("CREATE TABLE owned_history (value INTEGER)"));
++  ASSERT_TRUE(source.Execute("INSERT INTO owned_history VALUES (42)"));
++  ASSERT_TRUE(base::PathExists(
++      base::FilePath(Source().value() + FILE_PATH_LITERAL("-wal"))));
++  const auto before = SourceBytes();
++  base::FilePath copied_directory;
++  {
++    ScopedCopyFile copy(Source(), ScopedCopyFile::Mode::kSqliteDatabase);
++    ASSERT_TRUE(copy.copy_success());
++    copied_directory = copy.copied_file_path().DirName();
++    EXPECT_NE(copied_directory, source_.GetPath());
++    sql::Database copied(sql::test::kTestTag);
++    ASSERT_TRUE(copied.Open(copy.copied_file_path()));
++    sql::Statement rows(
++        copied.GetUniqueStatement("SELECT value FROM owned_history"));
++    ASSERT_TRUE(rows.Step());
++    EXPECT_EQ(rows.ColumnInt(0), 42);
++    EXPECT_FALSE(rows.Step());
++    EXPECT_TRUE(rows.Succeeded());
++    EXPECT_EQ(before, SourceBytes());
++  }
++  EXPECT_FALSE(base::PathExists(copied_directory));
++  EXPECT_EQ(before, SourceBytes());
++}
++
++TEST_F(ScopedCopyFileTest, JournalIsCopiedWithoutTouchingSource) {
++  ASSERT_TRUE(base::WriteFile(Source(), "owned main"));
++  const base::FilePath journal(Source().value() +
++                               FILE_PATH_LITERAL("-journal"));
++  ASSERT_TRUE(base::WriteFile(journal, "owned rollback journal"));
++  const auto before = SourceBytes();
++  ScopedCopyFile copy(Source(), ScopedCopyFile::Mode::kSqliteDatabase);
++  ASSERT_TRUE(copy.copy_success());
++  EXPECT_TRUE(base::ContentsEqual(
++      journal, base::FilePath(copy.copied_file_path().value() +
++                              FILE_PATH_LITERAL("-journal"))));
++  EXPECT_EQ(before, SourceBytes());
++}
++
++TEST_F(ScopedCopyFileTest, SourceChangingDuringCopyIsRejected) {
++  ASSERT_TRUE(base::WriteFile(Source(), "owned before"));
++  base::File::Info before;
++  ASSERT_TRUE(base::GetFileInfo(Source(), &before));
++  ScopedCopyFile copy(
++      Source(), ScopedCopyFile::Mode::kSqliteDatabase,
++      base::BindLambdaForTesting([&] {
++        EXPECT_TRUE(base::WriteFile(Source(), "owned change"));
++        // Same size/time ensures the streaming content comparison catches it.
++        EXPECT_TRUE(base::TouchFile(Source(), before.last_accessed,
++                                    before.last_modified));
++      }));
++  EXPECT_FALSE(copy.copy_success());
++}
++
++TEST_F(ScopedCopyFileTest, SidecarAppearingDuringCopyIsRejected) {
++  ASSERT_TRUE(base::WriteFile(Source(), "owned main"));
++  ScopedCopyFile copy(
++      Source(), ScopedCopyFile::Mode::kSqliteDatabase,
++      base::BindLambdaForTesting([&] {
++        EXPECT_TRUE(base::WriteFile(
++            base::FilePath(Source().value() + FILE_PATH_LITERAL("-wal")),
++            "owned new WAL"));
++      }));
++  EXPECT_FALSE(copy.copy_success());
++}
++
++TEST_F(ScopedCopyFileTest, OversizedSparseDatabaseIsRejectedBeforeCopying) {
++  base::File source(Source(), base::File::FLAG_CREATE | base::File::FLAG_WRITE);
++  ASSERT_TRUE(source.IsValid());
++  ASSERT_TRUE(source.SetLength(int64_t{2} * 1024 * 1024 * 1024 + 1));
++  source.Close();
++  ScopedCopyFile copy(Source(), ScopedCopyFile::Mode::kSqliteDatabase);
++  EXPECT_FALSE(copy.copy_success());
++  EXPECT_FALSE(base::PathExists(copy.copied_file_path()));
++}
++
++#if BUILDFLAG(IS_POSIX)
++TEST_F(ScopedCopyFileTest, SnapshotPermissionsArePrivate) {
++  ASSERT_TRUE(base::WriteFile(Source(), "owned main"));
++  ScopedCopyFile copy(Source(), ScopedCopyFile::Mode::kSqliteDatabase);
++  ASSERT_TRUE(copy.copy_success());
++  int mode = 0;
++  EXPECT_TRUE(base::GetPosixFilePermissions(copy.copied_file_path(), &mode));
++  EXPECT_EQ(mode, 0600);
++  EXPECT_TRUE(
++      base::GetPosixFilePermissions(copy.copied_file_path().DirName(), &mode));
++  EXPECT_EQ(mode, 0700);
++}
++
++TEST_F(ScopedCopyFileTest, LinkedDatabaseIsRejected) {
++  const base::FilePath actual = source_.GetPath().AppendASCII("actual");
++  ASSERT_TRUE(base::WriteFile(actual, "owned main"));
++  ASSERT_TRUE(base::CreateSymbolicLink(actual, Source()));
++  ScopedCopyFile copy(Source(), ScopedCopyFile::Mode::kSqliteDatabase);
++  EXPECT_FALSE(copy.copy_success());
++}
++#endif
+--- a/chrome/utility/BUILD.gn
++++ b/chrome/utility/BUILD.gn
+@@ -352,11 +352,14 @@
+   # The DBus tests use only mock services; no user keyring or profile is read.
+   test("noventra_password_import_tests") {
+     sources = [
++      "//chrome/common/importer/noventra_browser_discovery_unittest.cc",
++      "//chrome/common/importer/scoped_copy_file_unittest.cc",
+       "//components/os_crypt/async/browser/freedesktop_secret_key_provider_unittest.cc",
+       "importer/chrome_password_importer_unittest.cc",
+     ]
+     deps = [
+       ":chrome_password_import",
++      "//chrome/common/importer",
+       "//base/test:run_all_unittests",
+       "//base/test:test_support",
+       "//components/dbus",
+--- a/chrome/utility/importer/chrome_importer.cc
++++ b/chrome/utility/importer/chrome_importer.cc
+@@ -44,6 +44,7 @@
+   bridge_ = bridge;
+   source_path_ = source_profile.source_path;
+   importer_name_ = source_profile.importer_name;
++  import_failed_ = false;
+   // The order here is important!
+   bridge_->NotifyStarted();
+ 
+@@ -77,13 +78,21 @@
+ 
+   if ((items & user_data_importer::HISTORY) && !cancelled()) {
+     bridge_->NotifyItemStarted(user_data_importer::HISTORY);
+-    ImportHistory();
++    if (!ImportHistory()) {
++      bridge_->NotifyFailed(
++          "History could not be copied safely. Close the previous browser "
++          "and try again.");
++      return;
++    }
+     bridge_->NotifyItemEnded(user_data_importer::HISTORY);
+   }
+ 
+   if ((items & user_data_importer::FAVORITES) && !cancelled()) {
+     bridge_->NotifyItemStarted(user_data_importer::FAVORITES);
+     ImportBookmarks();
++    if (import_failed_) {
++      return;
++    }
+     bridge_->NotifyItemEnded(user_data_importer::FAVORITES);
+   }
+ 
+@@ -105,21 +114,22 @@
+   bridge_->NotifyEnded();
+ }
+ 
+-void ChromeImporter::ImportHistory() {
++bool ChromeImporter::ImportHistory() {
+   base::FilePath history_path = source_path_.Append(
+       base::FilePath::StringType(FILE_PATH_LITERAL("History")));
+   if (!base::PathExists(history_path)) {
+-    return;
+-  }
+-
+-  ScopedCopyFile copy_history_file(history_path);
++    return false;
++  }
++
++  ScopedCopyFile copy_history_file(history_path,
++                                   ScopedCopyFile::Mode::kSqliteDatabase);
+   if (!copy_history_file.copy_success()) {
+-    return;
++    return false;
+   }
+ 
+   sql::Database db(sql::Database::Tag("History"));
+   if (!db.Open(copy_history_file.copied_file_path())) {
+-    return;
++    return false;
+   }
+ 
+   const char query[] =
+@@ -131,15 +141,34 @@
+                                                 // KEYWORD_GENERATED
+ 
+   sql::Statement s(db.GetUniqueStatement(query));
++  if (!s.is_valid()) {
++    return false;
++  }
+   s.BindInt64(0, ui::PAGE_TRANSITION_CHAIN_END);
+   s.BindInt64(1, ui::PAGE_TRANSITION_CORE_MASK);
+   s.BindInt64(2, ui::PAGE_TRANSITION_AUTO_SUBFRAME);
+   s.BindInt64(3, ui::PAGE_TRANSITION_MANUAL_SUBFRAME);
+   s.BindInt64(4, ui::PAGE_TRANSITION_KEYWORD_GENERATED);
+ 
++  constexpr size_t kMaximumHistoryRows = 1000000;
++  constexpr size_t kMaximumFieldBytes = 1024 * 1024;
++  constexpr size_t kMaximumTextBytes = 128 * 1024 * 1024;
++  size_t text_bytes = 0;
+   std::vector<user_data_importer::ImporterURLRow> rows;
+   while (s.Step() && !cancelled()) {
+-    GURL url(s.ColumnString(0));
++    const auto source_url = s.ColumnStringView(0);
++    const auto source_title = s.ColumnStringView(1);
++    if (rows.size() >= kMaximumHistoryRows ||
++        source_url.size() > kMaximumFieldBytes ||
++        source_title.size() > kMaximumFieldBytes) {
++      return false;
++    }
++    const size_t row_bytes = source_url.size() + source_title.size() * 2;
++    if (row_bytes > kMaximumTextBytes - text_bytes) {
++      return false;
++    }
++    text_bytes += row_bytes;
++    GURL url(source_url);
+ 
+     user_data_importer::ImporterURLRow row(url);
+     row.title = s.ColumnString16(1);
+@@ -152,26 +181,41 @@
+     rows.push_back(row);
+   }
+ 
+-  if (!rows.empty() && !cancelled()) {
++  if (cancelled() || !s.Succeeded()) {
++    return false;
++  }
++  if (!rows.empty()) {
+     bridge_->SetHistoryItems(rows,
+                              user_data_importer::VISIT_SOURCE_CHROME_IMPORTED);
+   }
++  return true;
+ }
+ 
+ void ChromeImporter::ImportBookmarks() {
+   std::string bookmarks_content;
+   base::FilePath bookmarks_path = source_path_.Append(
+       base::FilePath::StringType(FILE_PATH_LITERAL("Bookmarks")));
++  const auto read_failed = [this] {
++    import_failed_ = true;
++    bridge_->NotifyFailed(
++        "Bookmarks could not be copied safely. Close the previous browser "
++        "and try again.");
++  };
++  if (!base::PathExists(bookmarks_path)) {
++    read_failed();
++    return;
++  }
+   ScopedCopyFile copy_bookmark_file(bookmarks_path);
+-  if (!copy_bookmark_file.copy_success()) {
+-    return;
+-  }
+-
+-  base::ReadFileToString(copy_bookmark_file.copied_file_path(),
+-                         &bookmarks_content);
++  if (!copy_bookmark_file.copy_success() ||
++      !base::ReadFileToString(copy_bookmark_file.copied_file_path(),
++                              &bookmarks_content)) {
++    read_failed();
++    return;
++  }
+   std::optional<base::DictValue> bookmark_dict = base::JSONReader::ReadDict(
+       bookmarks_content, base::JSON_PARSE_CHROMIUM_EXTENSIONS);
+-  if (!bookmark_dict) {
++  if (!bookmark_dict || !bookmark_dict->FindDict("roots")) {
++    read_failed();
+     return;
+   }
+ 
+--- a/chrome/utility/importer/chrome_importer.h
++++ b/chrome/utility/importer/chrome_importer.h
+@@ -44,7 +44,7 @@
+   ~ChromeImporter() override;
+ 
+   virtual void ImportBookmarks();
+-  void ImportHistory();
++  bool ImportHistory();
+ 
+   double chromeTimeToDouble(int64_t time);
+ 
+@@ -52,6 +52,8 @@
+   std::u16string importer_name_;
+ 
+  private:
++  bool import_failed_ = false;
++
+   // Multiple URLs can share the same favicon; this is a map
+   // of URLs -> IconIDs that we load as a temporary step before
+   // actually loading the icons.
+--- a/chrome/utility/importer/chrome_password_importer.cc
++++ b/chrome/utility/importer/chrome_password_importer.cc
+@@ -114,6 +114,17 @@
+     // select a different encryption key.
+     identity = Provider::ReadOnlyImport{"chromium", "Chromium Keys",
+                                         "Chromium Safe Storage"};
++  } else if (importer_name == u"Brave" || importer_name == u"Brave Beta" ||
++             importer_name == u"Brave Dev" ||
++             importer_name == u"Brave Nightly" ||
++             importer_name == u"Brave Origin" ||
++             importer_name == u"Brave Origin Beta" ||
++             importer_name == u"Brave Origin Dev" ||
++             importer_name == u"Brave Origin Nightly") {
++    // Brave's provider uses this shared key identity for Browser and Origin,
++    // independently of their separate profile roots and release channels.
++    identity =
++        Provider::ReadOnlyImport{"brave", "Brave Keys", "Brave Safe Storage"};
+   }
+   if (!identity || cancelled.Run()) {
+     return std::nullopt;
+--- a/chrome/utility/importer/firefox_importer.cc
++++ b/chrome/utility/importer/firefox_importer.cc
+@@ -19,6 +19,7 @@
+ #include "chrome/common/importer/firefox_importer_utils.h"
+ #include "chrome/common/importer/importer_autofill_form_data_entry.h"
+ #include "chrome/common/importer/importer_bridge.h"
++#include "chrome/common/importer/scoped_copy_file.h"
+ #include "chrome/grit/generated_resources.h"
+ #include "components/user_data_importer/common/imported_bookmark_entry.h"
+ #include "components/user_data_importer/common/importer_data_types.h"
+@@ -120,6 +121,7 @@
+   app_path_ = source_profile.app_path;
+   items_ = items;
+   browser_name_ = source_profile.importer_name;
++  bookmark_folders_seen_.clear();
+ 
+ #if BUILDFLAG(IS_POSIX)
+   locale_ = source_profile.locale;
+@@ -128,7 +130,8 @@
+   // The order here is important!
+   bridge_->NotifyStarted();
+   if (!source_path_copy_.CreateUniqueTempDir()) {
+-    bridge->NotifyEnded();
++    bridge_->NotifyFailed(
++        "A private copy of browser data could not be created.");
+     return;
+   }
+   if ((items & user_data_importer::HOME_PAGE) && !cancelled()) {
+@@ -142,7 +145,12 @@
+   // exist in history or bookmarks.
+   if ((items & user_data_importer::HISTORY) && !cancelled()) {
+     bridge_->NotifyItemStarted(user_data_importer::HISTORY);
+-    ImportHistory();
++    if (!ImportHistory()) {
++      bridge_->NotifyFailed(
++          "History could not be copied safely. Close the previous browser "
++          "and try again.");
++      return;
++    }
+     bridge_->NotifyItemEnded(user_data_importer::HISTORY);
+   }
+ 
+@@ -172,14 +180,14 @@
+   bridge_->NotifyEnded();
+ }
+ 
+-void FirefoxImporter::ImportHistory() {
++bool FirefoxImporter::ImportHistory() {
+   base::FilePath file = GetCopiedSourcePath("places.sqlite");
+   if (!base::PathExists(file))
+-    return;
++    return false;
+ 
+   sql::Database db(kDatabaseTag);
+   if (!db.Open(file))
+-    return;
++    return false;
+ 
+   // |visit_type| represent the transition type of URLs (typed, click,
+   // redirect, bookmark, etc.) We eliminate some URLs like sub-frames and
+@@ -195,12 +203,28 @@
+ 
+   sql::Statement s(db.GetUniqueStatement(query));
+   if (!s.is_valid()) {
+-    return;
+-  }
+-
++    return false;
++  }
++
++  constexpr size_t kMaximumHistoryRows = 1000000;
++  constexpr size_t kMaximumFieldBytes = 1024 * 1024;
++  constexpr size_t kMaximumTextBytes = 128 * 1024 * 1024;
++  size_t text_bytes = 0;
+   std::vector<user_data_importer::ImporterURLRow> rows;
+   while (s.Step() && !cancelled()) {
+-    GURL url(s.ColumnStringView(0));
++    const auto source_url = s.ColumnStringView(0);
++    const auto source_title = s.ColumnStringView(1);
++    if (rows.size() >= kMaximumHistoryRows ||
++        source_url.size() > kMaximumFieldBytes ||
++        source_title.size() > kMaximumFieldBytes) {
++      return false;
++    }
++    const size_t row_bytes = source_url.size() + source_title.size() * 2;
++    if (row_bytes > kMaximumTextBytes - text_bytes) {
++      return false;
++    }
++    text_bytes += row_bytes;
++    GURL url(source_url);
+ 
+     // Filter out unwanted URLs.
+     if (!CanImportURL(url)) {
+@@ -217,9 +241,14 @@
+     rows.push_back(row);
+   }
+ 
+-  if (!rows.empty() && !cancelled())
++  if (cancelled() || !s.Succeeded()) {
++    return false;
++  }
++  if (!rows.empty()) {
+     bridge_->SetHistoryItems(rows,
+                              user_data_importer::VISIT_SOURCE_FIREFOX_IMPORTED);
++  }
++  return true;
+ }
+ 
+ void FirefoxImporter::SetBookmarkHtmlParser(
+@@ -229,16 +258,14 @@
+ 
+ void FirefoxImporter::ImportBookmarks() {
+   base::FilePath sqlite_file = GetCopiedSourcePath("places.sqlite");
+-  if (!base::PathExists(sqlite_file)) {
+-    bridge_->NotifyItemEnded(user_data_importer::FAVORITES);
+-    ImportRemainingItems();
++  if (sqlite_file.empty()) {
++    bridge_->NotifyFailed("Bookmarks could not be copied safely.");
+     return;
+   }
+ 
+   auto db = std::make_unique<sql::Database>(kDatabaseTag);
+-  if (!db->Open(sqlite_file)) {
+-    bridge_->NotifyItemEnded(user_data_importer::FAVORITES);
+-    ImportRemainingItems();
++  if (!db->Open(sqlite_file) || !db->DoesTableExist("moz_bookmarks")) {
++    bridge_->NotifyFailed("The browser bookmarks could not be read.");
+     return;
+   }
+ 
+@@ -253,6 +280,10 @@
+   int toolbar_folder_id = LoadNodeIDByGUID(db.get(), "toolbar_____");
+   int menu_folder_id = LoadNodeIDByGUID(db.get(), "menu________");
+   int unsorted_folder_id = LoadNodeIDByGUID(db.get(), "unfiled_____");
++  if (toolbar_folder_id < 0 && menu_folder_id < 0 && unsorted_folder_id < 0) {
++    bridge_->NotifyFailed("The browser bookmark folders could not be read.");
++    return;
++  }
+ 
+   // Load livemark IDs.
+   auto livemark_id = std::make_unique<std::set<int>>();
+@@ -287,8 +318,7 @@
+ }
+ 
+ void FirefoxImporter::OnBookmarkHtmlParserDisconnected() {
+-  bridge_->NotifyItemEnded(user_data_importer::FAVORITES);
+-  ImportRemainingItems();
++  bridge_->NotifyFailed("The bookmarks parser could not finish. Try again.");
+ }
+ 
+ void FirefoxImporter::OnDefaultBookmarksParsed(
+@@ -307,12 +337,20 @@
+   }
+ 
+   BookmarkList list;
+-  GetTopBookmarkFolder(db.get(), toolbar_folder_id, &list);
+-  GetTopBookmarkFolder(db.get(), menu_folder_id, &list);
+-  GetTopBookmarkFolder(db.get(), unsorted_folder_id, &list);
++  if (!GetTopBookmarkFolder(db.get(), toolbar_folder_id, &list) ||
++      !GetTopBookmarkFolder(db.get(), menu_folder_id, &list) ||
++      !GetTopBookmarkFolder(db.get(), unsorted_folder_id, &list)) {
++    bridge_->NotifyFailed("The browser bookmark folders could not be read.");
++    return;
++  }
+   size_t count = list.size();
+   for (size_t i = 0; i < count; ++i) {
+-    GetWholeBookmarkFolder(db.get(), &list, i, favicons_location, nullptr);
++    if (!GetWholeBookmarkFolder(db.get(), &list, i, favicons_location,
++                                nullptr)) {
++      bridge_->NotifyFailed(
++          "The browser bookmarks could not be read completely.");
++      return;
++    }
+   }
+ 
+   std::vector<user_data_importer::ImportedBookmarkEntry> bookmarks;
+@@ -330,13 +368,17 @@
+   sql::Statement s(db->GetUniqueStatement(query));
+ 
+   if (!s.is_valid()) {
+-    bridge_->NotifyItemEnded(user_data_importer::FAVORITES);
+-    ImportRemainingItems();
++    bridge_->NotifyFailed("The browser bookmark keywords could not be read.");
+     return;
+   }
+ 
+   while (s.Step() && !cancelled()) {
+     post_keyword_ids.insert(s.ColumnInt(0));
++  }
++  if (cancelled() || !s.Succeeded()) {
++    bridge_->NotifyFailed(
++        "The browser bookmarks could not be read completely.");
++    return;
+   }
+ 
+   for (const auto& item : list) {
+@@ -568,7 +610,7 @@
+     livemark->insert(s.ColumnInt(0));
+ }
+ 
+-void FirefoxImporter::GetTopBookmarkFolder(sql::Database* db,
++bool FirefoxImporter::GetTopBookmarkFolder(sql::Database* db,
+                                            int folder_id,
+                                            BookmarkList* list) {
+   const char query[] =
+@@ -578,12 +620,12 @@
+       "ORDER BY b.position";
+   sql::Statement s(db->GetUniqueStatement(query));
+   if (!s.is_valid()) {
+-    return;
++    return false;
+   }
+ 
+   s.BindInt(0, folder_id);
+ 
+-  if (s.Step()) {
++  while (s.Step() && !cancelled()) {
+     std::unique_ptr<BookmarkItem> item = std::make_unique<BookmarkItem>();
+     item->parent = -1;  // The top level folder has no parent.
+     item->id = folder_id;
+@@ -593,15 +635,19 @@
+     item->empty_folder = true;
+     list->push_back(std::move(item));
+   }
+-}
+-
+-void FirefoxImporter::GetWholeBookmarkFolder(sql::Database* db,
++  return !cancelled() && s.Succeeded();
++}
++
++bool FirefoxImporter::GetWholeBookmarkFolder(sql::Database* db,
+                                              BookmarkList* list,
+                                              size_t position,
+                                              FaviconsLocation favicons_location,
+                                              bool* empty_folder) {
+   if (position >= list->size()) {
+     NOTREACHED();
++  }
++  if (!bookmark_folders_seen_.insert((*list)[position]->id).second) {
++    return false;
+   }
+ 
+   std::string query =
+@@ -617,13 +663,13 @@
+       "ORDER BY b.position";
+   sql::Statement s(db->GetUniqueStatement(query));
+   if (!s.is_valid()) {
+-    return;
++    return false;
+   }
+ 
+   s.BindInt(0, (*list)[position]->id);
+ 
+   BookmarkList temp_list;
+-  while (s.Step()) {
++  while (s.Step() && !cancelled()) {
+     std::unique_ptr<BookmarkItem> item = std::make_unique<BookmarkItem>();
+     item->parent = static_cast<int>(position);
+     item->id = s.ColumnInt(0);
+@@ -642,15 +688,22 @@
+       *empty_folder = false;
+   }
+ 
++  if (cancelled() || !s.Succeeded()) {
++    return false;
++  }
++
+   // Appends all items to the list.
+   for (auto& bookmark : temp_list) {
+     list->push_back(std::move(bookmark));
+     // Recursive add bookmarks in sub-folders.
+     if (list->back()->type == TYPE_FOLDER) {
+-      GetWholeBookmarkFolder(db, list, list->size() - 1, favicons_location,
+-                             &list->back()->empty_folder);
+-    }
+-  }
++      if (!GetWholeBookmarkFolder(db, list, list->size() - 1, favicons_location,
++                                  &list->back()->empty_folder)) {
++        return false;
++      }
++    }
++  }
++  return true;
+ }
+ 
+ void FirefoxImporter::LoadFavicons(
+@@ -738,6 +791,21 @@
+   const base::FilePath file = source_path_.AppendASCII(base_file_name);
+   if (!base::PathExists(file))
+     return {};
++  if (base_file_name.ends_with(".sqlite")) {
++    for (const auto& copy : source_database_copies_) {
++      if (copy->copied_file_path().BaseName() == file.BaseName()) {
++        return copy->copied_file_path();
++      }
++    }
++    auto copy = std::make_unique<ScopedCopyFile>(
++        file, ScopedCopyFile::Mode::kSqliteDatabase);
++    if (!copy->copy_success()) {
++      return {};
++    }
++    const base::FilePath destination = copy->copied_file_path();
++    source_database_copies_.push_back(std::move(copy));
++    return destination;
++  }
+   // Temporary directory must be initialized.
+   DCHECK(source_path_copy_.IsValid());
+   const base::FilePath destination =
+--- a/chrome/utility/importer/firefox_importer.h
++++ b/chrome/utility/importer/firefox_importer.h
+@@ -32,6 +32,7 @@
+ }  // namespace user_data_importer::mojom
+ 
+ class GURL;
++class ScopedCopyFile;
+ 
+ namespace sql {
+ class Database;
+@@ -82,7 +83,7 @@
+ #if !BUILDFLAG(IS_MAC)
+   void ImportPasswords();
+ #endif
+-  void ImportHistory();
++  bool ImportHistory();
+   // Import the user's home page, unless it is set to default home page as
+   // defined in browserconfig.properties.
+   void ImportHomepage();
+@@ -101,12 +102,12 @@
+ 
+   // Gets the bookmark folder with given ID, and adds the entry in |list|
+   // if successful.
+-  void GetTopBookmarkFolder(sql::Database* db,
++  bool GetTopBookmarkFolder(sql::Database* db,
+                             int folder_id,
+                             BookmarkList* list);
+ 
+   // Loads all children of the given folder, and appends them to the |list|.
+-  void GetWholeBookmarkFolder(sql::Database* db,
++  bool GetWholeBookmarkFolder(sql::Database* db,
+                               BookmarkList* list,
+                               size_t position,
+                               FaviconsLocation favicons_location,
+@@ -126,9 +127,9 @@
+       const std::vector<user_data_importer::ImportedBookmarkEntry>& bookmarks,
+       favicon_base::FaviconUsageDataList* favicons);
+ 
+-  // Copies |source_path_|/|base_file_name| to a temporary directory and returns
+-  // the copy's path. Using the copy is safer, ensures we don't modify Firefox's
+-  // profile. |base_file_name| must be ASCII. Returns empty path on I/O failure.
++  // Copies a source file privately, with WAL/journal for SQLite databases.
++  // Snapshots live until this importer is destroyed; originals are never opened
++  // in SQLite. |base_file_name| must be ASCII. Empty path means copy failure.
+   base::FilePath GetCopiedSourcePath(std::string_view base_file_name);
+ 
+   void OnDefaultBookmarksParsed(
+@@ -152,6 +153,9 @@
+   base::FilePath source_path_;
+   base::FilePath app_path_;
+   base::ScopedTempDir source_path_copy_;
++  // Keep SQLite snapshots alive through asynchronous bookmark parsing.
++  std::vector<std::unique_ptr<ScopedCopyFile>> source_database_copies_;
++  std::set<int> bookmark_folders_seen_;
+   uint16_t items_ = 0;
+ 
+ #if BUILDFLAG(IS_POSIX)
+--- a/chrome/utility/importer/firefox_importer_unittest.cc
++++ b/chrome/utility/importer/firefox_importer_unittest.cc
+@@ -173,8 +173,9 @@
+   EXPECT_CALL(*bridge, NotifyItemStarted(user_data_importer::FAVORITES));
+   EXPECT_CALL(*bridge, AddBookmarks(_, _)).Times(0);
+   EXPECT_CALL(*bridge, SetFavicons(_)).Times(0);
+-  EXPECT_CALL(*bridge, NotifyItemEnded(user_data_importer::FAVORITES));
+-  EXPECT_CALL(*bridge, NotifyEnded())
++  EXPECT_CALL(*bridge, NotifyItemEnded(user_data_importer::FAVORITES)).Times(0);
++  EXPECT_CALL(*bridge, NotifyEnded()).Times(0);
++  EXPECT_CALL(*bridge, NotifyFailed(testing::Not(testing::IsEmpty())))
+       .WillOnce(testing::InvokeWithoutArgs(&run_loop1, &base::RunLoop::Quit));
+ 
+   user_data_importer::FakeBookmarkHtmlParser fake_parser1;
+@@ -228,8 +229,10 @@
+   EXPECT_CALL(*second_bridge, NotifyItemStarted(user_data_importer::FAVORITES));
+   EXPECT_CALL(*second_bridge, AddBookmarks(_, _)).Times(0);
+   EXPECT_CALL(*second_bridge, SetFavicons(_)).Times(0);
+-  EXPECT_CALL(*second_bridge, NotifyItemEnded(user_data_importer::FAVORITES));
+-  EXPECT_CALL(*second_bridge, NotifyEnded())
++  EXPECT_CALL(*second_bridge, NotifyItemEnded(user_data_importer::FAVORITES))
++      .Times(0);
++  EXPECT_CALL(*second_bridge, NotifyEnded()).Times(0);
++  EXPECT_CALL(*second_bridge, NotifyFailed(testing::Not(testing::IsEmpty())))
+       .WillOnce(testing::InvokeWithoutArgs(&run_loop2, &base::RunLoop::Quit));
+ 
+   user_data_importer::FakeBookmarkHtmlParser fake_parser2;
+@@ -257,13 +260,16 @@
+   EXPECT_CALL(*bridge_, NotifyItemStarted(user_data_importer::FAVORITES));
+   EXPECT_CALL(*bridge_, AddBookmarks(_, _)).Times(0);
+   EXPECT_CALL(*bridge_, SetFavicons(_)).Times(0);
+-  EXPECT_CALL(*bridge_, NotifyItemEnded(user_data_importer::FAVORITES));
+-  // The items that follow the bookmarks must still be imported.
++  EXPECT_CALL(*bridge_, NotifyItemEnded(user_data_importer::FAVORITES))
++      .Times(0);
++  // A parser failure is terminal, not a successful partial import.
+   EXPECT_CALL(*bridge_,
+-              NotifyItemStarted(user_data_importer::AUTOFILL_FORM_DATA));
+-  EXPECT_CALL(*bridge_,
+-              NotifyItemEnded(user_data_importer::AUTOFILL_FORM_DATA));
+-  EXPECT_CALL(*bridge_, NotifyEnded())
++              NotifyItemStarted(user_data_importer::AUTOFILL_FORM_DATA))
++      .Times(0);
++  EXPECT_CALL(*bridge_, NotifyItemEnded(user_data_importer::AUTOFILL_FORM_DATA))
++      .Times(0);
++  EXPECT_CALL(*bridge_, NotifyEnded()).Times(0);
++  EXPECT_CALL(*bridge_, NotifyFailed(testing::Not(testing::IsEmpty())))
+       .WillOnce(testing::InvokeWithoutArgs(&run_loop, &base::RunLoop::Quit));
+ 
+   // Bind a remote whose receiver is dropped immediately, so that the parser is
+@@ -334,8 +340,9 @@
+   EXPECT_CALL(*bridge, NotifyStarted());
+   EXPECT_CALL(*bridge, NotifyItemStarted(user_data_importer::HISTORY));
+   EXPECT_CALL(*bridge, SetHistoryItems(_, _)).Times(0);
+-  EXPECT_CALL(*bridge, NotifyItemEnded(user_data_importer::HISTORY));
+-  EXPECT_CALL(*bridge, NotifyEnded());
++  EXPECT_CALL(*bridge, NotifyItemEnded(user_data_importer::HISTORY)).Times(0);
++  EXPECT_CALL(*bridge, NotifyEnded()).Times(0);
++  EXPECT_CALL(*bridge, NotifyFailed(testing::Not(testing::IsEmpty())));
+   ff_importer->StartImport(profile, user_data_importer::HISTORY, bridge.get());
+ }
+ 
+--- a/components/helium_onboarding/src/NoventraOnboarding.svelte
++++ b/components/helium_onboarding/src/NoventraOnboarding.svelte
+@@ -1,6 +1,10 @@
+ <script lang="ts">
+     import { onMount, tick } from 'svelte';
+     import NoventraLogo from './components/NoventraLogo.svelte';
++    import { IconWorld } from '@imput/helium-prism';
++    import IconKey from './icons/tabler/IconKey.svelte';
++    import IconTransferIn from './icons/tabler/IconTransferIn.svelte';
++    import { browserIcons } from './lib/nonfree-icons';
+     import NoventraPasswordManagers from './components/NoventraPasswordManagers.svelte';
+     import { passwordManagers } from './lib/password-managers';
+     import { getBoolean } from './lib/strings';
+@@ -8,7 +12,7 @@
+     import { addWebUiListener, removeWebUiListener, sendWithPromise } from './lib/cr';
+     import { ImportDataBrowserProxyImpl, ImportDataStatus, type BrowserProfile } from './lib/cr/import_data_browser_proxy';
+ 
+-    const steps = ['Welcome', 'Bookmarks', 'Passwords', 'Password manager', 'Ready'];
++    const steps = ['Welcome', 'Data', 'Passwords', 'Password manager', 'Ready'];
+     const importer = ImportDataBrowserProxyImpl.getInstance();
+     const showMacImportNotice = getBoolean('showMacImportPermissionNotice');
+     const canImportBrowserPasswords = getBoolean('canImportBrowserPasswords');
+@@ -20,7 +24,12 @@
+     let selectedPasswordId = $state<number>();
+     let status = $state<'idle' | 'choosing' | 'importing' | 'success' | 'error'>('idle');
+     let bookmarkImports = $state(0);
+-    let importedProfileIds = $state<number[]>([]);
++    type DataKind = 'bookmarks' | 'history';
++    let selectedData = $state({ bookmarks: true, history: true });
++    let importedProfileData = $state<Record<number, DataKind[]>>({});
++    let dataImportIssues = $state<Record<string, DataKind[]>>({});
++    let historyImports = $state(0);
++    let importingDataKinds = $state<DataKind[]>([]);
+     let importedPasswordProfileIds = $state<number[]>([]);
+     let passwordImports = $state(0);
+     let importKind = $state<'bookmarks' | 'passwords'>('bookmarks');
+@@ -33,12 +42,34 @@
+     let managerInstalling = $state(false);
+     let managerLoading = $state(true);
+     let managerCheckFailed = $state(false);
+-    const enabledManagers = $derived(['bitwarden', 'onePassword', 'icloudPasswords']
+-        .filter(id => managerExtensions[passwordManagers[id].extensionId])
+-        .map(id => passwordManagers[id].title));
+-    const busy = $derived(discovery === 'loading' || status === 'importing' || saving || managerInstalling);
++    const enabledManagers = $derived(Object.values(passwordManagers)
++        .filter(info => managerExtensions[info.extensionId])
++        .map(info => info.title));
++    const busy = $derived(status === 'importing' || saving || managerInstalling);
++    const discoveryBusy = $derived(discovery === 'loading');
+     const chosenProfile = $derived(discovery === 'loaded' ? profiles.find(p => p.id === selectedId) : undefined);
+     const chosenPasswordProfile = $derived(discovery === 'loaded' ? profiles.find(p => p.id === selectedPasswordId) : undefined);
++    const hasIncompleteDataImport = $derived(Object.values(dataImportIssues).some(kinds => kinds.length));
++    const requestedData = $derived(chosenProfile ? availableData(chosenProfile)
++        .filter(kind => selectedData[kind] && !importedProfileData[chosenProfile.id]?.includes(kind)) : []);
++
++    function availableData(profile: BrowserProfile): DataKind[] {
++        return [...(profile.favorites ? ['bookmarks' as const] : []),
++            ...(profile.history ? ['history' as const] : [])];
++    }
++
++    function dataComplete(profile: BrowserProfile) {
++        const available = availableData(profile);
++        return available.length > 0 && available.every(kind => importedProfileData[profile.id]?.includes(kind));
++    }
++
++    function selectData(profile: BrowserProfile) {
++        status = 'idle';
++        selectedData = {
++            bookmarks: profile.favorites && !importedProfileData[profile.id]?.includes('bookmarks'),
++            history: profile.history && !importedProfileData[profile.id]?.includes('history'),
++        };
++    }
+ 
+     async function refreshManagerExtensions() {
+         managerLoading = true;
+@@ -60,6 +91,9 @@
+         sessionStorage.setItem('noventra.setup.step', String(step));
+         await tick();
+         title?.focus();
++        if ((step === 1 || step === 2) && discovery === 'initial') {
++            await refreshBrowserProfiles();
++        }
+     }
+ 
+     async function finish() {
+@@ -78,15 +112,15 @@
+ 
+     function importProfile(kind: 'bookmarks' | 'passwords') {
+         const profile = kind === 'bookmarks' ? chosenProfile : chosenPasswordProfile;
+-        const imported = kind === 'bookmarks' ? importedProfileIds : importedPasswordProfileIds;
+-        if (busy || !profile || imported.includes(profile.id) ||
+-            !(kind === 'bookmarks' ? profile.favorites : profile.passwords)) return;
++        if (busy || discoveryBusy || !profile || (kind === 'bookmarks' ? !requestedData.length :
++            !profile.passwords || importedPasswordProfileIds.includes(profile.id))) return;
+         importKind = kind;
+         importingProfileId = profile.id;
++        importingDataKinds = kind === 'bookmarks' ? [...requestedData] : [];
+         status = 'importing';
+         const types = {
+-            import_dialog_bookmarks: kind === 'bookmarks',
+-            import_dialog_history: false,
++            import_dialog_bookmarks: importingDataKinds.includes('bookmarks'),
++            import_dialog_history: importingDataKinds.includes('history'),
+             import_dialog_saved_passwords: kind === 'passwords',
+             import_dialog_search_engine: false,
+             import_dialog_autofill_form_data: false,
+@@ -98,10 +132,11 @@
+     }
+ 
+     function importFile() {
+-        if (busy) return;
++        if (busy || discoveryBusy) return;
+         selectedId = undefined;
+         importKind = 'bookmarks';
+         importingProfileId = undefined;
++        importingDataKinds = ['bookmarks'];
+         // Cancellation does not emit a native import event. Stay navigable until
+         // the handler actually starts processing a selected file.
+         status = 'choosing';
+@@ -115,7 +150,7 @@
+     }
+ 
+     async function refreshBrowserProfiles() {
+-        if (busy) return;
++        if (busy || discoveryBusy) return;
+         discovery = 'loading';
+         selectedId = undefined;
+         selectedPasswordId = undefined;
+@@ -140,8 +175,17 @@
+         if (showMacImportNotice) chrome.send('openFilesAndFoldersSettings');
+     }
+ 
++    const browserLogoNames: Record<string, string> = {
++        'Google Chrome': 'chrome', 'Google Chrome Beta': 'chrome_beta',
++        'Google Chrome Canary': 'chrome_canary', 'Google Chrome Dev': 'chrome_dev',
++        'Microsoft Edge': 'edge', 'Mozilla Firefox': 'firefox',
++        'NAVER Whale': 'whale', 'Perplexity Comet': 'comet',
++    };
++    const browserLogo = (name: string) => browserIcons[browserLogoNames[name] ?? name.toLowerCase()];
++
+     onMount(() => {
+         document.title = 'Set up Noventra';
++        if (step === 1 || step === 2) void refreshBrowserProfiles();
+         const extensionListener = addWebUiListener('extension-state-changed', (diff: ExtensionStatus) => {
+             managerExtensions = { ...managerExtensions, ...diff };
+         });
+@@ -158,13 +202,30 @@
+                         importedPasswordProfileIds = [...importedPasswordProfileIds, importingProfileId];
+                     }
+                 } else {
+-                    bookmarkImports += 1;
+-                    if (importingProfileId !== undefined && !importedProfileIds.includes(importingProfileId)) {
+-                        importedProfileIds = [...importedProfileIds, importingProfileId];
++                    if (importingDataKinds.includes('bookmarks')) {
++                        bookmarkImports += 1;
+                     }
++                    if (importingDataKinds.includes('history')) historyImports += 1;
++                    if (importingProfileId !== undefined) {
++                        importedProfileData = { ...importedProfileData,
++                            [importingProfileId]: [...new Set([...(importedProfileData[importingProfileId] ?? []), ...importingDataKinds])] };
++                    }
++                    const key = importingProfileId === undefined ? 'file' : String(importingProfileId);
++                    const remaining = dataImportIssues[key]?.filter(kind => !importingDataKinds.includes(kind)) ?? [];
++                    const issues = { ...dataImportIssues };
++                    if (remaining.length) issues[key] = remaining;
++                    else delete issues[key];
++                    dataImportIssues = issues;
+                 }
+             }
+-            if (value === ImportDataStatus.FAILED) status = 'error';
++            if (value === ImportDataStatus.FAILED) {
++                status = 'error';
++                if (importKind === 'bookmarks') {
++                    const key = importingProfileId === undefined ? 'file' : String(importingProfileId);
++                    dataImportIssues = { ...dataImportIssues,
++                        [key]: [...new Set([...(dataImportIssues[key] ?? []), ...importingDataKinds])] };
++                }
++            }
+         });
+         return () => {
+             removeWebUiListener(listener);
+@@ -175,15 +236,12 @@
+ 
+ <main id="noventra-onboarding">
+     <header class="brand-bar">
+-        <div class="brand"><NoventraLogo height="28px" /><span>Noventra</span></div>
+-        <button id="skip-setup" class="quiet" disabled={busy} onclick={finish}>Skip setup <span aria-hidden="true">↗</span></button>
++        <div class="brand"><NoventraLogo height="26px" /><span>Noventra</span></div>
++        <button id="skip-setup" class="quiet" disabled={busy} onclick={finish}>Skip setup</button>
+     </header>
+ 
+     <div class="setup-shell">
+-        <aside aria-label="Setup progress">
+-            <div class="eyebrow">A FRESH START</div>
+-            <h2>Your browser.<br />Your way.</h2>
+-            <p class="aside-description">Bring the things you love.<br />Leave the rest behind.</p>
++        <nav class="setup-progress" aria-label="Setup progress">
+             <ol class="steps">
+                 {#each steps as label, index}
+                     <li class:active={step === index} class:complete={step > index} aria-current={step === index ? 'step' : undefined}>
+@@ -192,184 +250,171 @@
+                     </li>
+                 {/each}
+             </ol>
+-            <div class="local-note"><span aria-hidden="true">◈</span><span>On your device.<br /><strong>No browser account needed.</strong></span></div>
+-        </aside>
+-
+-        <section class="panel" aria-labelledby="step-title" aria-busy={busy}>
++        </nav>
++
++        <section class="panel" aria-labelledby="step-title" aria-busy={busy || ((step === 1 || step === 2) && discoveryBusy)}>
+             <div class="panel-content">
+-                <div class="step-count">STEP {step + 1} OF {steps.length}<span>OPTIONAL SETUP</span></div>
++                <div class="step-count">STEP {step + 1} OF {steps.length}<span>OPTIONAL</span></div>
+                 {#if step === 0}
++                    <div class="welcome-logo" aria-hidden="true"><NoventraLogo height="56px" /></div>
+                     <h1 id="step-title" tabindex="-1" bind:this={title}>Make yourself at home.</h1>
+-                    <p class="intro">A fresh browser doesn’t have to mean starting over. Bring your bookmarks and saved passwords to Noventra.</p>
+-                    <p class="intro"><a href="chrome://settings/dataDevices" target="_blank" rel="noopener noreferrer">Moving from another PC? Restore a Noventra transfer file or connect directly.</a></p>
+-                    <div class="welcome-visual" aria-hidden="true">
+-                        <div class="mini-toolbar"><span></span><span></span><span></span><div class="mini-address">A little more room for what matters</div></div>
+-                        <div class="mini-browser">
+-                            <div class="mini-sidebar"><NoventraLogo height="25px" /><div class="mini-row selected">⌂ <span>Your space</span></div><div class="mini-row">+ <span>New Tab</span></div><div class="mini-row">▤ <span>Bookmarks</span></div></div>
+-                            <div class="mini-page"><div class="mini-symbol"><NoventraLogo height="44px" /></div><div class="mini-search">Search, explore, make it yours <span>↗</span></div><div class="mini-tiles"><i>☆</i><i>▤</i><i>◈</i></div></div>
+-                        </div>
+-                    </div>
+-                    <div class="feature-row"><div><span class="feature-icon" aria-hidden="true">☆</span><strong>Keep your favorites</strong><p>Your saved places, together.</p></div><div><span class="feature-icon" aria-hidden="true">◈</span><strong>Bring your passwords</strong><p>Import them to this device.</p></div></div>
++                    <p class="intro">Bring your browser data and password manager.</p>
++                    <a class="transfer-link" href="chrome://settings/dataDevices" target="_blank" rel="noopener noreferrer">Moving from another PC? Restore or connect a device.</a>
+                 {:else if step === 1}
+-                    <h1 id="step-title" tabindex="-1" bind:this={title}>Bring your favorite places.</h1>
+-                    <p class="intro">Choose a browser profile to copy bookmarks from, or use a bookmarks HTML file. Your original bookmarks stay where they are.</p>
+-                    <div class="source-heading"><strong>From another browser</strong><span>{discovery === 'initial' ? 'Optional' : discovery === 'loading' ? 'Looking for profiles…' : discovery === 'error' ? 'Check needed' : `${profiles.length} available`}</span></div>
++                    <h1 id="step-title" tabindex="-1" bind:this={title}>Bring your browsing data.</h1>
++                    <p class="intro">Choose a browser and what to copy.</p>
++                    <div class="source-heading"><strong>On this device</strong><span>{discovery === 'initial' ? 'Ready to scan' : discovery === 'loading' ? 'Looking…' : discovery === 'error' ? 'Check needed' : `${profiles.length} profiles`}</span></div>
+                     {#if discovery === 'initial'}
+-                        <div class="empty"><span aria-hidden="true">▤</span><strong>Look for bookmarks on this device?</strong><p>Choose Find browsers to let Noventra look for local browser profiles. Nothing is imported until you choose a profile and start an import.</p></div>
++                        <div class="empty"><strong>Find browsers on this device.</strong><p>Choose what to import after scanning.</p></div>
+                     {:else if discovery === 'loading'}
+-                        <div class="empty" role="status"><span class="spinner" aria-hidden="true"></span>Looking for browser profiles on this device…</div>
++                        <div class="empty" role="status"><span class="spinner" aria-hidden="true"></span>Looking for browser profiles…</div>
+                     {:else if profiles.length === 0}
+-                        <div class="empty" role={discovery === 'error' ? 'alert' : undefined}><span aria-hidden="true">▤</span><strong>{discovery === 'error' ? 'We couldn’t check your browser profiles.' : 'No browser profiles found.'}</strong><p>You can refresh this list, use a bookmarks file below, or do this later in Settings.</p></div>
++                        <div class="empty" role={discovery === 'error' ? 'alert' : undefined}><strong>{discovery === 'error' ? 'We couldn’t check your browser profiles.' : 'No browser profiles found.'}</strong><p>Refresh or choose a file below.</p></div>
+                     {:else}
+-                        <fieldset class="profile-list" disabled={busy || discovery === 'error'}>
++                        <fieldset class="profile-list" disabled={busy || discoveryBusy || discovery === 'error'}>
+                             <legend class="sr-only">Choose a browser profile</legend>
+                             {#each profiles as profile (profile.id)}
+-                                <label class="profile-card" class:selected={selectedId === profile.id} class:imported={importedProfileIds.includes(profile.id)}>
+-                                    <input type="radio" name="source-profile" value={profile.id} bind:group={selectedId} disabled={busy || discovery === 'error' || !profile.favorites || importedProfileIds.includes(profile.id)} onchange={() => { status = 'idle'; }} />
+-                                    <span class="source-icon" aria-hidden="true">▤</span>
++                                <label class="profile-card" class:selected={selectedId === profile.id} class:imported={dataComplete(profile)}>
++                                    <input type="radio" name="source-profile" value={profile.id} bind:group={selectedId} disabled={busy || discoveryBusy || discovery === 'error' || !availableData(profile).length || dataComplete(profile)} onchange={() => selectData(profile)} />
++                                    <span class="source-icon" aria-hidden="true">{#if browserLogo(profile.name)}<img src={browserLogo(profile.name)} alt="" />{:else}<IconWorld />{/if}</span>
+                                     <span class="source-name"><strong>{profile.name}</strong><span>{profile.profileName || 'Default profile'}</span></span>
+-                                    <span class="source-kind">{importedProfileIds.includes(profile.id) ? 'Imported ✓' : profile.favorites ? 'Bookmarks' : 'No saved bookmarks'}</span>
++                                    <span class="source-kind">{dataComplete(profile) ? 'Imported ✓' : profile.favorites && profile.history ? 'Bookmarks · History' : profile.favorites ? 'Bookmarks' : profile.history ? 'History' : 'No saved bookmarks or history'}</span>
+                                 </label>
+                             {/each}
+                         </fieldset>
+                     {/if}
+                     <div class="discovery-actions">
+-                        <button id={discovery === 'initial' ? 'find-import-profiles' : 'refresh-import-profiles'} class="quiet" disabled={busy} onclick={refreshBrowserProfiles}>{discovery === 'initial' ? 'Find browsers' : discovery === 'loading' ? 'Looking for browsers…' : discovery === 'error' ? 'Try again' : 'Refresh browsers'}</button>
++                        <button id={discovery === 'initial' ? 'find-import-profiles' : 'refresh-import-profiles'} class="quiet" disabled={busy || discoveryBusy} onclick={refreshBrowserProfiles}>{discovery === 'initial' ? 'Find browsers' : discovery === 'loading' ? 'Looking…' : discovery === 'error' ? 'Try again' : 'Refresh browsers'}</button>
+                     </div>
+-                    {#if discovery === 'error' && profiles.length > 0}<p class="error" role="alert">We couldn’t refresh browser profiles. Try again before choosing a profile, or use a bookmarks file below.</p>{/if}
++                    {#if discovery === 'error' && profiles.length > 0}<p class="error" role="alert">Refresh before choosing a profile, or use a file.</p>{/if}
+                     {#if showMacImportNotice}
+                         <aside class="mac-import-notice" aria-label="Browser import access">
+-                            <p>If a browser is missing, allow Noventra to access its data in macOS Files and Folders settings, then refresh this list.</p>
+-                            <div>
+-                                <button id="mac-import-settings" class="quiet" disabled={busy} onclick={openMacImportSettings}>Open Files and Folders settings</button>
+-                            </div>
++                            <p>Missing a browser? Allow access in macOS, then refresh.</p>
++                            <button id="mac-import-settings" class="quiet" disabled={busy} onclick={openMacImportSettings}>Open Files and Folders settings</button>
+                         </aside>
+                     {/if}
+-                    {#if discovery === 'loaded' && profiles.length && !profiles.some(p => p.favorites)}<p class="privacy-hint">These profiles have no saved bookmarks. You can still check for passwords on the next step.</p>{/if}
+-                    <button id="import-bookmarks" class="primary full" onclick={() => importProfile('bookmarks')} disabled={busy || !chosenProfile?.favorites || importedProfileIds.includes(chosenProfile.id)}>{status === 'importing' ? 'Importing bookmarks…' : 'Import selected bookmarks'}<span aria-hidden="true">↓</span></button>
+-                    <div class="divider"><span>or use a file</span></div>
+-                    <button id="bookmark-file" class="file-card" onclick={importFile} disabled={busy}><span class="source-icon" aria-hidden="true">↥</span><span class="source-name"><strong>Choose a bookmarks file</strong><span>HTML export from your previous browser</span></span><span aria-hidden="true">↗</span></button>
++                    {#if discovery === 'loaded' && profiles.length && !profiles.some(p => availableData(p).length)}<p class="privacy-hint">Passwords are on the next step.</p>{/if}
++                    {#if chosenProfile}
++                        <fieldset class="data-types" disabled={busy || discoveryBusy}>
++                            <legend>Choose data</legend>
++                            <label><input id="import-data-bookmarks" type="checkbox" checked={selectedData.bookmarks && chosenProfile.favorites && !importedProfileData[chosenProfile.id]?.includes('bookmarks')} disabled={!chosenProfile.favorites || importedProfileData[chosenProfile.id]?.includes('bookmarks')} onchange={event => selectedData.bookmarks = event.currentTarget.checked} />Bookmarks{#if importedProfileData[chosenProfile.id]?.includes('bookmarks')}<span>Copied</span>{/if}</label>
++                            <label><input id="import-data-history" type="checkbox" checked={selectedData.history && chosenProfile.history && !importedProfileData[chosenProfile.id]?.includes('history')} disabled={!chosenProfile.history || importedProfileData[chosenProfile.id]?.includes('history')} onchange={event => selectedData.history = event.currentTarget.checked} />History{#if importedProfileData[chosenProfile.id]?.includes('history')}<span>Copied</span>{/if}</label>
++                        </fieldset>
++                    {/if}
++                    <button id="import-bookmarks" class="primary full" onclick={() => importProfile('bookmarks')} disabled={busy || discoveryBusy || !requestedData.length}>{status === 'importing' ? 'Importing data…' : 'Import selected data'}<span aria-hidden="true">↓</span></button>
++                    <div class="divider"><span>or</span></div>
++                    <button id="bookmark-file" class="file-card" onclick={importFile} disabled={busy || discoveryBusy}><span class="source-icon" aria-hidden="true"><IconTransferIn /></span><span class="source-name"><strong>Choose a bookmarks file</strong><span>HTML from your previous browser</span></span><span aria-hidden="true">↗</span></button>
+                     <div class="import-message" role="status" aria-live="polite">
+-                        {#if status === 'success'}<span class="success">✓ Bookmark import finished. You can import another profile or continue.</span>
+-                        {:else if status === 'error'}<span class="error">The import didn’t finish. Try again, or choose a bookmarks file.</span>
+-                        {:else if status === 'choosing'}Choose an HTML file in the file picker. You can cancel and continue without importing.
+-                        {:else if status === 'importing'}Copying bookmarks to Noventra. Keep this page open until it finishes.{/if}
++                        {#if status === 'success'}<span class="success">✓ {importingDataKinds.includes('history') ? importingDataKinds.includes('bookmarks') ? 'Bookmarks and history import finished.' : 'History import finished.' : 'Bookmark import finished.'}</span>
++                        {:else if status === 'error'}<span class="error">Import didn’t finish. Some data may already have been copied. Close the source browser and try again.</span>
++                        {:else if status === 'choosing'}Choose an HTML file, or cancel to continue.
++                        {:else if status === 'importing'}Copying selected data. Keep this page open.{/if}
+                     </div>
+                 {:else if step === 2}
+                     <h1 id="step-title" tabindex="-1" bind:this={title}>Your passwords, on this device.</h1>
+                     {#if canImportBrowserPasswords}
+-                    <p class="intro">Choose a browser profile to copy its saved passwords. Your system may ask you to unlock its credential store. Passwords already saved in Noventra are kept. Already use a password manager? Continue to add its extension.</p>
+-                    <div class="source-heading"><strong>From another browser</strong><span>{discovery === 'initial' ? 'Optional' : discovery === 'loading' ? 'Looking for profiles…' : discovery === 'error' ? 'Check needed' : `${profiles.length} available`}</span></div>
+-                    {#if discovery === 'initial'}
+-                        <div class="empty"><span aria-hidden="true">◈</span><strong>Find your saved passwords.</strong><p>Look for local browser profiles, then choose which one to import. Your original passwords stay in your previous browser.</p></div>
+-                    {:else if discovery === 'loading'}
+-                        <div class="empty" role="status"><span class="spinner" aria-hidden="true"></span>Looking for browser profiles on this device…</div>
+-                    {:else if profiles.length === 0}
+-                        <div class="empty" role={discovery === 'error' ? 'alert' : undefined}><span aria-hidden="true">◈</span><strong>{discovery === 'error' ? 'We couldn’t check your browser profiles.' : 'No browser profiles found.'}</strong><p>Refresh the list, or use a password CSV below.</p></div>
++                        <p class="intro">Choose a browser to copy its saved passwords.</p>
++                        <div class="source-heading"><strong>On this device</strong><span>{discovery === 'initial' ? 'Ready to scan' : discovery === 'loading' ? 'Looking…' : discovery === 'error' ? 'Check needed' : `${profiles.length} profiles`}</span></div>
++                        {#if discovery === 'initial'}
++                            <div class="empty"><strong>Find your saved passwords.</strong><p>Choose what to import after scanning.</p></div>
++                        {:else if discovery === 'loading'}
++                            <div class="empty" role="status"><span class="spinner" aria-hidden="true"></span>Looking for browser profiles…</div>
++                        {:else if profiles.length === 0}
++                            <div class="empty" role={discovery === 'error' ? 'alert' : undefined}><strong>{discovery === 'error' ? 'We couldn’t check your browser profiles.' : 'No browser profiles found.'}</strong><p>Refresh or use a CSV below.</p></div>
++                        {:else}
++                            <fieldset class="profile-list" disabled={busy || discoveryBusy || discovery === 'error'}>
++                                <legend class="sr-only">Choose a profile for passwords</legend>
++                                {#each profiles as profile (profile.id)}
++                                    <label class="profile-card" class:selected={selectedPasswordId === profile.id} class:imported={importedPasswordProfileIds.includes(profile.id)}>
++                                        <input type="radio" name="password-source-profile" value={profile.id} bind:group={selectedPasswordId} disabled={busy || discoveryBusy || discovery === 'error' || !profile.passwords || importedPasswordProfileIds.includes(profile.id)} onchange={() => { status = 'idle'; }} />
++                                        <span class="source-icon" aria-hidden="true">{#if browserLogo(profile.name)}<img src={browserLogo(profile.name)} alt="" />{:else}<IconWorld />{/if}</span>
++                                        <span class="source-name"><strong>{profile.name}</strong><span>{profile.profileName || 'Default profile'}</span></span>
++                                        <span class="source-kind">{importedPasswordProfileIds.includes(profile.id) ? 'Imported ✓' : profile.passwords ? 'Saved passwords' : 'Use CSV'}</span>
++                                    </label>
++                                {/each}
++                            </fieldset>
++                        {/if}
++                        <div class="discovery-actions">
++                            <button id={discovery === 'initial' ? 'find-password-profiles' : 'refresh-password-profiles'} class="quiet" disabled={busy || discoveryBusy} onclick={refreshBrowserProfiles}>{discovery === 'initial' ? 'Find browsers' : discovery === 'loading' ? 'Looking…' : discovery === 'error' ? 'Try again' : 'Refresh browsers'}</button>
++                        </div>
++                        {#if discovery === 'loaded' && profiles.length && !profiles.some(p => p.passwords)}<p class="privacy-hint">Use a CSV or continue to your password manager.</p>{/if}
++                        <button id="import-passwords" class="primary full" onclick={() => importProfile('passwords')} disabled={busy || discoveryBusy || !chosenPasswordProfile?.passwords || importedPasswordProfileIds.includes(chosenPasswordProfile.id)}>{status === 'importing' ? 'Importing passwords…' : 'Import selected passwords'}<span aria-hidden="true">↓</span></button>
++                        <div class="import-message" role="status" aria-live="polite">
++                            {#if status === 'success'}<span class="success">✓ Password import finished.</span>
++                            {:else if status === 'error'}<span class="error">Couldn’t import. Check saved passwords, close the source browser and unlock its credential store. Try again or use CSV.</span>
++                            {:else if status === 'importing'}Copying passwords. Respond to any system unlock prompt.{/if}
++                        </div>
++                        <div class="divider"><span>or</span></div>
+                     {:else}
+-                        <fieldset class="profile-list" disabled={busy || discovery === 'error'}>
+-                            <legend class="sr-only">Choose a profile for passwords</legend>
+-                            {#each profiles as profile (profile.id)}
+-                                <label class="profile-card" class:selected={selectedPasswordId === profile.id} class:imported={importedPasswordProfileIds.includes(profile.id)}>
+-                                    <input type="radio" name="password-source-profile" value={profile.id} bind:group={selectedPasswordId} disabled={busy || discovery === 'error' || !profile.passwords || importedPasswordProfileIds.includes(profile.id)} onchange={() => { status = 'idle'; }} />
+-                                    <span class="source-icon" aria-hidden="true">◈</span>
+-                                    <span class="source-name"><strong>{profile.name}</strong><span>{profile.profileName || 'Default profile'}</span></span>
+-                                    <span class="source-kind">{importedPasswordProfileIds.includes(profile.id) ? 'Imported ✓' : profile.passwords ? 'Saved passwords' : 'Use CSV'}</span>
+-                                </label>
+-                            {/each}
+-                        </fieldset>
++                        <p class="intro">Import a CSV exported from your previous browser.</p>
+                     {/if}
+-                    <div class="discovery-actions">
+-                        <button id={discovery === 'initial' ? 'find-password-profiles' : 'refresh-password-profiles'} class="quiet" disabled={busy} onclick={refreshBrowserProfiles}>{discovery === 'initial' ? 'Find browsers' : discovery === 'loading' ? 'Looking for browsers…' : discovery === 'error' ? 'Try again' : 'Refresh browsers'}</button>
+-                    </div>
+-                    {#if discovery === 'loaded' && profiles.length && !profiles.some(p => p.passwords)}<p class="privacy-hint">Direct password import isn’t available for these profiles. You can import a CSV below or continue with your password manager.</p>{/if}
+-                    <button id="import-passwords" class="primary full" onclick={() => importProfile('passwords')} disabled={busy || !chosenPasswordProfile?.passwords || importedPasswordProfileIds.includes(chosenPasswordProfile.id)}>{status === 'importing' ? 'Importing passwords…' : 'Import selected passwords'}<span aria-hidden="true">↓</span></button>
+-                    <div class="import-message" role="status" aria-live="polite">
+-                        {#if status === 'success'}<span class="success">✓ Password import finished. You can choose another profile or continue.</span>
+-                        {:else if status === 'error'}<span class="error">Password import didn’t finish. Check that this profile has saved passwords, close the previous browser and unlock its credential store, then try again. You can also use CSV below.</span>
+-                        {:else if status === 'importing'}Copying saved passwords securely to Noventra. Keep this page open and respond to any system credential prompt.{/if}
+-                    </div>
+-                    <div class="divider"><span>or use a file</span></div>
+-                    {:else}
+-                    <p class="intro">Import a password CSV exported from your previous browser. Noventra’s password manager handles the import and asks how to resolve duplicates. Already use a password manager? Continue to add its extension.</p>
+-                    <div class="password-guide">
+-                        <div><span class="guide-number">1</span><p><strong>Export from your previous browser</strong><span>Open its password settings and export your saved passwords as a CSV file.</span></p></div>
+-                        <div><span class="guide-number">2</span><p><strong>Choose your file in Noventra</strong><span>The password manager opens in a new tab and shows your import results there.</span></p></div>
+-                        <div><span class="guide-number">3</span><p><strong>Come back here to finish</strong><span>You can also skip this step and import passwords later.</span></p></div>
+-                    </div>
+-                    {/if}
+-                    <button id="password-import" class="file-card" disabled={busy} onclick={openPasswords}><span class="source-icon" aria-hidden="true">◈</span><span class="source-name"><strong>{passwordOpened ? 'Open password import again' : 'Import passwords from CSV'}</strong><span>Opens Noventra’s password manager in a new tab</span></span><span aria-hidden="true">↗</span></button>
+-                    <p class="privacy-hint">A password CSV contains readable passwords. After checking your import, remove the export file if you no longer need it.</p>
++                    <button id="password-import" class="file-card" disabled={busy} onclick={openPasswords}><span class="source-icon" aria-hidden="true"><IconKey /></span><span class="source-name"><strong>{passwordOpened ? 'Open password import again' : 'Import passwords from CSV'}</strong><span>Opens the password manager</span></span><span aria-hidden="true">↗</span></button>
++                    <details class="import-details"><summary>About password imports</summary><p>Existing Noventra passwords are kept. Your system may ask you to unlock its credential store.</p><p>For CSV, export from your previous browser, select the file in Noventra’s password manager, then return here. CSV files contain readable passwords; remove the export after importing.</p></details>
+                     {#if passwordOpened}<p class="import-message" role="status">Password import opened in another tab. Finish there, then return here to continue.</p>{/if}
+                 {:else if step === 3}
+                     <h1 id="step-title" tabindex="-1" bind:this={title}>Keep your password manager.</h1>
+-                    <p class="intro">Already use Bitwarden, 1Password or iCloud Passwords? Add its extension here, then sign in as usual. This step is optional.</p>
++                    <p class="intro">Add an extension, then sign in as usual.</p>
+                     <NoventraPasswordManagers bind:extensions={managerExtensions} bind:installing={managerInstalling} refreshExtensions={refreshManagerExtensions} />
+                 {:else}
+-                    <div class="finish-symbol"><NoventraLogo height="48px" /></div>
++                    <div class="finish-symbol" aria-hidden="true"><NoventraLogo height="42px" /></div>
+                     <h1 id="step-title" tabindex="-1" bind:this={title}>You’re ready to browse.</h1>
+-                    <p class="intro">Make Noventra your own as you go. You can always return to imports and customization in Settings.</p>
+-                    <div class="summary-row"><span aria-hidden="true">☆</span><div><strong>Bookmarks</strong><p>{bookmarkImports ? 'Bookmark import finished.' : 'You can import them later.'}</p></div><span class="summary-tag">{bookmarkImports ? 'Finished' : 'Optional'}</span></div>
+-                    <div class="summary-row"><span aria-hidden="true">◈</span><div><strong>Passwords</strong><p>{passwordImports ? 'Password import finished.' : passwordOpened ? 'Check the results in your password manager tab.' : canImportBrowserPasswords ? 'Import from a browser or CSV whenever you’re ready.' : 'Import a password CSV whenever you’re ready.'}</p></div><span class="summary-tag">{passwordImports ? 'Finished' : passwordOpened ? 'Opened' : 'Optional'}</span></div>
+-                    <div class="summary-row"><span aria-hidden="true">♧</span><div><strong>Password manager</strong><p role="status">{managerLoading ? 'Checking installed extensions…' : managerCheckFailed ? 'Installed extensions couldn’t be checked. Go back to retry.' : enabledManagers.length ? `${enabledManagers.join(', ')} installed. Open the extension to sign in or unlock.` : 'You can add an extension later.'}</p></div><span class="summary-tag">{managerLoading ? 'Checking' : managerCheckFailed ? 'Check needed' : enabledManagers.length ? 'Installed' : 'Optional'}</span></div>
+-                    <div class="finish-note">A fresh start. Everything at your pace.</div>
++                    <p class="intro">You can change these choices in Settings.</p>
++                    <div class="summary-row" id="data-import-summary"><div><strong>Browser data</strong><p>{hasIncompleteDataImport ? 'An import didn’t finish. Check Bookmarks and History.' : bookmarkImports && historyImports ? 'Bookmarks and history import finished.' : bookmarkImports ? 'Bookmark import finished.' : historyImports ? 'History import finished.' : 'Import later in Settings.'}</p></div><span class="summary-tag">{hasIncompleteDataImport ? 'Check needed' : bookmarkImports || historyImports ? 'Finished' : 'Optional'}</span></div>
++                    <div class="summary-row"><div><strong>Passwords</strong><p>{passwordImports ? 'Password import finished.' : passwordOpened ? 'Check the results in your password manager tab.' : 'Import later in Settings.'}</p></div><span class="summary-tag">{passwordImports ? 'Finished' : passwordOpened ? 'Opened' : 'Optional'}</span></div>
++                    <div class="summary-row"><div><strong>Password manager</strong><p role="status">{managerLoading ? 'Checking extensions…' : managerCheckFailed ? 'Couldn’t check extensions. Go back to retry.' : enabledManagers.length ? `${enabledManagers.join(', ')} installed. Sign in through the extension.` : 'Add an extension later.'}</p></div><span class="summary-tag">{managerLoading ? 'Checking' : managerCheckFailed ? 'Check needed' : enabledManagers.length ? 'Installed' : 'Optional'}</span></div>
+                 {/if}
+                 {#if saveError}<p class="error" role="alert">Setup couldn’t be saved. Please try again.</p>{/if}
+             </div>
+             <footer>
+-                {#if step > 0}<button id="back" class="quiet" onclick={() => go(step - 1)} disabled={busy}><span aria-hidden="true">←</span> Back</button>{:else}<span class="footer-note">About a minute. Entirely optional.</span>{/if}
+-                <button id="continue" class="primary" disabled={busy} onclick={() => step === steps.length - 1 ? finish() : go(step + 1)}>{saving ? 'Finishing…' : step === 0 ? 'Make it yours' : step === steps.length - 1 ? 'Start browsing' : step === 3 && !enabledManagers.length ? 'Continue without installing' : 'Continue'}<span aria-hidden="true">→</span></button>
++                {#if step > 0}<button id="back" class="quiet" onclick={() => go(step - 1)} disabled={busy}><span aria-hidden="true">←</span> Back</button>{:else}<span class="footer-note">Setup is optional.</span>{/if}
++                <button id="continue" class="primary" disabled={busy} onclick={() => step === steps.length - 1 ? finish() : go(step + 1)}>{saving ? 'Finishing…' : step === 0 ? 'Get started' : step === steps.length - 1 ? 'Start browsing' : step === 3 && !enabledManagers.length ? 'Continue without installing' : 'Continue'}<span aria-hidden="true">→</span></button>
+             </footer>
+         </section>
+     </div>
+-    <div class="bottom-note">A little setup. A lot more you.</div>
+ </main>
+ 
+ <style>
+-    :global(body) { margin: 0; overflow: auto; }
+-    :global(button), :global(input), :global(select) { font: inherit; }
+-    main { --surface:var(--color-primary-background,#fafafb); --ink:contrast-color(var(--surface)); --muted:color-mix(in srgb,var(--ink) 62%,var(--surface)); --line:color-mix(in srgb,var(--ink) 12%,var(--surface)); --soft:color-mix(in srgb,var(--ink) 4%,var(--surface)); color:var(--ink);background:var(--surface);min-height:100dvh;padding:32px 48px 20px;box-sizing:border-box; }
+-    .brand-bar { max-width:1140px;margin:0 auto 42px;display:flex;align-items:center;justify-content:space-between;gap:20px; }
+-    .brand { display:flex;align-items:center;gap:10px;font-size:21px;font-weight:650;letter-spacing:-.6px; }
+-    button { cursor:pointer; border:0; color:inherit; background:none; display:flex;align-items:center;justify-content:center;gap:12px;min-height:44px;border-radius:12px; transition:background .15s,transform .15s; }
+-    button:focus-visible,input:focus-visible { outline:2px solid var(--ink);outline-offset:4px; }
++    :global(body) { margin:0;overflow:auto; }
++    :global(button),:global(input),:global(select) { font:inherit; }
++    main { --surface:var(--color-primary-background,#fafafb);--ink:contrast-color(var(--surface));--muted:color-mix(in srgb,var(--ink) 62%,var(--surface));--line:color-mix(in srgb,var(--ink) 12%,var(--surface));--soft:color-mix(in srgb,var(--ink) 4%,var(--surface));color:var(--ink);background:var(--surface);min-height:100dvh;padding:24px 32px 32px;box-sizing:border-box; }
++    .brand-bar { max-width:1040px;margin:0 auto 26px;display:flex;align-items:center;justify-content:space-between;gap:16px; }
++    .brand { display:flex;align-items:center;gap:9px;font-size:20px;font-weight:650;letter-spacing:-.6px; }
++    button { cursor:pointer;border:0;color:inherit;background:none;display:flex;align-items:center;justify-content:center;gap:10px;min-height:40px;border-radius:10px;transition:background .15s,transform .15s; }
++    button:focus-visible,input:focus-visible,a:focus-visible,summary:focus-visible { outline:2px solid var(--ink);outline-offset:4px; }
+     button:disabled { cursor:default;opacity:.45; }
+     button:not(:disabled):active { transform:translateY(1px); }
+-    .quiet { color:var(--muted);padding:8px 12px;font-size:14px; }
++    .quiet { color:var(--muted);padding:7px 11px;font-size:13px; }
+     .quiet:hover:not(:disabled) { color:var(--ink);background:var(--soft); }
+-    .setup-shell { max-width:1060px;margin:auto;display:grid;grid-template-columns:240px minmax(0,1fr);gap:48px;align-items:start; }
+-    aside { padding-top:28px; }
+-    .eyebrow,.step-count { font-size:10px;letter-spacing:1.4px;font-weight:650;color:var(--muted); }
+-    h2 { font-size:37px;line-height:1.12;letter-spacing:-1.5px;font-weight:580;margin:18px 0; }
+-    .aside-description { font-size:14px;line-height:1.7;color:var(--muted); }
+-    .steps { list-style:none;padding:0;display:grid;gap:21px;margin:40px 0 64px; }
+-    .steps li { display:flex;align-items:center;gap:13px;color:var(--muted);font-size:14px;min-width:0; }
+-    .step-number { display:grid;place-items:center;border:1px solid var(--line);border-radius:50%;width:28px;height:28px;font-size:12px; }
+-    .steps .active { color:var(--ink);font-weight:650; }.active .step-number { background:var(--ink);color:var(--surface);border-color:var(--ink); }.complete .step-number { background:var(--soft);color:var(--ink); }
+-    .local-note { display:flex;gap:12px;font-size:11px;line-height:1.7;color:var(--muted); }.local-note>span:first-child { font-size:23px; }.local-note strong { font-weight:450; }
+-    .panel { border:1px solid var(--line);border-radius:24px;min-width:0;background:var(--surface);box-shadow:0 8px 40px color-mix(in srgb,var(--ink) 3%,transparent);overflow:hidden; }
+-    .panel-content { padding:34px 38px 22px;min-height:420px; }
+-    .step-count { display:flex;justify-content:space-between;gap:20px;margin-bottom:27px; }.step-count span { letter-spacing:1px;font-size:9px; }
+-    h1 { font-size:33px;font-weight:570;line-height:1.16;letter-spacing:-1.15px;margin:0 0 15px;outline:none; }
+-    .intro a { color:inherit;text-underline-offset:3px; }
+-    .intro { color:var(--muted);line-height:1.65;font-size:14px;margin:0 0 26px;max-width:540px; }
+-    .welcome-visual { border:1px solid var(--line);border-radius:14px;background:var(--soft);overflow:hidden;margin:24px 0 26px;box-shadow:0 12px 20px color-mix(in srgb,var(--ink) 3%,transparent); }
+-    .mini-toolbar { display:flex;align-items:center;gap:5px;padding:10px 13px;border-bottom:1px solid var(--line); }.mini-toolbar>span { width:5px;height:5px;background:var(--line);border-radius:50%; }.mini-address { margin-left:16px;background:var(--surface);padding:6px 12px;font-size:8px;border-radius:6px;flex:1;color:var(--muted); }
+-    .mini-browser { display:grid;grid-template-columns:110px 1fr;min-height:170px; }.mini-sidebar { border-right:1px solid var(--line);padding:14px 10px;display:flex;flex-direction:column;gap:10px;font-size:9px; }.mini-row { padding:7px;border-radius:5px;display:flex;gap:6px;color:var(--muted); }.mini-row.selected { background:var(--surface);color:var(--ink); }.mini-page { display:flex;align-items:center;justify-content:center;flex-direction:column;gap:13px;padding:25px 20px;background:var(--surface); }.mini-search { width:90%;max-width:245px;display:flex;justify-content:space-between;border-radius:7px;background:var(--soft);padding:10px;font-size:8px;color:var(--muted); }.mini-tiles { display:flex;gap:10px; }.mini-tiles i { display:grid;place-items:center;border-radius:7px;font-style:normal;background:var(--soft);width:27px;height:27px; }
+-    .feature-row { display:grid;grid-template-columns:1fr 1fr;gap:20px; }.feature-row>div { display:grid;grid-template-columns:26px 1fr;align-items:center;gap:5px 8px; }.feature-icon { grid-row:span 2;font-size:21px; }.feature-row strong { font-size:12px;font-weight:600; }.feature-row p { color:var(--muted);font-size:11px;margin:0; }
+-    footer { display:flex;align-items:center;justify-content:space-between;gap:16px;padding:20px 30px;border-top:1px solid var(--line);background:var(--soft); }.footer-note { font-size:11px;color:var(--muted); }.primary { background:var(--ink);color:var(--surface);padding:12px 20px;font-size:13px;font-weight:550; }.primary:hover:not(:disabled) { opacity:.86; }.primary.full { width:100%;margin-top:14px;justify-content:space-between; }
++    .setup-shell { max-width:860px;margin:auto; }
++    .steps { list-style:none;padding:0;display:flex;justify-content:space-between;gap:12px;margin:0 4px 20px; }
++    .steps li { display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px;min-width:0; }
++    .step-number { display:grid;place-items:center;border:1px solid var(--line);border-radius:50%;width:25px;height:25px;font-size:11px;flex-shrink:0; }
++    .steps .active { color:var(--ink);font-weight:650; }.active .step-number { background:var(--ink);color:var(--surface);border-color:var(--ink); }.complete .step-number { background:var(--soft); }
++    .panel { border:1px solid var(--line);border-radius:20px;min-width:0;background:var(--surface);overflow:hidden; }
++    .panel-content { padding:28px 32px 18px;min-height:340px; }
++    .step-count { display:flex;justify-content:space-between;gap:16px;margin-bottom:22px;font-size:10px;letter-spacing:1px;font-weight:600;color:var(--muted); }.step-count span { font-size:9px; }
++    h1 { font-size:30px;font-weight:570;line-height:1.18;letter-spacing:-.9px;margin:0 0 12px;outline:none; }
++    .intro { color:var(--muted);line-height:1.5;font-size:14px;margin:0 0 22px; }
++    .welcome-logo { margin:12px 0 28px; }
++    .transfer-link { display:inline-block;color:var(--muted);font-size:13px;line-height:1.5;margin-top:12px;text-underline-offset:3px; }
++    footer { display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 24px;border-top:1px solid var(--line);background:var(--soft); }.footer-note { font-size:11px;color:var(--muted); }
++    .primary { background:var(--ink);color:var(--surface);padding:10px 17px;font-size:13px;font-weight:550; }.primary:hover:not(:disabled) { opacity:.86; }.primary.full { width:100%;margin-top:10px;justify-content:space-between; }
+     .source-heading { display:flex;justify-content:space-between;gap:16px;font-size:12px;margin:10px 0; }.source-heading span { color:var(--muted);font-size:11px; }
+-    .discovery-actions { display:flex;justify-content:flex-end;margin-top:8px; }
+-    .profile-list { display:grid;gap:8px;border:0;padding:0;margin:0;max-height:230px;overflow:auto; }.profile-card { display:flex;align-items:center;gap:12px;padding:13px;border:1px solid var(--line);border-radius:12px;cursor:pointer; }.profile-card.selected { border-color:var(--ink);background:var(--soft); }.profile-card.imported { opacity:.6;cursor:default; }.profile-card input { accent-color:var(--ink);margin:0; }.source-icon { display:grid;place-items:center;font-size:21px;width:38px;height:38px;border-radius:9px;background:var(--soft);flex-shrink:0; }.source-name { display:flex;flex-direction:column;gap:4px;flex:1;min-width:0;text-align:left; }.source-name strong { font-size:13px;font-weight:600;overflow-wrap:anywhere; }.source-name>span { font-size:11px;color:var(--muted);overflow-wrap:anywhere; }.source-kind { color:var(--muted);font-size:10px; }.empty { display:flex;align-items:center;justify-content:center;flex-direction:column;gap:9px;border:1px dashed var(--line);border-radius:12px;padding:24px 16px;text-align:center;font-size:12px;color:var(--muted); }.empty>span { font-size:24px; }.empty strong { color:var(--ink);font-size:13px;font-weight:500; }.empty p { margin:0;max-width:300px;line-height:1.6; }
+-    .divider { display:flex;align-items:center;gap:12px;color:var(--muted);font-size:10px;margin:22px 0; }.divider::before,.divider::after { content:'';height:1px;flex:1;background:var(--line); }.file-card { border:1px solid var(--line);padding:13px 16px;border-radius:12px;width:100%;justify-content:flex-start;gap:12px; }.file-card:hover:not(:disabled) { background:var(--soft); }.file-card>.source-icon { background:var(--soft); }
+-    .mac-import-notice { border:1px dashed var(--line);border-radius:12px;padding:12px 14px;margin-top:14px; }
+-    .mac-import-notice p { color:var(--muted);font-size:12px;line-height:1.6;margin:0; }
+-    .mac-import-notice>div { display:flex;flex-wrap:wrap;gap:6px;margin-top:8px; }
+-    .mac-import-notice .quiet { min-height:36px;font-size:12px; }
+-    .import-message { min-height:20px;margin-top:16px;font-size:12px;color:var(--muted);line-height:1.6; }.success { color:var(--ink); }.error { color:light-dark(#b3261e,#ffb4ab);font-size:12px; }.password-guide { display:flex;flex-direction:column;gap:20px;margin:32px 0; }.password-guide>div { display:flex;gap:14px; }.guide-number { width:27px;height:27px;display:grid;place-items:center;flex-shrink:0;border-radius:8px;border:1px solid var(--line);font-size:11px; }.password-guide p { margin:0;display:flex;flex-direction:column;gap:6px; }.password-guide strong { font-size:13px;font-weight:550; }.password-guide p>span { color:var(--muted);font-size:12px;line-height:1.6; }.privacy-hint { font-size:11px;color:var(--muted);line-height:1.6;margin:17px 0; }
+-    .finish-symbol { display:grid;place-items:center;background:var(--soft);border-radius:18px;width:80px;height:80px;margin:4px 0 26px; }.summary-row { display:flex;align-items:center;gap:15px;padding:20px 0;border-bottom:1px solid var(--line); }.summary-row>span:first-child { font-size:23px; }.summary-row>div { flex:1; }.summary-row strong { font-size:14px;font-weight:550; }.summary-row p { font-size:12px;color:var(--muted);margin:5px 0 0;line-height:1.5; }.summary-tag { border:1px solid var(--line);border-radius:6px;padding:5px 8px;font-size:10px;color:var(--muted); }.finish-note { font-size:12px;color:var(--muted);margin:28px 0 0; }.bottom-note { text-align:center;font-size:10px;color:var(--muted);margin:28px 0 0;letter-spacing:.2px; }.sr-only { position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0; }
++    .discovery-actions { display:flex;justify-content:flex-end;margin-top:5px; }
++    .data-types { display:flex;align-items:center;gap:12px 24px;flex-wrap:wrap;border:0;padding:0;margin:12px 0 4px;font-size:12px; }.data-types legend { padding:0;margin-bottom:9px;color:var(--muted);font-size:11px; }.data-types label { display:flex;align-items:center;gap:8px;min-height:30px; }.data-types input { margin:0;accent-color:var(--ink); }.data-types span { color:var(--muted);font-size:10px; }
++    .profile-list { display:grid;gap:6px;border:0;padding:0;margin:0;max-height:230px;overflow:auto; }.profile-card { display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;cursor:pointer; }.profile-card.selected { border-color:var(--ink);background:var(--soft); }.profile-card.imported { opacity:.6;cursor:default; }.profile-card input { accent-color:var(--ink);margin:0; }
++    .source-icon { display:grid;place-items:center;width:32px;height:32px;flex-shrink:0; }.source-icon img { width:28px;height:28px;object-fit:contain; }.source-icon :global(svg) { width:24px;height:24px; }
++    .source-name { display:flex;flex-direction:column;gap:3px;flex:1;min-width:0;text-align:left; }.source-name strong { font-size:13px;font-weight:600;overflow-wrap:anywhere; }.source-name>span { font-size:11px;color:var(--muted);overflow-wrap:anywhere; }.source-kind { color:var(--muted);font-size:10px; }
++    .empty { display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;border:1px dashed var(--line);border-radius:10px;padding:23px 16px;text-align:center;font-size:12px;color:var(--muted); }.empty strong { color:var(--ink);font-size:13px;font-weight:500; }.empty p { margin:0;line-height:1.5; }
++    .divider { display:flex;align-items:center;gap:12px;color:var(--muted);font-size:10px;margin:16px 0; }.divider::before,.divider::after { content:'';height:1px;flex:1;background:var(--line); }
++    .file-card { border:1px solid var(--line);padding:10px 12px;border-radius:10px;width:100%;justify-content:flex-start;gap:10px;text-align:left; }.file-card:hover:not(:disabled) { background:var(--soft); }
++    .mac-import-notice { border:1px dashed var(--line);border-radius:10px;padding:10px 12px;margin-top:10px; }.mac-import-notice p { color:var(--muted);font-size:12px;line-height:1.5;margin:0; }.mac-import-notice .quiet { margin-top:5px;min-height:36px;padding-left:0;font-size:12px; }
++    .import-message { min-height:18px;margin-top:12px;font-size:12px;color:var(--muted);line-height:1.5; }.success { color:var(--ink); }.error { color:light-dark(#b3261e,#ffb4ab);font-size:12px; }.privacy-hint { font-size:11px;color:var(--muted);line-height:1.5;margin:10px 0; }
++    .import-details { margin-top:14px;color:var(--muted);font-size:11px;line-height:1.5; }.import-details summary { cursor:pointer;width:fit-content; }.import-details p { max-width:650px;margin:8px 0 0; }
++    .finish-symbol { margin:4px 0 22px; }.summary-row { display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--line); }.summary-row>div { flex:1; }.summary-row strong { font-size:13px;font-weight:550; }.summary-row p { font-size:12px;color:var(--muted);margin:4px 0 0;line-height:1.5; }.summary-tag { border:1px solid var(--line);border-radius:6px;padding:4px 7px;font-size:10px;color:var(--muted); }
++    .sr-only { position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0; }
+     .spinner { width:20px;height:20px;border:2px solid var(--line);border-top-color:var(--ink);border-radius:50%;animation:spin 1s linear infinite; }@keyframes spin { to { transform:rotate(360deg); } }
+-    @media(max-width:850px) { main{padding:24px;}.brand-bar{margin-bottom:24px;}.setup-shell{grid-template-columns:1fr;gap:18px;max-width:660px;}aside{padding:0;}aside>.eyebrow,aside>h2,aside>.aside-description,.local-note{display:none;}.steps{display:flex;justify-content:space-between;gap:8px;margin:0 0 3px;}.steps li{font-size:11px;gap:6px;}.step-number{width:24px;height:24px;font-size:10px;}.panel-content{min-height:0;} }
+-    @media(max-width:520px) { main{padding:18px 12px;}.brand-bar{padding:0 8px;}.panel{border-radius:18px;}.panel-content{padding:26px 22px 18px;}h1{font-size:28px;}.step-count span{display:none;}.feature-row{grid-template-columns:1fr;gap:14px;}.mini-sidebar{padding:12px 6px;}.mini-browser{grid-template-columns:82px 1fr;}.mini-page{padding:22px 12px;}.steps{gap:4px;}.steps li{font-size:10px;gap:4px;flex-direction:column;text-align:center;}.steps li>span:last-child{max-width:58px;}.source-kind{display:none;}footer{padding:16px 20px;}.footer-note{max-width:105px;line-height:1.5;}.primary{padding:12px 16px;}.summary-tag{font-size:9px;} }
++    @media(max-width:600px) { main{padding:18px 14px 24px;}.brand-bar{margin-bottom:20px;}.steps{gap:5px;margin-bottom:16px;}.steps li{font-size:10px;gap:5px;flex-direction:column;text-align:center;}.step-number{width:24px;height:24px;font-size:10px;}.steps li>span:last-child{max-width:66px;}.panel-content{padding:24px 20px 16px;min-height:0;}.panel{border-radius:16px;}h1{font-size:27px;}.intro{font-size:13px;margin-bottom:18px;}footer{padding:14px 18px;gap:10px;}.primary{padding:10px 14px;font-size:12px;}.source-kind{max-width:84px;text-align:right;}.welcome-logo{margin:8px 0 24px;}.summary-tag{font-size:9px;} }
++    @media(max-width:380px) { .source-kind{max-width:65px;font-size:9px;}.source-icon{width:26px;height:28px;}.source-icon img{width:25px;height:25px;}.profile-card{gap:7px;padding:10px;}.step-count span{display:none;}.source-name strong{font-size:12px;}.source-name>span{font-size:10px;} }
+     @media(prefers-reduced-motion:reduce) { button{transition:none;}.spinner{animation:none;} }
+ </style>
+--- a/components/helium_onboarding/src/components/NoventraPasswordManagers.svelte
++++ b/components/helium_onboarding/src/components/NoventraPasswordManagers.svelte
+@@ -3,7 +3,9 @@
+     import { sendWithPromise } from '../lib/cr';
+     import { installExtension, WebstoreInstallErrorCode, type ExtensionStatus } from '../lib/browser/extensions';
+     import { passwordManagers } from '../lib/password-managers';
++    import { passwordManagerIcons } from '../lib/nonfree-icons';
+     import { platform } from '../lib/platform';
++    import IconKey from '../icons/tabler/IconKey.svelte';
+ 
+     let {
+         extensions = $bindable<ExtensionStatus>({}),
+@@ -15,11 +17,20 @@
+         refreshExtensions: () => Promise<void>;
+     } = $props();
+ 
+-    const managers = ['bitwarden', 'onePassword', 'icloudPasswords'];
++    const managers = Object.entries(passwordManagers);
++    const descriptions: Record<string, string> = {
++        protonPass: 'Passwords and email aliases',
++        bitwarden: 'Open-source password vault',
++        onePassword: 'Account or desktop app',
++        keePassXC: 'Requires the KeePassXC desktop app',
++        dashlane: 'Password manager',
++        icloudPasswords: 'Requires macOS Sonoma+ or iCloud for Windows',
++    };
+     let loading = $state(true);
+     let checkFailed = $state(false);
+     let workingId = $state('');
+     let messages = $state<Record<string, string>>({});
++    let brokenIcons = $state<Record<string, boolean>>({});
+ 
+     async function refresh() {
+         loading = true;
+@@ -54,17 +65,17 @@
+             const result = await installExtension(info.extensionId);
+             await refresh();
+             if (extensions[info.extensionId]) {
+-                messages[id] = `${info.title} is ready. Open its toolbar icon to sign in or unlock your vault.`;
++                messages[id] = 'Ready. Open the extension to sign in.';
+             } else if (!result.success && result.code === WebstoreInstallErrorCode.UserCancelled) {
+-                messages[id] = 'Installation canceled. Try again, or continue without installing.';
++                messages[id] = 'Canceled. Try again whenever you’re ready.';
+             } else if (!result.success && (result.code === WebstoreInstallErrorCode.BlockedByPolicy ||
+                        result.code === WebstoreInstallErrorCode.NotPermitted)) {
+-                messages[id] = 'Installation isn’t allowed by your browser or organization settings. You can continue without it.';
++                messages[id] = 'Blocked by browser or organization settings.';
+             } else {
+-                messages[id] = 'The extension wasn’t enabled. Try again, or continue without installing.';
++                messages[id] = 'The extension isn’t enabled. Try again.';
+             }
+         } catch {
+-            messages[id] = 'Couldn’t install the extension. Check your connection and Chrome Web Store downloads in Settings, then try again. You can also continue without it.';
++            messages[id] = 'Couldn’t install. Check your connection and Web Store downloads in Settings.';
+         } finally {
+             installing = false;
+             workingId = '';
+@@ -78,57 +89,81 @@
+ 
+ <div class="managers" aria-busy={loading || installing}>
+     {#if checkFailed}
+-        <div class="check-error" role="status">We couldn’t check installed extensions.
++        <div class="check-error" role="status">Couldn’t check installed extensions.
+             <button id="retry-managers" onclick={refresh} disabled={installing}>Try again</button>
+         </div>
+     {/if}
+-    {#each managers as id}
+-        {@const info = passwordManagers[id]}
++    {#each managers as [id, info]}
+         {@const supported = !info.platforms || info.platforms.includes(platform.name)}
+         {@const enabled = extensions[info.extensionId] === true}
+         {@const disabled = extensions[info.extensionId] === false}
+-        <article class="manager" class:unavailable={!supported} data-manager={id}>
++        {@const icon = passwordManagerIcons[id.toLowerCase()]}
++        <article class="manager" data-manager={id}>
+             <div class="manager-top">
+-                <span class="manager-icon" aria-hidden="true">{id === 'bitwarden' ? 'B' : id === 'onePassword' ? '1' : '☁'}</span>
+-                <h3>{info.title}</h3>
+-                <button id={`install-${id}`} class:installed={enabled} class="install"
+-                    disabled={!supported || loading || checkFailed || installing || enabled}
+-                    onclick={() => install(id)} aria-label={`${disabled ? 'Enable' : 'Install'} ${info.title}`}>
+-                    {workingId === info.extensionId ? 'Installing…' : !supported ? 'Unavailable' :
+-                        enabled ? 'Installed ✓' : loading ? 'Checking…' : disabled ? 'Enable' : 'Install'}
+-                </button>
++                <span class="manager-icon" aria-hidden="true">
++                    {#if icon && !brokenIcons[id]}
++                        <img src={icon} width="32" height="32" alt="" onerror={() => brokenIcons[id] = true} />
++                    {:else}
++                        <IconKey />
++                    {/if}
++                </span>
++                <div class="manager-name">
++                    <h3>{info.title}</h3>
++                    <p>{supported ? descriptions[id] : 'Requires macOS or Windows'}</p>
++                </div>
++                {#if supported}
++                    <button id={`install-${id}`} class:installed={enabled} class="install"
++                        disabled={loading || checkFailed || installing || enabled}
++                        onclick={() => install(id)} aria-label={`${disabled ? 'Enable' : 'Install'} ${info.title}`}>
++                        {workingId === info.extensionId ? 'Installing…' :
++                            enabled ? 'Installed ✓' : loading ? 'Checking…' : disabled ? 'Enable' : 'Install'}
++                    </button>
++                {:else}
++                    <a id={`view-${id}`} class="view-extension" href={`https://chromewebstore.google.com/detail/${info.extensionId}`} target="_blank" rel="noopener noreferrer" aria-label={`View ${info.title} extension`}>View extension</a>
++                {/if}
+             </div>
+-            <p>{id === 'bitwarden' ? 'Keep using your Bitwarden vault in Noventra.' :
+-                id === 'onePassword' ? 'Sign in to your 1Password account in the extension.' :
+-                supported ? 'Requires macOS Sonoma or later, or iCloud for Windows with Passwords enabled.' :
+-                    'iCloud Passwords is available on macOS and Windows. Apple doesn’t offer it for Linux.'}</p>
+-            {#if id === 'onePassword'}
+-                <a href={info.setupGuide} target="_blank" rel="noopener noreferrer">Connect the desktop app</a>
+-            {/if}
++            <details class="manager-details">
++                <summary>Details</summary>
++                <div class="manager-links">
++                    {#if info.importGuide}<a href={info.importGuide} target="_blank" rel="noopener noreferrer">Import guide</a>{/if}
++                    {#if info.setupGuide}<a href={info.setupGuide} target="_blank" rel="noopener noreferrer">{id === 'onePassword' ? 'Connect the desktop app' : 'Setup guide'}</a>{/if}
++                    <a href={info.privacyPolicy} target="_blank" rel="noopener noreferrer">Privacy</a>
++                </div>
++            </details>
+             {#if messages[id]}<p class="manager-message" role="status" aria-live="polite">{messages[id]}</p>{/if}
+         </article>
+     {/each}
+ </div>
+-<p class="download-note">Install allows Chrome Web Store downloads and updates directly from Google when no extension proxy is enabled. You’ll see the extension’s permission prompt. Change downloads in <a href="chrome://settings/services" target="_blank" rel="noopener noreferrer">Settings → Noventra services</a>.</p>
+-<p class="vault-note">Sign in inside your extension. Your vault and master password never pass through setup.</p>
++<details class="download-details">
++    <summary>Extension download details</summary>
++    <p>Install enables Chrome Web Store downloads and shows the extension’s permission prompt. Manage downloads in <a href="chrome://settings/services" target="_blank" rel="noopener noreferrer">Noventra services</a>.</p>
++    <p>Sign in inside the extension. Your vault and master password stay outside setup.</p>
++</details>
+ 
+ <style>
+-    .managers { display:grid;gap:10px; }
+-    .manager { border:1px solid var(--line);border-radius:12px;padding:16px;min-width:0; }
+-    .manager-top { display:flex;align-items:center;gap:12px;flex-wrap:wrap; }
+-    .manager-icon { display:grid;place-items:center;width:34px;height:34px;background:var(--soft);border-radius:9px;font-size:19px;font-weight:650;flex-shrink:0; }
+-    h3 { margin:0;font-size:14px;font-weight:600;flex:1; }
+-    .managers button { cursor:pointer;font:inherit;min-height:40px;border-radius:8px;border:1px solid var(--line);padding:8px 14px;background:var(--ink);color:var(--surface);font-size:12px; }
++    .managers { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px; }
++    .manager { border:1px solid var(--line);border-radius:12px;padding:14px;min-width:0;align-self:start; }
++    .manager-top { display:flex;align-items:center;gap:10px; }
++    .manager-icon { display:grid;place-items:center;width:32px;height:32px;flex-shrink:0; }
++    .manager-icon img { width:32px;height:32px;object-fit:contain; }
++    .manager-icon :global(svg) { width:25px;height:25px; }
++    .manager-name { min-width:0;flex:1; }
++    h3 { margin:0;font-size:13px;font-weight:600;overflow-wrap:anywhere; }
++    .manager-name p { margin:4px 0 0;color:var(--muted);font-size:10px;line-height:1.4; }
++    .managers button,.view-extension { cursor:pointer;font:inherit;min-height:36px;border-radius:8px;border:1px solid var(--line);padding:7px 10px;background:var(--ink);color:var(--surface);font-size:11px;white-space:nowrap;flex-shrink:0; }
+     .managers button:disabled { cursor:default;opacity:.5; }
+     .managers button.installed { background:var(--soft);color:var(--ink);opacity:1; }
+-    .managers button:focus-visible,a:focus-visible { outline:2px solid var(--ink);outline-offset:4px; }
+-    .manager p { margin:11px 0 0;color:var(--muted);font-size:12px;line-height:1.6;overflow-wrap:anywhere; }
+-    .manager a { display:inline-block;font-size:11px;margin-top:8px; }
+-    .manager .manager-message { color:var(--ink); }
++    .view-extension { display:flex;align-items:center;text-decoration:none;color:var(--ink);background:var(--soft);white-space:normal;text-align:center;max-width:84px;line-height:1.3; }
++    .managers button:focus-visible,a:focus-visible,summary:focus-visible { outline:2px solid var(--ink);outline-offset:4px; }
++    .manager-details { margin-top:11px;color:var(--muted);font-size:10px;line-height:1.5; }
++    summary { cursor:pointer;width:fit-content; }
++    .manager-links { display:flex;gap:6px 14px;flex-wrap:wrap;margin-top:7px; }
++    .manager-message { margin:10px 0 0;color:var(--ink);font-size:11px;line-height:1.5;overflow-wrap:anywhere; }
+     a { color:inherit;text-underline-offset:3px; }
+-    .download-note,.vault-note,.check-error { font-size:11px;line-height:1.65;color:var(--muted); }
+-    .download-note { margin:18px 0 10px; }.vault-note { margin:0; }
+-    .check-error button { margin-left:8px; }
+-    .unavailable { background:var(--soft); }
+-    @media(max-width:360px) { .manager { padding:12px; }.manager-top { gap:8px; }.install { width:100%; } }
++    .download-details { margin-top:15px;color:var(--muted);font-size:11px;line-height:1.5; }
++    .download-details p { margin:8px 0 0; }
++    .check-error { grid-column:1/-1;font-size:12px;color:var(--muted);display:flex;align-items:center;gap:8px;flex-wrap:wrap; }
++    .check-error button { background:var(--soft);color:var(--ink); }
++    @media(max-width:620px) { .managers { grid-template-columns:1fr; }.manager { padding:12px; }.manager-name p { font-size:11px; } }
++    @media(max-width:360px) { .manager-top { gap:8px; }.manager-icon { width:28px; }.manager-icon img { width:28px;height:28px; }.managers button,.view-extension { padding:7px 8px;font-size:10px; }.manager-name p { font-size:10px; } }
+ </style>

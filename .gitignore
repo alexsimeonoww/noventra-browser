@@ -1,0 +1,10 @@
+/build/
+/work/
+/.wrangler/
+node_modules/
+__pycache__/
+*.py[cod]
+.env
+.env.*
+*-private.pem
+stable-ed25519.pem
