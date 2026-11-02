@@ -322,11 +322,31 @@ def verify_assets(api, plan, value, *, complete):
     return names
 
 
+def existing_release(api, repo, tag):
+    endpoint = f"/repos/{repo}/releases/tags/{urllib.parse.quote(tag, safe='')}"
+    current = api.request('GET', endpoint, missing=True)
+    if current is not None:
+        release.require(isinstance(current, dict), 'Invalid GitHub release response')
+        return current
+    # The tag endpoint can hide unpublished drafts even from their owner.
+    # Inspect the authenticated release list before creating or publishing one.
+    matches = []
+    for page in range(1, 21):
+        values = api.request('GET', f'/repos/{repo}/releases?per_page=100&page={page}')
+        release.require(isinstance(values, list) and len(values) <= 100
+                        and all(isinstance(value, dict) for value in values),
+                        'Invalid GitHub release list')
+        matches.extend(value for value in values if value.get('tag_name') == tag)
+        release.require(len(matches) <= 1, 'Multiple GitHub releases have the requested tag')
+        if len(values) < 100:
+            return matches[0] if matches else None
+    raise ValueError('GitHub release list exceeds inspection limit')
+
+
 def operate(plan, api, operation):
     release.require(operation in ('check', 'draft', 'publish'), 'Unsupported GitHub release operation')
     repo, tag = plan['repo'], plan['tag']
-    endpoint = f"/repos/{repo}/releases/tags/{urllib.parse.quote(tag, safe='')}"
-    current = api.request('GET', endpoint, missing=True)
+    current = existing_release(api, repo, tag)
     present = verify_assets(api, plan, current, complete=not current.get('draft')) if current else {}
     if operation == 'check':
         return {'status': 'verified_read_only', 'repository': repo, 'tag': tag,

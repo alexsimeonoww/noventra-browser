@@ -39,6 +39,7 @@ class FakeGitHub:
         self.writes = []
         self.tag = COMMIT
         self.fail_upload = None
+        self.release_pages = None
 
     def assets(self, repo, release_id):
         return copy.deepcopy(self.asset_values)
@@ -57,7 +58,14 @@ class FakeGitHub:
         if endpoint.startswith(f'/repos/{REPO}/releases/tags/'):
             if self.release is None and not missing:
                 raise ValueError('Missing release')
+            if self.release is not None and self.release.get('draft'):
+                return None
             return copy.deepcopy(self.release)
+        if method == 'GET' and endpoint.startswith(f'/repos/{REPO}/releases?'):
+            page = int(urllib.parse.parse_qs(urllib.parse.urlsplit(endpoint).query)['page'][0])
+            if self.release_pages is not None:
+                return copy.deepcopy(self.release_pages.get(page, []))
+            return [copy.deepcopy(self.release)] if self.release is not None and page == 1 else []
         if method == 'POST' and endpoint == f'/repos/{REPO}/releases':
             self.release = {**body, 'id': 7, 'html_url': f'https://github.com/{REPO}/releases/tag/{TAG}', 'immutable': False}
             return copy.deepcopy(self.release)
@@ -180,6 +188,29 @@ class GitHubReleaseTests(unittest.TestCase):
         self.assertEqual(github.operate(plan, self.api, 'publish')['status'], 'published_verified')
         before = list(self.api.writes)
         self.assertEqual(github.operate(self.inspect(), self.api, 'publish')['status'], 'published_verified')
+        self.assertEqual(self.api.writes, before)
+
+    def test_hidden_draft_is_found_on_a_later_release_list_page(self):
+        plan = self.inspect()
+        github.operate(plan, self.api, 'draft')
+        self.api.release_pages = {
+            1: [{'id': 100 + i, 'tag_name': 'other-' + str(i), 'draft': True} for i in range(100)],
+            2: [copy.deepcopy(self.api.release)],
+        }
+        before = list(self.api.writes)
+        result = github.operate(plan, self.api, 'check')
+        self.assertTrue(result['existing_draft'])
+        self.assertEqual(result['verified_existing_assets'], 13)
+        self.assertEqual(self.api.writes, before)
+
+    def test_duplicate_hidden_drafts_are_refused_before_mutation(self):
+        plan = self.inspect()
+        github.operate(plan, self.api, 'draft')
+        self.api.release_pages = {1: [copy.deepcopy(self.api.release),
+                                      {**copy.deepcopy(self.api.release), 'id': 8}]}
+        before = list(self.api.writes)
+        with self.assertRaisesRegex(ValueError, 'Multiple GitHub releases'):
+            github.operate(plan, self.api, 'publish')
         self.assertEqual(self.api.writes, before)
 
     def test_asset_conflict_unknown_asset_and_metadata_conflict_never_clobber(self):
