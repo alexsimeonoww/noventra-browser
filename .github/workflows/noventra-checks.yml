@@ -26,6 +26,10 @@ jobs:
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
+      - name: Install desktop integration test tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends desktop-file-utils xdg-utils libglib2.0-bin
       - name: Check package and signed delivery tools
         run: |
           python3 --version

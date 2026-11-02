@@ -248,14 +248,29 @@ class InstallerTests(unittest.TestCase):
         self.assertFalse((self.managed / '.update').exists())
 
     def test_running_installed_executable_blocks_update_and_uninstall(self):
-        sleeper = Path(shutil.which('sleep'))
-        self.fixture.put(package.BINARY, sleeper.read_bytes() + b'\0' + self.fixture.helper.encode() + b'\0', executable=True)
+        # A multicall coreutils executable can reject the installed filename.
+        # Use the already-required system Python as a real renamed ELF instead.
+        executable = Path('/usr/bin/python3').resolve(strict=True)
+        self.fixture.put(package.BINARY, executable.read_bytes() + b'\0' + self.fixture.helper.encode() + b'\0', executable=True)
         self.fixture.refresh()
         source = self.make_package()
         self.run_helper(source)
         other = self.another_package('2.0-local')
-        process = subprocess.Popen([str(self.managed / 'app/opt/noventra/noventra-browser'), '30'])
+        installed = self.managed / 'app/opt/noventra/noventra-browser'
+        ready = self.root / 'running-native-ready'
+        code = 'import sys,time;open(sys.argv[1],"w").write("ready");time.sleep(30)'
+        process = subprocess.Popen([str(installed), '-I', '-S', '-c', code, str(ready)], env=self.env)
         try:
+            expected = installed.stat()
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline:
+                self.assertIsNone(process.poll(), 'Renamed fixture executable exited before readiness')
+                actual = (Path('/proc') / str(process.pid) / 'exe').stat()
+                if ready.exists() and ready.read_text() == 'ready' and (actual.st_dev, actual.st_ino) == (expected.st_dev, expected.st_ino):
+                    break
+                time.sleep(.01)
+            else:
+                self.fail('Installed fixture executable did not become ready')
             for operation, candidate in (('install', other), ('uninstall', source)):
                 refused = self.run_helper(candidate, operation, success=False)
                 self.assertIn('Close Noventra', refused.stderr)
