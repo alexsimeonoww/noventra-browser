@@ -59,10 +59,9 @@ class DesktopUpdateTests(unittest.TestCase):
         self.config = self.root / 'explicit-update-config.json'
         self.config_value = {'format': 1, 'base_url': self.url, 'channel': 'local',
                              'sequence': 1, 'public_key': str(self.public)}
-        # A copied system Python ELF stays executable under the installed name,
-        # unlike multicall coreutils. The native fixture only sleeps; its real
-        # inode and process lifetime still exercise the launch/close boundary.
-        self.fixture.put('noventra-browser', Path('/usr/bin/python3').resolve(strict=True).read_bytes()
+        # A standalone test ELF ignores its filename and keeps the same numeric
+        # duration API for these checks and their recovery-test callers.
+        self.fixture.put('noventra-browser', fixtures.native_sleep_elf()
                          + b'\0noventra_crashpad_handler\0', executable=True)
         self.fixture.refresh()
         self.packages = {}
@@ -116,8 +115,7 @@ class DesktopUpdateTests(unittest.TestCase):
         return result, json.loads(result.stdout)
 
     def spawn(self, *args):
-        code = 'import sys,time;time.sleep(float(sys.argv[1]))'
-        process = subprocess.Popen([str(self.app / 'AppRun'), '-I', '-S', '-c', code, *args], env=self.env,
+        process = subprocess.Popen([str(self.app / 'AppRun'), *args], env=self.env,
                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         def cleanup():
             if process.poll() is None:
@@ -215,8 +213,7 @@ class DesktopUpdateTests(unittest.TestCase):
         self.to_second()
         installed = self.app / 'opt/noventra/noventra-browser'
         ready = self.root / 'running-native-ready'
-        code = 'import sys,time;open(sys.argv[1],"w").write("ready");time.sleep(10)'
-        running = subprocess.Popen([str(installed), '-I', '-S', '-c', code, str(ready)], env=self.env)
+        running = subprocess.Popen([str(installed), '10', str(ready)], env=self.env)
         self.addCleanup(lambda: running.poll() is None and running.kill())
         try:
             expected = installed.stat()
@@ -541,7 +538,7 @@ class DesktopUpdateTests(unittest.TestCase):
 
     def test_unmanaged_extraction_does_not_create_update_state(self):
         env = {**self.env, 'XDG_DATA_HOME': str(self.home / 'unrelated data')}
-        process = subprocess.run([str(self.packages[1] / 'AppRun'), '-I', '-S', '-c', 'pass'], env=env,
+        process = subprocess.run([str(self.packages[1] / 'AppRun'), '0'], env=env,
                                  capture_output=True, text=True, timeout=5)
         self.assertEqual(process.returncode, 0, process.stderr)
         self.assertFalse((self.home / 'unrelated data').exists())

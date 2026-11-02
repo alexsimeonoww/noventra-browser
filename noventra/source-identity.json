@@ -13,9 +13,9 @@
       "sha256": "fd92ff208ef7439765d7b3a5b89b422234abf7408137646e4d615e68df128537"
     },
     "build-inputs/.github/workflows/noventra-checks.yml": {
-      "bytes": 1793,
+      "bytes": 1807,
       "mode": 420,
-      "sha256": "d54c35605470178385b98654d01bd3dce642be0988b68106c8aed26f80eb7af3"
+      "sha256": "2f4c40cdba92df4eb314a7da9aa63dfaf958e8e137ff4d22c1463f1b1163a692"
     },
     "build-inputs/LICENSE": {
       "bytes": 35071,
@@ -28,9 +28,9 @@
       "sha256": "f133ae4b6340e0bfc42338e6bd1d42d85d8a850652aa10dba6e37f82fe3ca080"
     },
     "build-inputs/docs/noventra/github-releases.md": {
-      "bytes": 7174,
+      "bytes": 7604,
       "mode": 420,
-      "sha256": "f413190b0118d4b02a8ea522efcc92bbce00bb32272d050cfa8d8ed7a640ee95"
+      "sha256": "ab5fce8b8cbfd593fd41cbaa54046bc8413a0a27af6211d10715c33d9ecc37e3"
     },
     "build-inputs/docs/noventra/update-protocol.md": {
       "bytes": 4247,
@@ -613,9 +613,9 @@
       "sha256": "772872ab7b9c2c5bd0c7b5a26d6f85123e3f1b9580b4abcf9dca4e9652f7baf0"
     },
     "build-inputs/tests/noventra/test_desktop_updater.py": {
-      "bytes": 32343,
+      "bytes": 32015,
       "mode": 420,
-      "sha256": "318023ea57f50ce273d7316897842ba1c16430504d1d06209e9583869658e08a"
+      "sha256": "13876ac24a708c2b266fafa2c3eef65ac5142f920646f994d709b02eefc1a206"
     },
     "build-inputs/tests/noventra/test_github_release.py": {
       "bytes": 15767,
@@ -623,14 +623,14 @@
       "sha256": "a312cd6f81885e5fc5363c91fb8f9456574f75c8436149abc69c1eacadb93b82"
     },
     "build-inputs/tests/noventra/test_package_distribution.py": {
-      "bytes": 22007,
+      "bytes": 23580,
       "mode": 420,
-      "sha256": "451f050ca4ad39efd7b1b2427eb85b257b30709baff29573f7185606484c6234"
+      "sha256": "2acaf3b00dbac2f6943cafc87ef4dee18b3cfcb7465354c7a16ff7f21a4576b5"
     },
     "build-inputs/tests/noventra/test_package_installer.py": {
-      "bytes": 25239,
+      "bytes": 24915,
       "mode": 420,
-      "sha256": "d43c284e35124940f9e90525d68e21e5e70979b02bdbb56507009eb0e21f4bca"
+      "sha256": "4360edba56a808188ad3a5ae5d13deabf0589fffaa2b5cbce61f37ef022a8428"
     },
     "build-inputs/tests/noventra/test_publish_release.py": {
       "bytes": 24669,

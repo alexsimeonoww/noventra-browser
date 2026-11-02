@@ -1,6 +1,7 @@
 """Offline packaging fixtures only: no Chromium build, runtime, or profile."""
 
 import configparser
+import functools
 import hashlib
 import json
 import os
@@ -24,6 +25,46 @@ import package_distribution as package
 
 def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+@functools.cache
+def native_sleep_elf():
+    """Build one tiny test-only ELF with a stable duration/optional-ready-file API."""
+    compiler = shutil.which('cc')
+    if compiler is None:
+        raise RuntimeError('Process fixture checks require a C compiler and libc headers')
+    source = r'''
+#define _POSIX_C_SOURCE 200809L
+#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+int main(int argc, char **argv) {
+    if (argc < 2 || argc > 3) return 2;
+    char *end;
+    double seconds = strtod(argv[1], &end);
+    if (end == argv[1] || *end || seconds != seconds || seconds < 0 || seconds > 60) return 2;
+    if (argc == 3) {
+        FILE *ready = fopen(argv[2], "w");
+        if (!ready) return 3;
+        int written = fputs("ready", ready);
+        int closed = fclose(ready);
+        if (written == EOF || closed != 0) return 3;
+    }
+    struct timespec delay = {(time_t)seconds, (long)((seconds - (time_t)seconds) * 1000000000)};
+    while (nanosleep(&delay, &delay) < 0) {
+        if (errno != EINTR) return 4;
+    }
+    return 0;
+}
+'''
+    with tempfile.TemporaryDirectory(prefix='noventra-native-process-fixture-') as temporary:
+        binary = Path(temporary) / 'native-process-fixture'
+        result = subprocess.run([compiler, '-x', 'c', '-std=c11', '-O0', '-o', str(binary), '-'],
+                                input=source, capture_output=True, text=True)
+        if result.returncode != 0:
+            raise RuntimeError('Cannot compile process fixture: ' + result.stderr)
+        return binary.read_bytes()
 
 
 class PackageTests(unittest.TestCase):

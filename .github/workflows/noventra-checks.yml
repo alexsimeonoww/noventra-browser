@@ -29,7 +29,7 @@ jobs:
       - name: Install desktop integration test tools
         run: |
           sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends desktop-file-utils xdg-utils libglib2.0-bin
+          sudo apt-get install --yes --no-install-recommends desktop-file-utils xdg-utils libglib2.0-bin gcc libc6-dev
       - name: Check package and signed delivery tools
         run: |
           python3 --version

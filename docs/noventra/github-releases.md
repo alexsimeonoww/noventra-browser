@@ -9,8 +9,8 @@ any other project's visibility. Review a clean export before its first public
 commit, excluding profiles, credentials, private signing material, compiler
 outputs and personal captures.
 
-The intended public source repository is `alexsimeonoww/noventra-browser`.
-This document and the helper do not create it or claim it has been published.
+The public source repository is
+[`alexsimeonoww/noventra-browser`](https://github.com/alexsimeonoww/noventra-browser).
 The source repository and GitHub Releases provide the public development/release
 record. Cloudflare at `downloads.noventrastudio.com` remains the browser's pinned
 signed update origin; the same verified files are mirrored on GitHub.
@@ -110,6 +110,13 @@ verified commits. The workflow grants only `contents: read`, does not persist
 checkout credentials, has no secrets or deployment jobs, and never runs pull
 request code on a self-hosted machine. It does not build, sign, upload or publish
 a browser. Native Linux/macOS/Windows release qualification remains separate.
+
+The full tool suite needs Python 3.11+, OpenSSL, Node 24, desktop-file-validate,
+xdg-utils, GIO, and a C compiler with libc development headers. The workflow
+installs these dependencies explicitly. Process tests compile a tiny standalone
+sleeping program in a disposable directory to check real executable identity,
+launch locks and shutdown. Its argument handling is independent of renamed
+system utilities; native browser qualification remains a separate step.
 
 The helper tests mock the GitHub boundary and use disposable signing keys and
 fake browser payloads. They do not establish actual repository permissions or a

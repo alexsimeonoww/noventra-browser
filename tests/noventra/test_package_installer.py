@@ -248,18 +248,14 @@ class InstallerTests(unittest.TestCase):
         self.assertFalse((self.managed / '.update').exists())
 
     def test_running_installed_executable_blocks_update_and_uninstall(self):
-        # A multicall coreutils executable can reject the installed filename.
-        # Use the already-required system Python as a real renamed ELF instead.
-        executable = Path('/usr/bin/python3').resolve(strict=True)
-        self.fixture.put(package.BINARY, executable.read_bytes() + b'\0' + self.fixture.helper.encode() + b'\0', executable=True)
+        self.fixture.put(package.BINARY, fixtures.native_sleep_elf() + b'\0' + self.fixture.helper.encode() + b'\0', executable=True)
         self.fixture.refresh()
         source = self.make_package()
         self.run_helper(source)
         other = self.another_package('2.0-local')
         installed = self.managed / 'app/opt/noventra/noventra-browser'
         ready = self.root / 'running-native-ready'
-        code = 'import sys,time;open(sys.argv[1],"w").write("ready");time.sleep(30)'
-        process = subprocess.Popen([str(installed), '-I', '-S', '-c', code, str(ready)], env=self.env)
+        process = subprocess.Popen([str(installed), '30', str(ready)], env=self.env)
         try:
             expected = installed.stat()
             deadline = time.monotonic() + 5
