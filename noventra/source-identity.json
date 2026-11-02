@@ -613,9 +613,9 @@
       "sha256": "772872ab7b9c2c5bd0c7b5a26d6f85123e3f1b9580b4abcf9dca4e9652f7baf0"
     },
     "build-inputs/tests/noventra/test_desktop_updater.py": {
-      "bytes": 31396,
+      "bytes": 32343,
       "mode": 420,
-      "sha256": "b4faca6222a5ed85b3ec7d3dd434d1db86241947643979aad70af4cab6875fbf"
+      "sha256": "318023ea57f50ce273d7316897842ba1c16430504d1d06209e9583869658e08a"
     },
     "build-inputs/tests/noventra/test_github_release.py": {
       "bytes": 15767,

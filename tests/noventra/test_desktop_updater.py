@@ -59,10 +59,10 @@ class DesktopUpdateTests(unittest.TestCase):
         self.config = self.root / 'explicit-update-config.json'
         self.config_value = {'format': 1, 'base_url': self.url, 'channel': 'local',
                              'sequence': 1, 'public_key': str(self.public)}
-        # A real system ELF gives require_closed an actual installed executable
-        # identity. Appending the harmless helper marker permits normal snapshot
-        # validation; sleep remains the only program executed by these tests.
-        self.fixture.put('noventra-browser', Path('/usr/bin/sleep').read_bytes()
+        # A copied system Python ELF stays executable under the installed name,
+        # unlike multicall coreutils. The native fixture only sleeps; its real
+        # inode and process lifetime still exercise the launch/close boundary.
+        self.fixture.put('noventra-browser', Path('/usr/bin/python3').resolve(strict=True).read_bytes()
                          + b'\0noventra_crashpad_handler\0', executable=True)
         self.fixture.refresh()
         self.packages = {}
@@ -116,7 +116,8 @@ class DesktopUpdateTests(unittest.TestCase):
         return result, json.loads(result.stdout)
 
     def spawn(self, *args):
-        process = subprocess.Popen([str(self.app / 'AppRun'), *args], env=self.env,
+        code = 'import sys,time;time.sleep(float(sys.argv[1]))'
+        process = subprocess.Popen([str(self.app / 'AppRun'), '-I', '-S', '-c', code, *args], env=self.env,
                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         def cleanup():
             if process.poll() is None:
@@ -212,9 +213,22 @@ class DesktopUpdateTests(unittest.TestCase):
 
     def test_real_running_executable_defers_install_until_closed(self):
         self.to_second()
-        running = subprocess.Popen([str(self.app / 'opt/noventra/noventra-browser'), '10'])
+        installed = self.app / 'opt/noventra/noventra-browser'
+        ready = self.root / 'running-native-ready'
+        code = 'import sys,time;open(sys.argv[1],"w").write("ready");time.sleep(10)'
+        running = subprocess.Popen([str(installed), '-I', '-S', '-c', code, str(ready)], env=self.env)
         self.addCleanup(lambda: running.poll() is None and running.kill())
         try:
+            expected = installed.stat()
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline:
+                self.assertIsNone(running.poll(), 'Renamed fixture executable exited before readiness')
+                actual = (Path('/proc') / str(running.pid) / 'exe').stat()
+                if ready.exists() and ready.read_text() == 'ready' and (actual.st_dev, actual.st_ino) == (expected.st_dev, expected.st_ino):
+                    break
+                time.sleep(.01)
+            else:
+                self.fail('Installed fixture executable did not become ready')
             result = self.updater.apply()
             self.assertEqual(result['status'], 'ready')
             self.assertEqual(self.current_version(), '1-test')
@@ -527,7 +541,7 @@ class DesktopUpdateTests(unittest.TestCase):
 
     def test_unmanaged_extraction_does_not_create_update_state(self):
         env = {**self.env, 'XDG_DATA_HOME': str(self.home / 'unrelated data')}
-        process = subprocess.run([str(self.packages[1] / 'AppRun'), '0'], env=env,
+        process = subprocess.run([str(self.packages[1] / 'AppRun'), '-I', '-S', '-c', 'pass'], env=env,
                                  capture_output=True, text=True, timeout=5)
         self.assertEqual(process.returncode, 0, process.stderr)
         self.assertFalse((self.home / 'unrelated data').exists())
