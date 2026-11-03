@@ -343,6 +343,14 @@ void AddAboutStrings(content::WebUIDataSource* html_source, Profile* profile) {
   };
   html_source->AddLocalizedStrings(kLocalizedStrings);
 
+#if BUILDFLAG(IS_LINUX)
+  html_source->AddString("aboutRelaunch", u"Update and restart");
+  html_source->AddString(
+      "aboutUpgradeRelaunch",
+      u"Update ready. Restart Noventra to install it. Your regular tabs will "
+      u"reopen.");
+#endif
+
   html_source->AddString("managementPage",
                          GetDeviceManagedUiHelpLabel(profile));
   html_source->AddString(

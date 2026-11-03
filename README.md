@@ -16,6 +16,26 @@ the same window. Its tabs use an off-the-record profile with separate cookies
 and site storage. Closing its last tab removes that Space; regular Spaces stay
 available beside it.
 
+## Updates and moving to another PC
+
+Linux preview 3 offers **Update and restart** in **About Noventra** once a
+verified update is ready. It closes the browser normally, installs the signed
+update, then reopens regular tabs and Spaces. Cancelling an unsaved-page or
+Incognito warning cancels the restart. Incognito sessions are not restored.
+
+To receive preview 3 from preview 2, open About Noventra, let it prepare the
+update, then close every Noventra window and reopen it once. Preview 2 uses its
+existing close-and-reopen flow; the new button becomes available for subsequent
+updates after preview 3 is installed. The button is hidden while the installed
+version is current.
+
+Setup now offers **Move from another Noventra PC** above imports from other
+browsers on the current PC. It opens **Data & devices** in a separate tab for a
+direct connection code or encrypted `.noventra` file, keeping setup open.
+Transfer supports reviewed bookmarks, Spaces, tabs, appearance/layout, an
+extension reinstall list and optional built-in saved passwords. Website
+sessions and browsing history are excluded. See [device transfer](docs/noventra/device-transfer-2026-10-30.md).
+
 ## Cookie import and update reminders
 
 Linux preview 2 adds optional cookie import for supported Chromium-family and
@@ -24,11 +44,11 @@ Settings. The choice starts unchecked, and imported sessions belong to the
 Space where the import started. Some websites still require another sign-in.
 See [cookie import limits](docs/noventra/cookie-import-2026-11-03.md).
 
-The installed launcher checks for updates while Noventra remains open. Preview 2
-can send a desktop reminder after a verified update is ready, at most once every
+The installed launcher checks for updates while Noventra remains open. It can
+send a desktop reminder after a verified update is ready, at most once every
 twelve hours. It never forces a restart. Desktop reminders require `notify-send`
-and a notification service. Preview 1 gains this feature through its upgrade;
-use About Noventra to check immediately for that first update.
+and a notification service. Preview 3 directs the reminder to About Noventra's
+update action. Older previews gain the new behavior through their upgrade.
 
 ## Source and builds
 
@@ -53,6 +73,10 @@ that separate checkout. The supplied admission checks refuse to adopt or reset
 an unrelated source/build tree. Preparation applies pinned Helium changes,
 then the Noventra series and resources, and checks the generated GN arguments
 against `noventra/qualified-args.gn`.
+
+The included native regression fixture source is documented in
+[the native fixture notes](tests/noventra/update_restart/README.md). Its private
+display and network harness is separate from the public CI unit tests.
 
 ## Contributing and releases
 

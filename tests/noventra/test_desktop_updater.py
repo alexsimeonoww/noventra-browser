@@ -1,6 +1,7 @@
 """Signed loopback updates of disposable managed apps; never a real browser."""
 import fcntl
 import ctypes
+import functools
 from http.server import ThreadingHTTPServer
 import importlib.util
 import io
@@ -30,6 +31,60 @@ import test_package_distribution as fixtures
 spec = importlib.util.spec_from_file_location('desktop_updater_fixture', ROOT / 'noventra/package/desktop_updater.py')
 desktop = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(desktop)
+
+
+@functools.cache
+def native_relaunch_elf():
+    source = r'''
+#define _POSIX_C_SOURCE 200809L
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <unistd.h>
+static void pause_briefly(void) {
+    struct timespec delay = {0, 10000000};
+    nanosleep(&delay, NULL);
+}
+static void wait_file(const char *path) {
+    while (access(path, F_OK)) pause_briefly();
+}
+int main(int argc, char **argv) {
+    if (argc == 7 && !strcmp(argv[1], "relaunch-owner")) {
+        char owner[32];
+        snprintf(owner, sizeof owner, "%ld", (long)getpid());
+        pid_t worker = fork();
+        if (worker < 0) return 3;
+        if (worker == 0) {
+            if (strcmp(argv[5], "-")) wait_file(argv[5]);
+            execl("/usr/bin/python3", "/usr/bin/python3", "-I", "-B", argv[2],
+                  "--owner-pid", owner, "relaunch", "--", ".1", argv[6], NULL);
+            return 127;
+        }
+        FILE *ready = fopen(argv[3], "w");
+        if (!ready) return 4;
+        fprintf(ready, "%ld", (long)worker);
+        if (fclose(ready)) return 4;
+        wait_file(argv[4]);
+        return 0;
+    }
+    if (argc != 3) return 2;
+    FILE *ready = fopen(argv[2], "w");
+    if (!ready) return 4;
+    if (fputs("ready", ready) < 0 || fclose(ready)) return 4;
+    double seconds = strtod(argv[1], NULL);
+    struct timespec delay = {(time_t)seconds, (long)((seconds - (time_t)seconds) * 1000000000)};
+    nanosleep(&delay, NULL);
+    return 0;
+}
+'''
+    with tempfile.TemporaryDirectory(prefix='noventra-relaunch-owner-') as folder:
+        binary = Path(folder) / 'native-relaunch-owner'
+        build = subprocess.run([shutil.which('cc'), '-x', 'c', '-std=c11', '-O0', '-o', binary, '-'],
+                               input=source, capture_output=True, text=True)
+        if build.returncode:
+            raise RuntimeError('Cannot compile relaunch fixture: ' + build.stderr)
+        return binary.read_bytes()
 
 
 class DesktopUpdateTests(unittest.TestCase):
@@ -155,6 +210,148 @@ class DesktopUpdateTests(unittest.TestCase):
             time.sleep(.02)
         self.fail('Native fixture did not start')
 
+    def start_relaunch(self, *, late=False, checker_timeout=None):
+        self.fixture.put('noventra-browser', native_relaunch_elf()
+                         + b'\0noventra_crashpad_handler\0', executable=True)
+        self.fixture.refresh()
+        for version in (3, 4):
+            self.make_version(version)
+        self.installer.install(self.packages[3], self.data)
+        self.updater = desktop.DesktopUpdater(self.app, self.data)
+        self.http.release_root = self.releases[3]
+        libc = ctypes.CDLL(None)
+        previous = ctypes.c_int()
+        self.assertEqual(libc.prctl(37, ctypes.byref(previous), 0, 0, 0), 0)
+        self.assertEqual(libc.prctl(36, 1, 0, 0, 0), 0)
+        self.addCleanup(lambda: self.assertEqual(libc.prctl(36, previous.value, 0, 0, 0), 0))
+        self.owner_gate, self.helper_gate = self.root / 'owner-gate', self.root / 'helper-gate'
+        self.reopened = self.root / 'reopened with original arguments Café'
+        worker_file = self.root / 'relaunch-worker'
+        helper = self.app / 'updater/desktop_updater.py'
+        if checker_timeout is not None:
+            bootstrap = self.root / 'test-only-short-checker-timeout.py'
+            bootstrap.write_text(
+                'import importlib.util,sys\n'
+                f'spec=importlib.util.spec_from_file_location("tested_updater",{str(helper)!r})\n'
+                'updater=importlib.util.module_from_spec(spec)\n'
+                'spec.loader.exec_module(updater)\n'
+                f'updater.RELAUNCH_CHECK_TIMEOUT={checker_timeout!r}\n'
+                'sys.exit(updater.main())\n')
+            helper = bootstrap
+        owner = self.spawn('relaunch-owner', str(helper),
+                           str(worker_file), str(self.owner_gate),
+                           str(self.helper_gate) if late else '-', str(self.reopened))
+        self.wait_native(owner)
+        until = time.monotonic() + 5
+        while time.monotonic() < until:
+            if worker_file.exists() and worker_file.read_text():
+                break
+            self.assertIsNone(owner.poll())
+            time.sleep(.02)
+        else:
+            self.fail('Native owner did not publish its relaunch child')
+        worker = int(worker_file.read_text())
+        start = Path(f'/proc/{worker}/stat').read_text().rsplit(') ', 1)[1].split()[19]
+        def cleanup():
+            try:
+                fields = Path(f'/proc/{worker}/stat').read_text().rsplit(') ', 1)[1].split()
+                if fields[19] == start:
+                    os.kill(worker, signal.SIGTERM)
+            except (FileNotFoundError, ProcessLookupError):
+                pass
+            try:
+                os.waitpid(worker, 0)
+            except ChildProcessError:
+                pass
+        self.addCleanup(cleanup)
+        self.http.release_root = self.releases[4]
+        self.assertTrue(self.updater.check()['can_relaunch'])
+        return owner, worker
+
+    def finish_relaunch(self, owner, worker, *, updated=True, timeout=15):
+        owner.communicate(timeout=timeout)
+        self.assertEqual(owner.returncode, 0)
+        until = time.monotonic() + timeout
+        while time.monotonic() < until:
+            pid, status = os.waitpid(worker, os.WNOHANG)
+            if pid:
+                break
+            time.sleep(.02)
+        else:
+            self.fail('Relaunch coordinator did not finish')
+        self.assertEqual(os.waitstatus_to_exitcode(status), 0)
+        self.assertEqual(self.reopened.read_text(), 'ready')
+        self.assertEqual(self.current_version(), '4-test' if updated else '3-test')
+        self.assertEqual(self.profile.read_text(), 'retained profile fixture')
+        installer = desktop.load_installer(self.app)
+        installer.verify_installation(self.app.parent, self.data,
+                                      installer.state_for(self.app.parent, self.data))
+
+    def test_relaunch_waits_for_native_exit_and_applies_signed_update(self):
+        owner, worker = self.start_relaunch()
+        time.sleep(.2)
+        self.assertEqual(self.current_version(), '3-test')
+        self.assertFalse(self.reopened.exists())
+        with desktop.file_lock(self.app.parent / '.launch-lock'):
+            self.assertIsNone(owner.poll())
+        self.owner_gate.touch()
+        self.finish_relaunch(owner, worker)
+
+    def test_relaunch_started_after_native_parent_exit_ignores_subreaper(self):
+        owner, worker = self.start_relaunch(late=True)
+        self.owner_gate.touch()
+        owner.wait(timeout=5)
+        fields = Path(f'/proc/{worker}/stat').read_text().rsplit(') ', 1)[1].split()
+        self.assertEqual(int(fields[1]), os.getpid())
+        self.helper_gate.touch()
+        self.finish_relaunch(owner, worker)
+
+    def test_relaunch_waits_for_retiring_checker_lock(self):
+        owner, worker = self.start_relaunch()
+        with desktop.file_lock(self.updater.root / '.desktop-lock'):
+            self.owner_gate.touch()
+            owner.wait(timeout=5)
+            time.sleep(.2)
+            self.assertEqual(self.current_version(), '3-test')
+            self.assertFalse(self.reopened.exists())
+            self.assertTrue(Path(f'/proc/{worker}').exists())
+        self.finish_relaunch(owner, worker)
+
+    def test_relaunch_long_held_checker_lock_reopens_old_version_with_retry(self):
+        owner, worker = self.start_relaunch(checker_timeout=.2)
+        with desktop.file_lock(self.updater.root / '.desktop-lock'):
+            self.owner_gate.touch()
+            self.finish_relaunch(owner, worker, updated=False, timeout=3)
+            cached = self.updater.cached()
+            self.assertEqual(cached['status'], 'ready')
+            self.assertTrue(cached['can_relaunch'])
+            self.assertIn('Try Update and restart again shortly', cached['message'])
+            self.assertIsNotNone(self.state()['staged'])
+
+    def test_relaunch_does_not_terminate_another_installed_process(self):
+        owner, worker = self.start_relaunch()
+        ready = self.root / 'other-instance-ready'
+        other = subprocess.Popen([str(self.app / 'opt/noventra/noventra-browser'), '30', str(ready)],
+                                 env=self.env)
+        self.addCleanup(lambda: other.poll() is None and (other.terminate(), other.wait(timeout=5)))
+        until = time.monotonic() + 5
+        while not ready.exists() and time.monotonic() < until:
+            time.sleep(.02)
+        self.assertTrue(ready.exists())
+        self.owner_gate.touch()
+        self.finish_relaunch(owner, worker, updated=False)
+        self.assertIsNone(other.poll())
+        self.assertIsNotNone(self.state()['staged'])
+
+    def test_relaunch_verification_failure_reopens_healthy_installed_version(self):
+        owner, worker = self.start_relaunch()
+        with desktop.file_lock(self.updater.root / '.desktop-lock'):
+            staged = Path(self.updater.cfg['install_root']) / 'releases' / self.state()['staged']
+            (staged / 'Noventra.AppDir/opt/noventra/icudtl.dat').write_bytes(b'changed after staging')
+            self.owner_gate.touch()
+            owner.wait(timeout=5)
+        self.finish_relaunch(owner, worker, updated=False)
+
     def test_packaged_trust_is_explicit_normalized_and_inventoried(self):
         raw = (self.app / 'updater/release-public.pem').read_bytes()
         self.assertIn(b'BEGIN PUBLIC KEY', raw)
@@ -195,9 +392,21 @@ class DesktopUpdateTests(unittest.TestCase):
         with patch.object(delivery, 'download', wraps=delivery.download) as download:
             result = self.updater.check()
         self.assertEqual(result['status'], 'up_to_date')
+        self.assertFalse(result['can_relaunch'])
         self.assertEqual([call.args[1] for call in download.call_args_list], ['manifest.json', 'manifest.sig'])
         self.assertEqual(self.current_version(), '1-test')
         self.notifier.assert_not_called()
+
+    def test_legacy_ready_cache_uses_current_helpers_relaunch_capability(self):
+        self.to_second()
+        path = self.updater.root / 'desktop-status.json'
+        value = json.loads(path.read_text())
+        value.pop('can_relaunch')
+        value['message'] = 'Close and reopen the old build.'
+        path.write_bytes(release.encode(value))
+        cached = self.updater.cached()
+        self.assertTrue(cached['can_relaunch'])
+        self.assertEqual(cached['message'], desktop.READY)
 
     def test_download_then_closed_apply_uses_same_path_and_preserves_profile(self):
         desktop_before = (self.data / 'applications/noventra-browser.desktop').read_bytes()
@@ -466,7 +675,7 @@ class DesktopUpdateTests(unittest.TestCase):
                                   '--hint=string:desktop-entry:noventra-browser',
                                   '--hint=boolean:suppress-sound:true', '--',
                                   'Noventra update ready',
-                                  'Close all Noventra windows and open Noventra again to install the verified update.'])
+                                  'Open About Noventra and choose Update and restart to install the verified update.'])
         self.assertEqual(kwargs['env'], {'PATH': '/usr/bin:/bin',
                                         'DBUS_SESSION_BUS_ADDRESS': 'unix:path=/owned-private-bus',
                                         'XDG_RUNTIME_DIR': '/owned-runtime', 'HOME': str(self.home)})
@@ -748,6 +957,37 @@ class DesktopUpdateTests(unittest.TestCase):
 
 
 class ParentBindingTests(unittest.TestCase):
+    def test_relaunch_rejects_invalid_owner_before_reading_metadata(self):
+        for value in (None, 0, 1, -1, True, '812'):
+            with self.subTest(owner=value), patch.object(desktop.Path, 'stat') as stat:
+                with self.assertRaisesRegex(ValueError, 'owner PID'):
+                    desktop.wait_for_relaunch_parent(Path('/unused'), value)
+                stat.assert_not_called()
+
+    def test_relaunch_started_after_reparenting_does_not_inspect_reused_pid(self):
+        with patch.object(desktop.os, 'getppid', return_value=991), \
+                patch.object(desktop.Path, 'stat') as stat:
+            desktop.wait_for_relaunch_parent(Path('/unused'), 812)
+        stat.assert_not_called()
+
+    def test_relaunch_parent_losing_exe_during_exit_waits_for_reparenting(self):
+        with patch.object(desktop.os, 'getppid', side_effect=[812, 812, 991]), \
+                patch.object(desktop.Path, 'stat', side_effect=FileNotFoundError) as stat, \
+                patch.object(desktop.time, 'sleep') as sleep:
+            desktop.wait_for_relaunch_parent(Path('/unused'), 812)
+        stat.assert_called_once()
+        sleep.assert_called_once_with(.02)
+
+    def test_relaunch_rejects_an_unrelated_direct_parent(self):
+        with tempfile.TemporaryDirectory(prefix='noventra-relaunch-owner-check-') as folder:
+            app = Path(folder)
+            binary = app / 'opt/noventra/noventra-browser'
+            binary.parent.mkdir(parents=True)
+            binary.write_text('different executable inode')
+            with patch.object(desktop.os, 'getppid', return_value=os.getpid()):
+                with self.assertRaisesRegex(ValueError, 'not this installed browser'):
+                    desktop.wait_for_relaunch_parent(app, os.getpid())
+
     def test_matching_explicit_owner_binds_then_rechecks(self):
         with patch.object(desktop.os, 'getppid', side_effect=[812, 812]), \
                 patch.object(desktop.ctypes, 'CDLL') as library:

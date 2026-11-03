@@ -73,11 +73,14 @@ DesktopUpdateResult CheckDesktopUpdate(const base::FilePath& helper,
   }
   if (*status == "up_to_date" || *status == "applied") {
     result.status = VersionUpdater::UPDATED;
-  } else if (*status == "ready" || *status == "busy") {
-    // Chromium's Relaunch invokes the executable directly. Applying is done
-    // by the coordinated package launcher after every window has closed.
-    // DEFERRED displays the helper's honest close/reopen instruction instead
-    // of offering a Relaunch button that would bypass that launcher.
+  } else if (*status == "ready") {
+    result.status = value->FindBool("can_relaunch").value_or(false)
+                        ? VersionUpdater::NEARLY_UPDATED
+                        : VersionUpdater::DEFERRED;
+    if (const auto* version = value->FindString("version")) {
+      result.version = *version;
+    }
+  } else if (*status == "busy") {
     result.status = VersionUpdater::DEFERRED;
     if (const auto* version = value->FindString("version")) {
       result.version = *version;

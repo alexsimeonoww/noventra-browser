@@ -42,6 +42,11 @@ package scripts are data; the installed trusted installer performs replacement.
 The desktop launcher checks while the browser is open and stages a verified
 release. About Noventra can request a check. An update is applied on a later
 launch after every installed window has closed; it never forces a browser quit.
+Builds with the one-click updater expose **Update and restart** in About after
+verification. Chromium saves the regular session and handles close prompts.
+Its Linux restart then waits for the old native process to exit and uses the
+same managed launch and atomic installer. Cancelling a close prompt cancels
+the restart. Earlier previews keep their close-and-reopen flow until upgraded.
 Profiles, passwords and bookmarks remain outside application replacement.
 
 Installed app activation and rollback use Linux `renameat2(RENAME_EXCHANGE)` so

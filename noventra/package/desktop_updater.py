@@ -35,10 +35,13 @@ import update_delivery as delivery
 INTERVAL = 6 * 3600
 REMINDER_INTERVAL = 12 * 3600
 OPERATION_TIMEOUT = 900
+RELAUNCH_WAIT_TIMEOUT = 60
+RELAUNCH_CHECK_TIMEOUT = 8
+SHUTDOWN_DRAIN_TIMEOUT = 5
 SPACE_RESERVE = 64 * 1024**2
 ERRORS = (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError,
           TimeoutError, tarfile.TarError, lzma.LZMAError, http.client.HTTPException)
-READY = 'Update ready. Close all Noventra windows and open Noventra again to install it.'
+READY = 'Update ready. Choose Update and restart to install it and reopen your tabs.'
 require = release.require
 
 
@@ -102,19 +105,31 @@ def send_update_notification(app):
                     '--hint=string:desktop-entry:noventra-browser',
                     '--hint=boolean:suppress-sound:true', '--',
                     'Noventra update ready',
-                    'Close all Noventra windows and open Noventra again to install the verified update.'],
+                    'Open About Noventra and choose Update and restart to install the verified update.'],
                    env=env, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                    stderr=subprocess.DEVNULL, timeout=3, check=True)
 
 
 @contextmanager
-def file_lock(path, *, blocking=False):
+def file_lock(path, *, blocking=False, timeout=None):
     fd = os.open(path, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW | os.O_NONBLOCK, 0o600)
     try:
         info = os.fstat(fd)
         require(stat.S_ISREG(info.st_mode) and info.st_uid == os.getuid()
                 and info.st_nlink == 1 and not info.st_mode & 0o077, 'Unsafe updater lock')
-        fcntl.flock(fd, fcntl.LOCK_EX | (0 if blocking else fcntl.LOCK_NB))
+        if timeout is None:
+            fcntl.flock(fd, fcntl.LOCK_EX | (0 if blocking else fcntl.LOCK_NB))
+        else:
+            until = time.monotonic() + timeout
+            while True:
+                try:
+                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    break
+                except BlockingIOError:
+                    remaining = until - time.monotonic()
+                    if remaining <= 0:
+                        raise
+                    time.sleep(min(.05, remaining))
         yield
     finally:
         os.close(fd)
@@ -149,11 +164,14 @@ class DesktopUpdater:
         value = release.parse(release.read(path, release.MANIFEST_LIMIT))
         require(value.get('format') == 1 and isinstance(value.get('checked_at'), (int, float)),
                 'Invalid updater status')
+        if value.get('status') == 'ready' and 'can_relaunch' not in value:
+            value = {**value, 'can_relaunch': True, 'message': READY}
         return value
 
     def save_status(self, status, message, *, version='', checked_at=None):
         value = {'format': 1, 'status': status, 'message': message, 'version': version,
-                 'checked_at': time.time() if checked_at is None else checked_at}
+                 'checked_at': time.time() if checked_at is None else checked_at,
+                 'can_relaunch': status == 'ready'}
         fd, name = tempfile.mkstemp(prefix='.status-', dir=self.root)
         try:
             with os.fdopen(fd, 'wb') as stream:
@@ -281,20 +299,22 @@ class DesktopUpdater:
         require(shutil.disk_usage(self.managed).free >= required,
                 'Not enough free disk space to safely install this update')
 
-    def apply(self, *, transition_locked=False, installation_locked=False):
+    def apply(self, *, transition_locked=False, installation_locked=False, wait_for_check=False):
         if not transition_locked:
             with file_lock(self.managed / '.launch-lock', blocking=True):
-                return self.apply(transition_locked=True)
+                return self.apply(transition_locked=True, wait_for_check=wait_for_check)
         if not installation_locked:
             with self.installer.lock(self.managed, blocking=True):
                 # A prior installer transaction is independent of the delivery
                 # cache. Recover before trusting the current metadata/floor.
                 self.installer.recover_update(self.managed, self.data)
                 self.refresh_installed()
-                return self.apply(transition_locked=True, installation_locked=True)
-        # Never wait for a network download before opening a browser. A check
-        # in progress will finish and its ready version waits for the next run.
-        with file_lock(self.root / '.desktop-lock'):
+                return self.apply(transition_locked=True, installation_locked=True,
+                                  wait_for_check=wait_for_check)
+        # Ordinary startup never waits for a download. A user-requested restart
+        # waits for the retiring coordinator's checker to release this lock.
+        with file_lock(self.root / '.desktop-lock', blocking=wait_for_check,
+                       timeout=RELAUNCH_CHECK_TIMEOUT if wait_for_check else None):
             if not Path(self.cfg['install_root']).exists():
                 return {'status': 'unchanged'}
             with delivery.locked(self.cfg['install_root']) as root:
@@ -303,12 +323,20 @@ class DesktopUpdater:
                     return {'status': 'unchanged'}
                 # Check before hashing a large payload, and again transactionally
                 # in the existing installer. Never terminate an open browser.
-                try:
-                    self.installer.require_closed(self.app)
-                except ValueError:
-                    cached = self.cached()
-                    return self.save_status('ready', READY, version=cached.get('version', ''),
-                                            checked_at=cached['checked_at'])
+                drain_until = time.monotonic() + (SHUTDOWN_DRAIN_TIMEOUT if wait_for_check else 0)
+                while True:
+                    try:
+                        self.installer.require_closed(self.app)
+                        break
+                    except ValueError:
+                        if time.monotonic() < drain_until:
+                            time.sleep(.05)
+                            continue
+                        cached = self.cached()
+                        message = ('Another Noventra instance is still open. Close it, then choose '
+                                   'Update and restart.' if wait_for_check else READY)
+                        return self.save_status('ready', message, version=cached.get('version', ''),
+                                                checked_at=cached['checked_at'])
                 manifest, raw = delivery.verify_installed(root, state['staged'], self.cfg)
                 require(manifest['sequence'] >= self.settings['sequence']
                         and manifest['sequence'] == state['highest_sequence']
@@ -356,7 +384,30 @@ def follow_parent(expected_pid=None):
         raise InterruptedUpdate('Update owner already exited')
 
 
-def launch(app, arguments):
+def wait_for_relaunch_parent(app, expected_pid):
+    require(type(expected_pid) is int and expected_pid > 1, 'Invalid relaunch owner PID')
+    # A late-starting child may already have been reparented. Never attach to
+    # the numeric PID again: it could belong to a different process by then.
+    if os.getppid() != expected_pid:
+        return
+    try:
+        owner = Path(f'/proc/{expected_pid}/exe').stat()
+    except FileNotFoundError:
+        # exit_mm can remove /proc/PID/exe just before exit_notify reparents
+        # children. Wait for that transition without reopening a numeric PID.
+        while os.getppid() == expected_pid:
+            time.sleep(.02)
+        return
+    if os.getppid() != expected_pid:
+        return
+    binary = (app / 'opt/noventra/noventra-browser').stat()
+    require((owner.st_dev, owner.st_ino) == (binary.st_dev, binary.st_ino),
+            'Relaunch owner is not this installed browser')
+    while os.getppid() == expected_pid:
+        time.sleep(.02)
+
+
+def launch(app, arguments, *, relaunch=False):
     binary = app / 'opt/noventra/noventra-browser'
     managed = data_home() / 'noventra-browser'
     if app != managed / 'app' or not (managed / 'installation.json').is_file():
@@ -373,11 +424,22 @@ def launch(app, arguments):
                 installer.recover_update(managed, data_home())
                 try:
                     updater = DesktopUpdater(app)
-                    updater.apply(transition_locked=True, installation_locked=True)
+                    updater.apply(transition_locked=True, installation_locked=True,
+                                  wait_for_check=relaunch)
                 except ERRORS as error:
-                    if 'updater' in locals() and not isinstance(error, BlockingIOError):
+                    if 'updater' in locals():
                         try:
-                            updater.save_status('failed', failure_message(error))
+                            if isinstance(error, BlockingIOError):
+                                if relaunch:
+                                    cached = updater.cached()
+                                    if cached.get('status') == 'ready':
+                                        updater.save_status(
+                                            'ready', 'Another update check is still running. '
+                                            'Try Update and restart again shortly.',
+                                            version=cached.get('version', ''),
+                                            checked_at=cached['checked_at'])
+                            else:
+                                updater.save_status('failed', failure_message(error))
                         except ERRORS:
                             pass
                 # If install failed during recovery, do not launch mismatched
@@ -422,8 +484,8 @@ def launch(app, arguments):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--owner-pid', type=int, help='Expected native parent for an About check')
-    parser.add_argument('operation', choices=('launch', 'background', 'check', 'apply', 'status'))
+    parser.add_argument('--owner-pid', type=int, help='Expected native parent for a check or relaunch')
+    parser.add_argument('operation', choices=('launch', 'relaunch', 'background', 'check', 'apply', 'status'))
     parser.add_argument('arguments', nargs=argparse.REMAINDER)
     args = parser.parse_args()
     signal.signal(signal.SIGALRM, deadline)
@@ -432,12 +494,18 @@ def main():
     signal.signal(signal.SIGTERM, interrupted)
     app = Path(__file__).resolve().parent.parent
     try:
-        if args.operation == 'launch':
+        if args.operation in ('launch', 'relaunch'):
             argv = args.arguments[1:] if args.arguments[:1] == ['--'] else args.arguments
+            if args.operation == 'relaunch':
+                signal.alarm(RELAUNCH_WAIT_TIMEOUT)
+                try:
+                    wait_for_relaunch_parent(app, args.owner_pid)
+                finally:
+                    signal.alarm(0)
             if sys.version_info < (3, 11):
                 binary = app / 'opt/noventra/noventra-browser'
                 os.execve(binary, [str(binary), *argv], ORIGINAL_ENV)
-            return launch(app, argv)
+            return launch(app, argv, relaunch=args.operation == 'relaunch')
         require(sys.version_info >= (3, 11), 'Updates require Python 3.11 or newer')
         follow_parent(args.owner_pid)
         signal.alarm(OPERATION_TIMEOUT)

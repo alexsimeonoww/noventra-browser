@@ -91,6 +91,7 @@
     "chrome/browser/crash_upload_list/helium_crash_reporting.h": "5961c3dec133dae65ded81607a8836f6f6a2be20abe9c69814f53c9a6b5da904",
     "chrome/browser/extensions/api/settings_private/prefs_util.cc": "d3abd2595d78334513a40da3feb827daeb92957de73592c7fbe4212f49ef0d8d",
     "chrome/browser/favicon/favicon_utils.cc": "a24d0913f405f072ff59db00d67a658e7a0cdb8faf873fd776f4850f5e44ab41",
+    "chrome/browser/first_run/upgrade_util_linux.cc": "62f7ad050eb9cedbf823576e04e6ba39f1bfbce82df725812dc37fd5c1bfa9ac",
     "chrome/browser/helium_flag_entries.h": "8f55152e54e40fbdc5a33c4b50b6cdaa4ab8d5737c2e0916a63b714ea8ae3688",
     "chrome/browser/importer/BUILD.gn": "057967fcefbf4cc4496ed2d63846ec3babcbf0fd84db6316b130fac4d5c00bd1",
     "chrome/browser/importer/chrome_importer_list.cc": "f5e5c77b392a13fe58430c0e671bcca80d2b3229b3bc659283a77b0d066954b2",
@@ -129,7 +130,7 @@
     "chrome/browser/resources/new_tab_page/ntp_searchbox.ts": "37b2051dea95619a8add01d1ca59e7e7ecd0ddf86e1a38ac5e4170affccc88c2",
     "chrome/browser/resources/new_tab_shared/customize_buttons/customize_buttons.css": "5d56e8a539fe610b44c8cc8d6cd12dfba83209bb2c5d140df0d6fe0266cbb139",
     "chrome/browser/resources/settings/BUILD.gn": "9c58995f9a60b02108c274ce7d6aec8e3e926ea366abc4cf4568ed2663355a39",
-    "chrome/browser/resources/settings/about_page/about_page.css": "9f77cbba90a801e8a0414519b1223b5f1aa6770e98f68ab4bcf85c13bef12cc5",
+    "chrome/browser/resources/settings/about_page/about_page.css": "99a7b50658a4a8beac8f135da7edf847c0c0ab963c86cda479298b7754a7869a",
     "chrome/browser/resources/settings/about_page/about_page.html.ts": "22cfb9bfae1ce462d373ce7123fa73eecb0cbc3595c6faf9be00080547ffd391",
     "chrome/browser/resources/settings/about_page/about_page.ts": "c00678408c688163fe154f3234535aa13ea8c22a905fd4cb6f8b0355449f0f5e",
     "chrome/browser/resources/settings/appearance_page/appearance_page.css": "13b15144bf337ce7a90a94e675bceab0d07ed30de79dda54d7b4ec378aaf6c4c",
@@ -157,7 +158,7 @@
     "chrome/browser/resources/settings/privacy_page/services_page.ts": "d65a1cb8ce34d9d229c126e1473fb3ff0a161a6312e81641f3515ba7750b95a0",
     "chrome/browser/resources/settings/route.ts": "7aad1d53218214106fecb1f81334bf13d484ddb0419f1f364672b89dbe0aedbc",
     "chrome/browser/resources/settings/router.ts": "c2d843530cea27500bd639451e873be573092746b5853fce0028a317d21a46bf",
-    "chrome/browser/resources/settings/settings_main/settings_main.html": "2655bfa172f47bfcdd5962b7b32616cbbd563e1bfe2010fae7e93f90e79759aa",
+    "chrome/browser/resources/settings/settings_main/settings_main.html": "1259826ce1631793cbc70a936497c1c71a53857732bf1fd7df725418d97aef22",
     "chrome/browser/resources/settings/settings_main/settings_main.ts": "17d2fa7293e5e4d750afaacb15adb8724c030caec8f61385c3d8645ddda2209f",
     "chrome/browser/resources/settings/settings_menu/settings_menu.html": "369d67ea72111a0fd548e92adce621154a81d5988367dce70b5ae535f5919ba9",
     "chrome/browser/resources/settings/settings_menu/settings_menu.ts": "5d383968268c75f8e8d659f996faacca6606663de0ba9b4ad61b68d6926bcc73",
@@ -384,7 +385,7 @@
     "chrome/browser/ui/webui/components/components_ui.cc": "0de749cac0e8a7cc253658ef0b365054ea6c683dae1f5c12a51b1b136e7d25fd",
     "chrome/browser/ui/webui/crashes/crashes_ui.cc": "6880bbfcb59010302b402a89a4adb40c74f21c52db06a02b5e0874ac7e9ce700",
     "chrome/browser/ui/webui/customize_buttons/customize_buttons_handler.cc": "effb1eb6c4fa9282e3065897261fd5b2db464016cc251a5e9cd40bdbf323459c",
-    "chrome/browser/ui/webui/help/version_updater_basic.cc": "38bf5ebcf6690eb0422aab7b019c6851d2e4a1c7e6387f6e4fcfbd29264d1866",
+    "chrome/browser/ui/webui/help/version_updater_basic.cc": "3b411221f00691a50a554221eacb102426f5f94c82aa3e7ad9bbd822638df85c",
     "chrome/browser/ui/webui/new_tab_page/BUILD.gn": "0d49c9743ae55629f08d675e6174d1a5cb5c9f022f7cacf8d7a4e5ea95a9dc22",
     "chrome/browser/ui/webui/new_tab_page/new_tab_page.mojom": "165948ebcdd1c4c49bd67c804b3f85ac50067986a1c7b455ac5eefb12d7c8588",
     "chrome/browser/ui/webui/new_tab_page/new_tab_page_handler.cc": "adb9d540be6e94c84a0540ef034bfbe4fadf82884a17b8a80af0543911b2e4fb",
@@ -406,7 +407,7 @@
     "chrome/browser/ui/webui/settings/portable_transfer_handler.cc": "5c816609b1fe367dcfa92433dd74d125500834e45144edf225710d89a0de707f",
     "chrome/browser/ui/webui/settings/portable_transfer_handler.h": "5d770fc2a1c4f66c00dd0185e1023550948bb06335a2820283d66197f78cd166",
     "chrome/browser/ui/webui/settings/settings_clear_browsing_data_handler.cc": "7c4247949c8f8ae29a79d23bcbc22e40fe2372262cd2b9d5184ce88b4a5604d7",
-    "chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc": "3180cab031e0d410ec2d5f639a86e188e7a2ddb222dda8bce534204c37ffaf21",
+    "chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc": "a752e5ce9ff4ef01e36b4e5c1e2941b0fde5b16dad702572259a4c6e3f247c6d",
     "chrome/browser/ui/webui/settings/settings_ui.cc": "09c4d82087418cb3c73a96479e302dc48818e076ca49aecb89afe14cfb9b5835",
     "chrome/browser/ui/webui/settings/settings_ui.h": "13fd8a45ae94dc3f27a40e630a25c9a43e74b7cf1237d9a87d393b285372d450",
     "chrome/browser/ui/webui/side_panel/customize_chrome/customize_chrome_ui.cc": "4b6e89e613cc091aa1175daad8fccedda508e8c480878f3c834d5c97cf792680",
@@ -501,7 +502,7 @@
     "components/helium_onboarding/index.html": "86b09dba652560e02da587f146561adadc056c86c6ee352b3e27e913b49a79ed",
     "components/helium_onboarding/public/favicon.png": "77b2a06f2eb5f848902ac7f5a55a8142665eec20754d9c90d0f9009ceb0112db",
     "components/helium_onboarding/src/App.svelte": "52d273d553c1da4630b2ffc449d39dbf0c7030a300e78db1aab6b84a987a9be4",
-    "components/helium_onboarding/src/NoventraOnboarding.svelte": "860b740ea00b6faac975a0cafb21fbee73716cc5d6643c9b48bffffdb22e214b",
+    "components/helium_onboarding/src/NoventraOnboarding.svelte": "e2b8532587e91fd22bcc16f6d2129e771530c57576eaf7c1941e47b90d8e17ff",
     "components/helium_onboarding/src/app.css": "18819f11d3644581ef46ba29b8e878e15f4f5c1da66ab1f845269c821908f65e",
     "components/helium_onboarding/src/components/HeliumPartner.svelte": "e6160360590dfb3811ffe8c598a4c2ca53f201fd87bd9bd28fa7f6febc79d3f8",
     "components/helium_onboarding/src/components/NoventraLogo.svelte": "c147722743badf985e41d09d03617cfb4c8ac1a545f3a38536985da3cfa1e1a2",
@@ -758,6 +759,14 @@
     {
       "file": "noventra-cookie-import.patch",
       "sha256": "45d1131b63682c792ab21cd70fb70f74f17d767fe9d240b1d96dab1c415ad1fc"
+    },
+    {
+      "file": "noventra-onboarding-device-transfer-entry.patch",
+      "sha256": "cf6a7c41dc1c32731db96aced2a37c8ddb94897770c8b22f03828365eb03a72f"
+    },
+    {
+      "file": "noventra-update-and-restart.patch",
+      "sha256": "339a95fd9490d3a72fbd990cad7f583de7fac5be7032047bbdef3a5b043832a6"
     }
   ],
   "pristine_files": {
@@ -844,6 +853,7 @@
     "chrome/browser/crash_upload_list/helium_crash_reporting.h": "c397148b124f7b93149887d406876339f0cf4f9218b57de178e5bccf01a2eedf",
     "chrome/browser/extensions/api/settings_private/prefs_util.cc": "a97a9181b170c708810269d097cda3f5dfc3c5416bd7dd73326b4f79b72f2e68",
     "chrome/browser/favicon/favicon_utils.cc": "69062ce62cee30f01503bacf3daf939895e2c248f142a416dbfc633e9e865f60",
+    "chrome/browser/first_run/upgrade_util_linux.cc": "677a0cf755b583336a07383ac0aec07249bc32fbcdfbc60232edbbddd28cc129",
     "chrome/browser/helium_flag_entries.h": "3d0b2eeb2957705febc490c959344de5147f71808686863a69acaad2056f1260",
     "chrome/browser/importer/BUILD.gn": "4558dffb70a56e203c20c9f20b8420f3905141a74e9b037b9f40292b17e4f838",
     "chrome/browser/importer/chrome_importer_list.cc": "264bea353ffdf9d6486ece2745e1c774153f29d7c2071d98855e6ba17214618f",
@@ -1511,7 +1521,7 @@
     "wordmark.svg": "a8b007ca4d0a67c33a2426b2db320d5561ba960cab8f2baa46500c1af65ba803"
   },
   "schema": 1,
-  "series_sha256": "d53452705cb39d03fdc814612964c0dd75ffd39205556e0880f23021786b4391",
+  "series_sha256": "c42d52b378b298d42cfe0a831284d386bf99fc936f288db6cbfe98c2fbf54158",
   "tooling": {
     ".github/scripts/build.sh": "fd92ff208ef7439765d7b3a5b89b422234abf7408137646e4d615e68df128537",
     "docker/build.Dockerfile": "f133ae4b6340e0bfc42338e6bd1d42d85d8a850652aa10dba6e37f82fe3ca080",

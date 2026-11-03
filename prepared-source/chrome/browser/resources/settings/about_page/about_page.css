@@ -56,3 +56,36 @@ cr-icon[icon='cr:error-filled'] {
 cr-button {
   white-space: nowrap;
 }
+
+.cr-padded-text,
+.info-sections {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 700px) {
+  .cr-row:not(.first) {
+    display: grid;
+    gap: 12px 10px;
+    grid-template-columns: 32px minmax(0, 1fr);
+    padding-block: 12px;
+  }
+
+  .icon-container {
+    margin-inline-end: 0;
+  }
+
+  .cr-padded-text {
+    grid-column: 2;
+    padding-block: 0;
+  }
+
+  .separator {
+    display: none;
+  }
+
+  #buttonContainer {
+    grid-column: 1 / -1;
+    justify-self: end;
+  }
+}

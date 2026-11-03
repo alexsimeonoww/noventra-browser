@@ -438,7 +438,15 @@
                     <a class="transfer-link" href="chrome://settings/dataDevices" target="_blank" rel="noopener noreferrer">Moving from another PC? Restore or connect a device.</a>
                 {:else if step === 1}
                     <h1 id="step-title" tabindex="-1" bind:this={title}>Bring your browsing data.</h1>
-                    <p class="intro">Choose what to bring. We’ll copy it when you finish setup.</p>
+                    <p class="intro">Move from another Noventra PC, or import a browser on this PC.</p>
+                    <a id="setup-device-transfer" class="device-transfer-choice" href={busy ? undefined : 'chrome://settings/dataDevices'} target="_blank" rel="noopener noreferrer" aria-describedby="setup-device-transfer-details" aria-disabled={busy} tabindex={busy ? -1 : undefined}>
+                        <span class="source-icon" aria-hidden="true"><IconTransferIn /></span>
+                        <span class="source-name"><strong>Move from another Noventra PC</strong><span>Connect both PCs with a code or restore an encrypted transfer file.</span></span>
+                        <span class="transfer-action">Open transfer <span aria-hidden="true">↗</span></span>
+                    </a>
+                    <p id="setup-device-transfer-details" class="transfer-details">Bring bookmarks, Spaces, tabs, layout, an extension reinstall list and optional saved passwords. Review the data before importing. Website sign-ins, history and passkeys are not included. Keep setup open and return here afterwards.</p>
+                    <h2 class="local-import-heading">From a browser on this PC</h2>
+                    <p class="privacy-hint">Choose what to bring below. We’ll copy it when you finish setup.</p>
                     <div class="source-heading"><strong>On this device</strong><span>{discovery === 'initial' ? 'Ready to scan' : discovery === 'loading' ? 'Looking…' : discovery === 'error' ? 'Check needed' : `${profiles.length} profiles`}</span></div>
                     {#if discovery === 'initial'}
                         <div class="empty"><strong>Find browsers on this device.</strong><p>Choose what to import after scanning.</p></div>
@@ -557,6 +565,13 @@
     .intro { color:var(--muted);line-height:1.5;font-size:14px;margin:0 0 22px; }
     .welcome-logo { margin:12px 0 28px; }
     .transfer-link { display:inline-block;color:var(--muted);font-size:13px;line-height:1.5;margin-top:12px;text-underline-offset:3px; }
+    .device-transfer-choice { display:flex;align-items:center;gap:14px;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--soft);color:var(--ink);text-decoration:none; }
+    .device-transfer-choice:not([aria-disabled="true"]):hover { border-color:color-mix(in srgb,var(--ink) 40%,var(--surface)); }
+    .device-transfer-choice[aria-disabled="true"] { opacity:.45;cursor:default; }
+    .device-transfer-choice .source-name>span { line-height:1.5; }
+    .transfer-action { display:flex;align-items:center;gap:6px;flex-shrink:0;font-size:12px;font-weight:550; }
+    .transfer-details { color:var(--muted);font-size:11px;line-height:1.6;margin:10px 0 22px; }
+    .local-import-heading { font-size:13px;font-weight:600;margin:0; }
     footer { display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 24px;border-top:1px solid var(--line);background:var(--soft); }.footer-note { font-size:11px;color:var(--muted); }
     .primary { background:var(--ink);color:var(--surface);padding:10px 17px;font-size:13px;font-weight:550; }.primary:hover:not(:disabled) { opacity:.86; }
     .source-heading { display:flex;justify-content:space-between;gap:16px;font-size:12px;margin:10px 0; }.source-heading span { color:var(--muted);font-size:11px; }
@@ -580,5 +595,6 @@
     .spinner { width:20px;height:20px;border:2px solid var(--line);border-top-color:var(--ink);border-radius:50%;animation:spin 1s linear infinite; }@keyframes spin { to { transform:rotate(360deg); } }
     @media(max-width:600px) { main{padding:18px 14px 24px;}.brand-bar{margin-bottom:20px;}.steps{gap:5px;margin-bottom:16px;}.steps li{font-size:10px;gap:5px;flex-direction:column;text-align:center;}.step-number{width:24px;height:24px;font-size:10px;}.steps li>span:last-child{max-width:66px;}.panel-content{padding:24px 20px 16px;min-height:0;}.panel{border-radius:16px;}h1{font-size:27px;}.intro{font-size:13px;margin-bottom:18px;}footer{padding:14px 18px;gap:10px;}.primary{padding:10px 14px;font-size:12px;}.source-kind{max-width:84px;text-align:right;}.welcome-logo{margin:8px 0 24px;}.summary-tag{font-size:9px;} }
     @media(max-width:380px) { .source-kind{max-width:65px;font-size:9px;}.source-icon{width:26px;height:28px;}.source-icon img{width:25px;height:25px;}.profile-card{gap:7px;padding:10px;}.step-count span{display:none;}.source-name strong{font-size:12px;}.source-name>span{font-size:10px;} }
+    @media(max-width:600px) { .device-transfer-choice{display:grid;grid-template-columns:32px minmax(0,1fr);gap:8px 10px;padding:14px;}.transfer-action{grid-column:2;font-size:11px;} }
     @media(prefers-reduced-motion:reduce) { button{transition:none;}.spinner{animation:none;} }
 </style>

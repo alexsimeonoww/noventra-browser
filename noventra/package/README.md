@@ -195,9 +195,16 @@ described above. Python 3.8–3.10 can still install and launch the browser, but
 cannot run its online updater. Packages without `--update-config` remain manual.
 
 The updater checks in the background while Noventra is open. **About Noventra**
-can also check for updates. A verified downloaded update is installed on the
-next launch after you close every Noventra window. Noventra never forces the
-browser to quit. If authentication, prerequisites or replacement checks fail,
+can also check for updates. Once a verified download is ready, builds with the
+one-click updater offer **Update and restart** there. This uses the browser's
+normal session saving and beforeunload prompts, then waits for its native
+process to exit before applying the update and reopening the regular session.
+Cancelling a close prompt cancels the restart. Private sessions are not restored.
+Another installed browser instance prevents replacement and is never stopped.
+Closing every Noventra window and opening it again also installs a ready update.
+Previously published packages retain their existing close-and-reopen flow until
+they receive a release containing the one-click updater.
+If authentication, prerequisites or replacement checks fail,
 it keeps the installed version. Its launch coordinator also reconciles retained
 update transactions before opening the browser. Browser profiles stay separate
 from application replacement.

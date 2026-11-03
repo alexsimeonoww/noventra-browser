@@ -1,0 +1,141 @@
+diff --git a/chrome/browser/first_run/upgrade_util_linux.cc b/chrome/browser/first_run/upgrade_util_linux.cc
+--- a/chrome/browser/first_run/upgrade_util_linux.cc
++++ b/chrome/browser/first_run/upgrade_util_linux.cc
+@@ -11,6 +11,8 @@
+ #include "base/logging.h"
+ #include "base/path_service.h"
+ #include "base/process/launch.h"
++#include "base/process/process_handle.h"
++#include "base/strings/string_number_conversions.h"
+ #include "chrome/browser/first_run/upgrade_util_linux.h"
+ 
+ namespace {
+@@ -25,6 +27,33 @@
+   base::LaunchOptions options;
+   // Don't set NO_NEW_PRIVS on the relaunched browser process.
+   options.allow_new_privs = true;
++  base::FilePath executable;
++  if (!base::PathService::Get(base::FILE_EXE, &executable)) {
++    return base::LaunchProcess(command_line, options).IsValid();
++  }
++  const auto updater =
++      executable.DirName().DirName().DirName().AppendASCII("updater");
++  const auto helper = updater.AppendASCII("desktop_updater.py");
++  if (base::PathExists(updater.AppendASCII("config.json")) &&
++      base::PathExists(helper)) {
++    // The bundled helper waits for this process before replacing resources.
++    // Chromium's filtered relaunch arguments retain session restoration.
++    base::CommandLine relaunch(base::FilePath("/usr/bin/python3"));
++    relaunch.AppendArg("-I");
++    relaunch.AppendArg("-B");
++    relaunch.AppendArgPath(helper);
++    relaunch.AppendArg("--owner-pid");
++    relaunch.AppendArg(base::NumberToString(base::GetCurrentProcId()));
++    relaunch.AppendArg("relaunch");
++    relaunch.AppendArg("--");
++    const auto& arguments = command_line.argv();
++    for (size_t i = 1; i < arguments.size(); ++i) {
++      relaunch.AppendArg(arguments[i]);
++    }
++    if (base::LaunchProcess(relaunch, options).IsValid()) {
++      return true;
++    }
++  }
+   return base::LaunchProcess(command_line, options).IsValid();
+ }
+ 
+diff --git a/chrome/browser/ui/webui/help/version_updater_basic.cc b/chrome/browser/ui/webui/help/version_updater_basic.cc
+--- a/chrome/browser/ui/webui/help/version_updater_basic.cc
++++ b/chrome/browser/ui/webui/help/version_updater_basic.cc
+@@ -73,11 +73,14 @@
+   }
+   if (*status == "up_to_date" || *status == "applied") {
+     result.status = VersionUpdater::UPDATED;
+-  } else if (*status == "ready" || *status == "busy") {
+-    // Chromium's Relaunch invokes the executable directly. Applying is done
+-    // by the coordinated package launcher after every window has closed.
+-    // DEFERRED displays the helper's honest close/reopen instruction instead
+-    // of offering a Relaunch button that would bypass that launcher.
++  } else if (*status == "ready") {
++    result.status = value->FindBool("can_relaunch").value_or(false)
++                        ? VersionUpdater::NEARLY_UPDATED
++                        : VersionUpdater::DEFERRED;
++    if (const auto* version = value->FindString("version")) {
++      result.version = *version;
++    }
++  } else if (*status == "busy") {
+     result.status = VersionUpdater::DEFERRED;
+     if (const auto* version = value->FindString("version")) {
+       result.version = *version;
+diff --git a/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc b/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
+--- a/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
++++ b/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
+@@ -342,6 +342,14 @@
+ #endif
+   };
+   html_source->AddLocalizedStrings(kLocalizedStrings);
++
++#if BUILDFLAG(IS_LINUX)
++  html_source->AddString("aboutRelaunch", u"Update and restart");
++  html_source->AddString(
++      "aboutUpgradeRelaunch",
++      u"Update ready. Restart Noventra to install it. Your regular tabs will "
++      u"reopen.");
++#endif
+ 
+   html_source->AddString("managementPage",
+                          GetDeviceManagedUiHelpLabel(profile));
+diff --git a/chrome/browser/resources/settings/settings_main/settings_main.html b/chrome/browser/resources/settings/settings_main/settings_main.html
+--- a/chrome/browser/resources/settings/settings_main/settings_main.html
++++ b/chrome/browser/resources/settings/settings_main/settings_main.html
+@@ -35,6 +35,10 @@
+     position: initial;
+   }
+ 
++  #switcher #about settings-about-page {
++    min-width: 0;
++  }
++
+   cr-view-manager [hidden-by-search] {
+     display: none;
+   }
+diff --git a/chrome/browser/resources/settings/about_page/about_page.css b/chrome/browser/resources/settings/about_page/about_page.css
+--- a/chrome/browser/resources/settings/about_page/about_page.css
++++ b/chrome/browser/resources/settings/about_page/about_page.css
+@@ -56,3 +56,36 @@
+ cr-button {
+   white-space: nowrap;
+ }
++
++.cr-padded-text,
++.info-sections {
++  min-width: 0;
++  overflow-wrap: anywhere;
++}
++
++@media (max-width: 700px) {
++  .cr-row:not(.first) {
++    display: grid;
++    gap: 12px 10px;
++    grid-template-columns: 32px minmax(0, 1fr);
++    padding-block: 12px;
++  }
++
++  .icon-container {
++    margin-inline-end: 0;
++  }
++
++  .cr-padded-text {
++    grid-column: 2;
++    padding-block: 0;
++  }
++
++  .separator {
++    display: none;
++  }
++
++  #buttonContainer {
++    grid-column: 1 / -1;
++    justify-self: end;
++  }
++}
