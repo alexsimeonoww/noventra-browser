@@ -33,6 +33,7 @@ import release_manifest as release
 import update_delivery as delivery
 
 INTERVAL = 6 * 3600
+REMINDER_INTERVAL = 12 * 3600
 OPERATION_TIMEOUT = 900
 SPACE_RESERVE = 64 * 1024**2
 ERRORS = (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError,
@@ -89,6 +90,21 @@ def load_installer(app):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def send_update_notification(app):
+    env = {key: value for key, value in ORIGINAL_ENV.items()
+           if not key.startswith(('LD_', 'GTK_', 'GIO_', 'GI_', 'GDK_PIXBUF_'))
+           and key != 'GSETTINGS_SCHEMA_DIR'}
+    env['PATH'] = '/usr/bin:/bin'
+    subprocess.run(['/usr/bin/notify-send', '--app-name=Noventra',
+                    f'--icon={app / "noventra-browser.png"}', '--urgency=normal',
+                    '--hint=string:desktop-entry:noventra-browser',
+                    '--hint=boolean:suppress-sound:true', '--',
+                    'Noventra update ready',
+                    'Close all Noventra windows and open Noventra again to install the verified update.'],
+                   env=env, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                   stderr=subprocess.DEVNULL, timeout=3, check=True)
 
 
 @contextmanager
@@ -150,8 +166,49 @@ class DesktopUpdater:
 
     def initialize(self):
         root = Path(self.cfg['install_root'])
-        if not root.exists():
-            delivery.initialize(self.cfg)
+        if not os.path.lexists(root):
+            with tempfile.TemporaryDirectory(prefix='.initialize-', dir=self.root) as folder:
+                prepared = Path(folder) / 'delivery'
+                delivery.initialize({**self.cfg, 'install_root': str(prepared)})
+                # A checker can be terminated as soon as its browser closes.
+                # Publish the cache only after its lock and state are complete.
+                prepared.rename(root)
+                delivery.sync_directory(self.root)
+
+    def notify_ready(self):
+        path = self.root / 'reminder-status.json'
+        try:
+            now = release.integer(int(time.time()))
+            if os.path.lexists(path):
+                with release.open_regular(path) as stream:
+                    info = os.fstat(stream.fileno())
+                    require(info.st_uid == os.getuid() and info.st_nlink == 1
+                            and not info.st_mode & 0o077 and info.st_size <= 1024,
+                            'Unsafe reminder status')
+                    raw = stream.read(1025)
+                require(len(raw) <= 1024, 'Reminder status is too large')
+                value = release.parse(raw)
+                release.keys(value, ('format', 'last_attempt_at'))
+                require(type(value['format']) is int and value['format'] == 1,
+                        'Unsupported reminder status')
+                previous = release.integer(value['last_attempt_at'])
+                if now - previous < REMINDER_INTERVAL:
+                    return
+            # Reserve the interval before dispatch so a crash after Notify
+            # cannot produce another prompt on the next launch.
+            fd, name = tempfile.mkstemp(prefix='.reminder-', dir=self.root)
+            try:
+                with os.fdopen(fd, 'wb') as stream:
+                    stream.write(release.encode({'format': 1, 'last_attempt_at': now}))
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                os.replace(name, path)
+                delivery.sync_directory(self.root)
+            finally:
+                Path(name).unlink(missing_ok=True)
+            send_update_notification(self.app)
+        except ERRORS:
+            pass  # A notification failure must not change update readiness.
 
     def remote_manifest(self, root, state):
         with tempfile.TemporaryDirectory(prefix='check-', dir=root / '.staging') as folder:
@@ -193,6 +250,7 @@ class DesktopUpdater:
                 target = root / 'releases' / state['staged'] / 'Noventra.AppDir'
                 self.check_target(target, manifest)
                 self.require_install_space(target)
+                self.notify_ready()
                 return self.save_status('ready', READY, version=manifest['version_label'])
 
     def discard_downloads(self, root):

@@ -52,6 +52,10 @@ class InProcessImporterBridge : public ImporterBridge {
   void SetAutofillFormData(
       const std::vector<ImporterAutofillFormDataEntry>& entries) override;
 
+  void WriteCookies(const std::vector<net::CanonicalCookie>& cookies,
+                    uint32_t skipped,
+                    base::OnceCallback<void(bool)> callback);
+
   void NotifyStarted() override;
   void NotifyItemStarted(user_data_importer::ImportItem item) override;
   void NotifyItemEnded(user_data_importer::ImportItem item) override;
@@ -61,6 +65,7 @@ class InProcessImporterBridge : public ImporterBridge {
   std::u16string GetLocalizedString(int message_id) override;
   // End ImporterBridge implementation.
   friend class BraveInProcessImporterBridge;
+
  private:
   ~InProcessImporterBridge() override;
 

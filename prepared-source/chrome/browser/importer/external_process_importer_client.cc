@@ -89,8 +89,9 @@ void ExternalProcessImporterClient::Start() {
 }
 
 void ExternalProcessImporterClient::Cancel() {
-  if (cancelled_)
+  if (cancelled_) {
     return;
+  }
 
   cancelled_ = true;
   profile_import_->CancelImport();
@@ -100,26 +101,30 @@ void ExternalProcessImporterClient::Cancel() {
 
 void ExternalProcessImporterClient::OnProcessCrashed() {
   DLOG(ERROR) << __func__;
-  if (cancelled_)
+  if (cancelled_) {
     return;
+  }
 
   // If the host is still around, cancel the import; otherwise it means the
   // import was already cancelled or completed and this message can be dropped.
-  if (process_importer_host_.get())
+  if (process_importer_host_.get()) {
     process_importer_host_->Cancel();
+  }
 }
 
 void ExternalProcessImporterClient::OnImportStart() {
-  if (cancelled_)
+  if (cancelled_) {
     return;
+  }
 
   bridge_->NotifyStarted();
 }
 
-void ExternalProcessImporterClient::OnImportFinished(
-    bool succeeded, const std::string&) {
-  if (cancelled_)
+void ExternalProcessImporterClient::OnImportFinished(bool succeeded,
+                                                     const std::string&) {
+  if (cancelled_) {
     return;
+  }
 
   if (!succeeded) {
     // Importer diagnostics can contain source data. Keep them out of logs and
@@ -132,25 +137,40 @@ void ExternalProcessImporterClient::OnImportFinished(
 
 void ExternalProcessImporterClient::OnImportItemStart(
     user_data_importer::ImportItem import_item) {
-  if (cancelled_)
+  if (cancelled_) {
     return;
+  }
 
   bridge_->NotifyItemStarted(import_item);
 }
 
 void ExternalProcessImporterClient::OnImportItemFinished(
     user_data_importer::ImportItem import_item) {
-  if (cancelled_)
+  if (cancelled_) {
     return;
+  }
 
   bridge_->NotifyItemEnded(import_item);
   profile_import_->ReportImportItemFinished(import_item);
 }
 
+void ExternalProcessImporterClient::OnCookiesImportReady(
+    const std::vector<net::CanonicalCookie>& cookies,
+    uint32_t skipped_count,
+    OnCookiesImportReadyCallback callback) {
+  if (cancelled_ || !process_importer_host_ || cookies.size() > 100 ||
+      skipped_count > 100000) {
+    std::move(callback).Run(false);
+    return;
+  }
+  bridge_->WriteCookies(cookies, skipped_count, std::move(callback));
+}
+
 void ExternalProcessImporterClient::OnHistoryImportStart(
     uint32_t total_history_rows_count) {
-  if (cancelled_)
+  if (cancelled_) {
     return;
+  }
 
   total_history_rows_count_ = total_history_rows_count;
   history_rows_.reserve(total_history_rows_count);
@@ -159,21 +179,24 @@ void ExternalProcessImporterClient::OnHistoryImportStart(
 void ExternalProcessImporterClient::OnHistoryImportGroup(
     const std::vector<user_data_importer::ImporterURLRow>& history_rows_group,
     int visit_source) {
-  if (cancelled_)
+  if (cancelled_) {
     return;
+  }
 
   history_rows_.insert(history_rows_.end(), history_rows_group.begin(),
                        history_rows_group.end());
-  if (history_rows_.size() >= total_history_rows_count_)
+  if (history_rows_.size() >= total_history_rows_count_) {
     bridge_->SetHistoryItems(
         history_rows_,
         static_cast<user_data_importer::VisitSource>(visit_source));
+  }
 }
 
 void ExternalProcessImporterClient::OnHomePageImportReady(
     const GURL& home_page) {
-  if (cancelled_)
+  if (cancelled_) {
     return;
+  }
 
   bridge_->AddHomePage(home_page);
 }
@@ -181,8 +204,9 @@ void ExternalProcessImporterClient::OnHomePageImportReady(
 void ExternalProcessImporterClient::OnBookmarksImportStart(
     const std::u16string& first_folder_name,
     uint32_t total_bookmarks_count) {
-  if (cancelled_)
+  if (cancelled_) {
     return;
+  }
 
   bookmarks_first_folder_name_ = first_folder_name;
   total_bookmarks_count_ = total_bookmarks_count;
@@ -192,21 +216,24 @@ void ExternalProcessImporterClient::OnBookmarksImportStart(
 void ExternalProcessImporterClient::OnBookmarksImportGroup(
     const std::vector<user_data_importer::ImportedBookmarkEntry>&
         bookmarks_group) {
-  if (cancelled_)
+  if (cancelled_) {
     return;
+  }
 
   // Collect sets of bookmarks from importer process until we have reached
   // total_bookmarks_count_:
   bookmarks_.insert(bookmarks_.end(), bookmarks_group.begin(),
                     bookmarks_group.end());
-  if (bookmarks_.size() >= total_bookmarks_count_)
+  if (bookmarks_.size() >= total_bookmarks_count_) {
     bridge_->AddBookmarks(bookmarks_, bookmarks_first_folder_name_);
+  }
 }
 
 void ExternalProcessImporterClient::OnFaviconsImportStart(
     uint32_t total_favicons_count) {
-  if (cancelled_)
+  if (cancelled_) {
     return;
+  }
 
   total_favicons_count_ = total_favicons_count;
   favicons_.reserve(total_favicons_count);
@@ -214,19 +241,22 @@ void ExternalProcessImporterClient::OnFaviconsImportStart(
 
 void ExternalProcessImporterClient::OnFaviconsImportGroup(
     const favicon_base::FaviconUsageDataList& favicons_group) {
-  if (cancelled_)
+  if (cancelled_) {
     return;
+  }
 
   favicons_.insert(favicons_.end(), favicons_group.begin(),
-                    favicons_group.end());
-  if (favicons_.size() >= total_favicons_count_)
+                   favicons_group.end());
+  if (favicons_.size() >= total_favicons_count_) {
     bridge_->SetFavicons(favicons_);
+  }
 }
 
 void ExternalProcessImporterClient::OnPasswordFormImportReady(
     const user_data_importer::ImportedPasswordForm& form) {
-  if (cancelled_)
+  if (cancelled_) {
     return;
+  }
 
   bridge_->SetPasswordForm(form);
 }
@@ -234,15 +264,17 @@ void ExternalProcessImporterClient::OnPasswordFormImportReady(
 void ExternalProcessImporterClient::OnKeywordsImportReady(
     const std::vector<user_data_importer::SearchEngineInfo>& search_engines,
     bool unique_on_host_and_path) {
-  if (cancelled_)
+  if (cancelled_) {
     return;
+  }
   bridge_->SetKeywords(search_engines, unique_on_host_and_path);
 }
 
 void ExternalProcessImporterClient::OnAutofillFormDataImportStart(
     uint32_t total_autofill_form_data_entry_count) {
-  if (cancelled_)
+  if (cancelled_) {
     return;
+  }
 
   total_autofill_form_data_entry_count_ = total_autofill_form_data_entry_count;
   autofill_form_data_.reserve(total_autofill_form_data_entry_count);
@@ -251,24 +283,28 @@ void ExternalProcessImporterClient::OnAutofillFormDataImportStart(
 void ExternalProcessImporterClient::OnAutofillFormDataImportGroup(
     const std::vector<ImporterAutofillFormDataEntry>&
         autofill_form_data_entry_group) {
-  if (cancelled_)
+  if (cancelled_) {
     return;
+  }
 
   autofill_form_data_.insert(autofill_form_data_.end(),
                              autofill_form_data_entry_group.begin(),
                              autofill_form_data_entry_group.end());
-  if (autofill_form_data_.size() >= total_autofill_form_data_entry_count_)
+  if (autofill_form_data_.size() >= total_autofill_form_data_entry_count_) {
     bridge_->SetAutofillFormData(autofill_form_data_);
+  }
 }
 
 ExternalProcessImporterClient::~ExternalProcessImporterClient() = default;
 
 void ExternalProcessImporterClient::Cleanup() {
-  if (cancelled_)
+  if (cancelled_) {
     return;
+  }
 
-  if (process_importer_host_.get())
+  if (process_importer_host_.get()) {
     process_importer_host_->NotifyImportEnded();
+  }
   CloseMojoHandles();
   Release();
 }

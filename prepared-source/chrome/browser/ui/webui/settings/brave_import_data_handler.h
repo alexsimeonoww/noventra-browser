@@ -7,13 +7,15 @@
 #define BRAVE_BROWSER_UI_WEBUI_SETTINGS_BRAVE_IMPORT_DATA_HANDLER_H_
 
 #include <memory>
+#include <optional>
 #include <unordered_map>
 
 #include "base/memory/weak_ptr.h"
+#include "build/build_config.h"
 #include "chrome/browser/importer/noventra_password_profile_writer.h"
 #include "chrome/browser/ui/webui/settings/brave_importer_observer.h"
-#include "build/build_config.h"
 #include "chrome/browser/ui/webui/settings/import_data_handler.h"
+#include "content/public/browser/storage_partition_config.h"
 #include "content/public/browser/web_contents_observer.h"
 
 namespace settings {
@@ -31,7 +33,7 @@ namespace settings {
 // The reason why native tab modal dialog is used here is to avoid modifying
 // upstream import html/js source code.
 class BraveImportDataHandler : public ImportDataHandler,
-                                      content::WebContentsObserver {
+                               content::WebContentsObserver {
  public:
   BraveImportDataHandler();
   ~BraveImportDataHandler() override;
@@ -87,6 +89,7 @@ class BraveImportDataHandler : public ImportDataHandler,
   bool guide_dialog_is_requested_ = false;
 #endif
  private:
+  std::optional<content::StoragePartitionConfig> cookie_partition_;
   std::unique_ptr<noventra::PasswordProfileWriterPreparation>
       pending_password_writer_;
   std::unordered_map<base::FilePath, std::unique_ptr<BraveImporterObserver>>

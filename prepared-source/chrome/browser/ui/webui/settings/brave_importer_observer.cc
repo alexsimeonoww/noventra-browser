@@ -24,14 +24,19 @@ BraveImporterObserver::BraveImporterObserver(
 }
 
 BraveImporterObserver::~BraveImporterObserver() {
-  if (importer_host_)
+  if (importer_host_) {
     importer_host_->set_observer(nullptr);
+    if (imported_items_ & user_data_importer::COOKIES) {
+      importer_host_->Cancel();
+    }
+  }
 }
 
 // user_data_importer::ImporterProgressObserver:
 void BraveImporterObserver::ImportStarted() {
-  if (import_started_called_)
+  if (import_started_called_) {
     return;
+  }
   import_started_called_ = true;
   base::DictValue data;
   data.Set("importer_name", source_profile_.importer_name);
@@ -71,8 +76,9 @@ void BraveImporterObserver::ImportEnded() {
   data.Set("event", "ImportEnded");
 
   DCHECK(importer_host_);
-  if (importer_host_)
+  if (importer_host_) {
     importer_host_->set_observer(nullptr);
+  }
 
   importer_host_ = nullptr;
 

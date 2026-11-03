@@ -19,11 +19,14 @@ source_set("importer") {
     "importer_uma.h",
     "in_process_importer_bridge.h",
     "profile_writer.h",
+    "noventra_cookie_profile_writer.h",
     "noventra_password_profile_writer.h",
   ]
 
   public_deps = [
     "//base",
+    "//content/public/browser",
+    "//net",
     "//chrome/app:generated_resources",
     "//chrome/common/importer",
     "//chrome/common/importer:interfaces",
@@ -53,12 +56,14 @@ source_set("impl") {
     "importer_uma.cc",
     "in_process_importer_bridge.cc",
     "profile_writer.cc",
+    "noventra_cookie_profile_writer.cc",
     "noventra_password_profile_writer.cc",
   ]
 
   deps = [
     ":importer",
     "//build/config/linux/dbus:buildflags",
+    "//services/network/public/mojom:cookies_mojom",
     "//chrome/browser:shell_integration",
     "//chrome/browser/bookmarks",
     "//chrome/browser/favicon",

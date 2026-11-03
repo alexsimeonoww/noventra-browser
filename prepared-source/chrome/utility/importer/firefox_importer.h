@@ -20,6 +20,10 @@
 #include "base/gtest_prod_util.h"
 #include "base/memory/weak_ptr.h"
 #include "build/build_config.h"
+#include "build/config/linux/dbus/buildflags.h"
+#if BUILDFLAG(IS_LINUX) && BUILDFLAG(USE_DBUS)
+#include "chrome/utility/importer/noventra_cookie_importer.h"
+#endif
 #include "chrome/utility/importer/importer.h"
 #include "components/favicon_base/favicon_usage_data.h"
 #include "components/user_data_importer/common/imported_bookmark_entry.h"
@@ -71,6 +75,9 @@ class FirefoxImporter : public Importer {
   using FaviconMap = std::map<int64_t, std::set<GURL>>;
 
   ~FirefoxImporter() override;
+#if BUILDFLAG(IS_LINUX) && BUILDFLAG(USE_DBUS)
+  std::optional<noventra::CookieImportBatch> imported_cookies_;
+#endif
 
   FRIEND_TEST_ALL_PREFIXES(FirefoxImporterTest, ImportBookmarksV25);
 

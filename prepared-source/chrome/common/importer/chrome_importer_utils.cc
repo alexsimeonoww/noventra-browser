@@ -38,15 +38,15 @@ namespace {
 
 std::optional<base::DictValue> GetChromeExtensionsListFromFile(
     const base::FilePath& preference_path) {
-  if (!base::PathExists(preference_path))
+  if (!base::PathExists(preference_path)) {
     return std::nullopt;
+  }
 
   std::string preference_content;
   base::ReadFileToString(preference_path, &preference_content);
 
-  std::optional<base::DictValue> preference =
-      base::JSONReader::ReadDict(preference_content,
-                                 base::JSON_PARSE_CHROMIUM_EXTENSIONS);
+  std::optional<base::DictValue> preference = base::JSONReader::ReadDict(
+      preference_content, base::JSON_PARSE_CHROMIUM_EXTENSIONS);
   if (!preference) {
     return std::nullopt;
   }
@@ -71,8 +71,9 @@ std::vector<std::string> GetImportableListFromChromeExtensionsList(
     const base::DictValue& dict = value.GetDict();
     // Only import if type is extension, it's came from webstore and it's not
     // installed by default.
-    if (dict.FindBool("was_installed_by_default").value_or(true))
+    if (dict.FindBool("was_installed_by_default").value_or(true)) {
       continue;
+    }
 
     const auto state = dict.FindInt("state");
     if (state.has_value()) {
@@ -109,8 +110,9 @@ std::optional<base::DictValue> GetChromeExtensionsList(
 
   auto list_from_preferences = GetChromeExtensionsListFromFile(
       profile_path.AppendASCII(kChromePreferencesFile));
-  if (!list_from_secure_preference.has_value())
+  if (!list_from_secure_preference.has_value()) {
     return list_from_preferences;
+  }
 
   if (list_from_secure_preference.has_value() &&
       list_from_preferences.has_value()) {
@@ -163,8 +165,9 @@ base::ListValue GetChromeSourceProfiles(
             continue;
           }
           const auto* profile = value.second.GetIfDict();
-          if (!profile)
+          if (!profile) {
             continue;
+          }
 
           auto* name = profile->FindString("name");
           if (!name) {
@@ -173,9 +176,10 @@ base::ListValue GetChromeSourceProfiles(
           base::DictValue entry;
           entry.Set("id", value.first);
           entry.Set("name", *name);
-          if (last_active_profiles)
+          if (last_active_profiles) {
             entry.Set("last_active",
                       IsLastActiveProfile(value.first, *last_active_profiles));
+          }
 
           auto* avatar_icon = profile->FindString("avatar_icon");
           if (avatar_icon) {
@@ -214,7 +218,8 @@ base::ListValue GetChromeSourceProfiles(
       entry.Set("name", "Default");
       profiles.Append(std::move(entry));
     }
-    base::FileEnumerator children(root, false, base::FileEnumerator::DIRECTORIES);
+    base::FileEnumerator children(root, false,
+                                  base::FileEnumerator::DIRECTORIES);
     for (auto path = children.Next(); !path.empty(); path = children.Next()) {
       const std::string id = path.BaseName().AsUTF8Unsafe();
       if ((id != "Default" && !id.starts_with("Profile ")) || !has_data(path) ||
@@ -259,6 +264,13 @@ bool ChromeImporterCanImport(const base::FilePath& profile,
   }
 
 #if BUILDFLAG(IS_LINUX) && BUILDFLAG(USE_DBUS)
+  if ((type == user_data_importer::TYPE_CHROME ||
+       type == user_data_importer::TYPE_BRAVE) &&
+      (base::PathExists(
+           profile.AppendASCII("Network").AppendASCII("Cookies")) ||
+       base::PathExists(profile.AppendASCII("Cookies")))) {
+    *services_supported |= user_data_importer::COOKIES;
+  }
   // The native reader supports these Chrome/Chromium and Brave keys.
   // Other platforms and brands retain their existing import capabilities.
   if ((type == user_data_importer::TYPE_CHROME ||
@@ -270,8 +282,9 @@ bool ChromeImporterCanImport(const base::FilePath& profile,
 #endif
 
 #if BUILDFLAG(ENABLE_EXTENSIONS)
-  if (HasImportableExtensions(profile))
+  if (HasImportableExtensions(profile)) {
     *services_supported |= user_data_importer::EXTENSIONS;
+  }
 #endif
 
   return *services_supported != user_data_importer::NONE;

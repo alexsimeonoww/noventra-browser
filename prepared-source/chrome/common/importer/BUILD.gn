@@ -17,6 +17,7 @@ mojom("interfaces") {
     "//components/user_data_importer/mojom",
     "//mojo/public/mojom/base",
     "//sandbox/policy/mojom",
+    "//services/network/public/mojom:cookies_mojom",
     "//url/mojom:url_mojom_gurl",
   ]
 
@@ -84,6 +85,7 @@ mojom("interfaces") {
 }
 
 source_set("importer") {
+  public_deps = [ "//net" ]
   sources = [
     "firefox_importer_utils.cc",
     "firefox_importer_utils.h",

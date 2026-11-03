@@ -8,11 +8,13 @@
 #include <string>
 #include <vector>
 
+#include "base/functional/callback.h"
 #include "base/memory/ref_counted.h"
 #include "build/build_config.h"
 #include "components/favicon_base/favicon_usage_data.h"
 #include "components/user_data_importer/common/importer_data_types.h"
 #include "components/user_data_importer/common/importer_url_row.h"
+#include "net/cookies/canonical_cookie.h"
 
 class GURL;
 struct ImporterAutofillFormDataEntry;
@@ -47,6 +49,12 @@ class ImporterBridge : public base::RefCountedThreadSafe<ImporterBridge> {
 
   virtual void SetPasswordForm(
       const user_data_importer::ImportedPasswordForm& form) = 0;
+
+  virtual bool SetCookies(const std::vector<net::CanonicalCookie>&,
+                          uint32_t,
+                          base::RepeatingCallback<bool()>) {
+    return false;
+  }
 
   virtual void SetAutofillFormData(
       const std::vector<ImporterAutofillFormDataEntry>& entries) = 0;

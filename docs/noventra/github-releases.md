@@ -15,6 +15,12 @@ The source repository and GitHub Releases provide the public development/release
 record. Cloudflare at `downloads.noventrastudio.com` remains the browser's pinned
 signed update origin; the same verified files are mirrored on GitHub.
 
+The managed Linux launcher checks while the browser stays open. Starting with
+preview 2, [desktop update reminders](update-reminders-2026-11-03.md) notify users
+when a verified update is staged, at most once every twelve hours. Preview 1
+predates these reminders. Every helper change must be shipped
+in a new inventoried package rather than patched into an existing installation.
+
 ## Source commit and build kit
 
 Use the same explicit source/build inventory for the qualified binary, its

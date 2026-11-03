@@ -39,6 +39,9 @@ PasswordImportResult ReadChromePasswords(
     SourcePasswordKeyLookup source_key,
     base::RepeatingCallback<bool()> cancelled);
 
+bool SnapshotBrowserDatabase(const base::FilePath& source,
+                             const base::FilePath& destination);
+
 // Known branding selects one existing key identity, never trial keys. Missing
 // credentials stay missing. This may display the normal desktop unlock prompt.
 std::optional<os_crypt_async::Encryptor::Key> ReadChromePasswordKey(

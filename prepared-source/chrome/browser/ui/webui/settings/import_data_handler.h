@@ -10,6 +10,7 @@
 #include <memory>
 
 #include "base/memory/raw_ptr.h"
+#include "base/memory/weak_ptr.h"
 #include "chrome/browser/importer/importer_progress_observer.h"
 #include "chrome/browser/ui/webui/settings/settings_page_ui_handler.h"
 #include "components/user_data_importer/common/importer_data_types.h"
@@ -37,9 +38,11 @@ class ImportDataHandler : public SettingsPageUIHandler,
   void OnJavascriptAllowed() override {}
   void OnJavascriptDisallowed() override;
   friend class BraveImportDataHandler;
+
  private:
-  virtual void StartImport(const user_data_importer::SourceProfile& source_profile,
-                   uint16_t imported_items);
+  virtual void StartImport(
+      const user_data_importer::SourceProfile& source_profile,
+      uint16_t imported_items);
 
   // Handler for the "importData" message. First argument is the selected
   // browser index, and second argument is the types of data to import.
@@ -54,6 +57,7 @@ class ImportDataHandler : public SettingsPageUIHandler,
   void HandleImportFromBookmarksFile(const base::ListValue& args);
 
   void SendBrowserProfileData(const std::string& callback_id);
+  void OnCookieImportResult(uint32_t imported, uint32_t skipped);
 
   // importer::ImporterProgressObserver:
   void ImportStarted() override;
@@ -77,6 +81,8 @@ class ImportDataHandler : public SettingsPageUIHandler,
   bool importer_list_loaded_{false};
 
   scoped_refptr<ui::SelectFileDialog> select_file_dialog_;
+  bool importing_cookies_ = false;
+  base::WeakPtrFactory<ImportDataHandler> cookie_weak_factory_{this};
 };
 
 }  // namespace settings

@@ -75,10 +75,14 @@ class DesktopUpdateTests(unittest.TestCase):
         self.updater = desktop.DesktopUpdater(self.app, self.data)
         self.env = {**os.environ, 'HOME': str(self.home), 'XDG_DATA_HOME': str(self.data),
                     'XDG_CONFIG_HOME': str(self.home / '.config'),
+                    'DBUS_SESSION_BUS_ADDRESS': f'unix:path={self.root / "no-notification-bus"}',
                     'NOVENTRA_VIDEO_BUFFER_WORKAROUND': 'off'}
         self.env.pop('APPIMAGE', None)
         self.env.pop('PYTHONPATH', None)
         self.env.pop('LD_LIBRARY_PATH', None)
+        self.notification_patcher = patch.object(desktop, 'send_update_notification')
+        self.notifier = self.notification_patcher.start()
+        self.addCleanup(self.notification_patcher.stop)
 
     def stop_server(self):
         self.http.shutdown(); self.http.server_close(); self.thread.join(timeout=3)
@@ -193,6 +197,7 @@ class DesktopUpdateTests(unittest.TestCase):
         self.assertEqual(result['status'], 'up_to_date')
         self.assertEqual([call.args[1] for call in download.call_args_list], ['manifest.json', 'manifest.sig'])
         self.assertEqual(self.current_version(), '1-test')
+        self.notifier.assert_not_called()
 
     def test_download_then_closed_apply_uses_same_path_and_preserves_profile(self):
         desktop_before = (self.data / 'applications/noventra-browser.desktop').read_bytes()
@@ -278,6 +283,197 @@ class DesktopUpdateTests(unittest.TestCase):
             self.updater.check()
             self.assertEqual(download.call_count, 2)
 
+    def test_ready_update_notifies_without_installing_and_records_private_attempt(self):
+        self.assertEqual(self.to_second()['status'], 'ready')
+        self.notifier.assert_called_once_with(self.app)
+        path = self.updater.root / 'reminder-status.json'
+        ledger = release.parse(path.read_bytes())
+        self.assertEqual(set(ledger), {'format', 'last_attempt_at'})
+        self.assertEqual(ledger['format'], 1)
+        self.assertLessEqual(abs(ledger['last_attempt_at'] - time.time()), 5)
+        self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+        self.assertEqual(self.current_version(), '1-test')
+        self.assertIsNotNone(self.state()['staged'])
+
+    def test_interrupted_initialization_does_not_publish_partial_cache(self):
+        def interrupted(cfg):
+            Path(cfg['install_root']).mkdir(mode=0o700)
+            raise desktop.InterruptedUpdate('Browser closed during initialization')
+        with patch.object(delivery, 'initialize', side_effect=interrupted):
+            with self.assertRaises(desktop.InterruptedUpdate):
+                self.updater.check()
+        self.assertFalse(Path(self.updater.cfg['install_root']).exists())
+        self.assertEqual(list(self.updater.root.glob('.initialize-*')), [])
+        self.assertEqual(self.to_second()['status'], 'ready')
+        self.assertEqual(self.state()['highest_sequence'], 2)
+        self.notifier.assert_called_once_with(self.app)
+
+    def test_interruption_after_cache_publication_keeps_it_usable(self):
+        original = delivery.sync_directory
+        def interrupted(path):
+            if Path(path) == self.updater.root:
+                raise desktop.InterruptedUpdate('Browser closed after cache publication')
+            return original(path)
+        with patch.object(delivery, 'sync_directory', side_effect=interrupted):
+            with self.assertRaises(desktop.InterruptedUpdate):
+                self.updater.check()
+        self.assertTrue((Path(self.updater.cfg['install_root']) / '.lock').is_file())
+        self.assertEqual(self.to_second()['status'], 'ready')
+        self.assertEqual(self.state()['highest_sequence'], 2)
+        self.notifier.assert_called_once_with(self.app)
+
+    def test_ready_reminder_survives_reload_and_repeats_after_twelve_hours(self):
+        now = int(time.time())
+        with patch.object(desktop.time, 'time', return_value=now):
+            self.to_second()
+        self.updater = desktop.DesktopUpdater(self.app, self.data)
+        with patch.object(desktop.time, 'time', return_value=now + desktop.INTERVAL):
+            self.assertEqual(self.updater.check(background=True)['status'], 'ready')
+        self.notifier.assert_called_once()
+        with patch.object(desktop.time, 'time', return_value=now + desktop.REMINDER_INTERVAL):
+            self.assertEqual(self.updater.check(background=True)['status'], 'ready')
+        self.assertEqual(self.notifier.call_count, 2)
+        with patch.object(desktop.time, 'time', return_value=now + desktop.REMINDER_INTERVAL + 1):
+            self.updater.check()
+        self.assertEqual(self.notifier.call_count, 2)
+
+    def test_new_release_does_not_reset_reminder_interval(self):
+        now = int(time.time())
+        with patch.object(desktop.time, 'time', return_value=now):
+            self.to_second()
+        self.make_version(3)
+        self.http.release_root = self.releases[3]
+        with patch.object(desktop.time, 'time', return_value=now + desktop.INTERVAL):
+            result = self.updater.check()
+        self.assertEqual(result['version'], '3-test')
+        self.notifier.assert_called_once()
+
+    def test_clock_rollback_defers_reminder(self):
+        now = int(time.time())
+        with patch.object(desktop.time, 'time', return_value=now + 100):
+            self.to_second()
+        with patch.object(desktop.time, 'time', return_value=now):
+            self.assertEqual(self.updater.check()['status'], 'ready')
+        self.notifier.assert_called_once()
+
+    def test_forged_cached_ready_status_cannot_trigger_reminder(self):
+        self.updater.save_status('ready', 'untrusted cache', version='forged')
+        self.assertEqual(self.updater.check(background=True)['status'], 'ready')
+        self.assertEqual(self.updater.check()['status'], 'up_to_date')
+        self.notifier.assert_not_called()
+        self.assertFalse((self.updater.root / 'reminder-status.json').exists())
+
+    def test_concurrent_checks_do_not_duplicate_reminder(self):
+        started, finish = threading.Event(), threading.Event()
+        results = []
+        self.http.release_root = self.releases[2]
+        def notify(app):
+            started.set()
+            self.assertTrue(finish.wait(timeout=10))
+        def check():
+            try:
+                results.append(self.updater.check())
+            except Exception as error:
+                results.append(error)
+        self.notifier.side_effect = notify
+        thread = threading.Thread(target=check)
+        thread.start()
+        try:
+            self.assertTrue(started.wait(timeout=10))
+            with self.assertRaises(BlockingIOError):
+                desktop.DesktopUpdater(self.app, self.data).check(background=True)
+        finally:
+            finish.set()
+            thread.join(timeout=10)
+        self.assertFalse(thread.is_alive())
+        self.assertEqual(len(results), 1)
+        self.assertIsInstance(results[0], dict)
+        self.assertEqual(results[0]['status'], 'ready')
+        self.notifier.assert_called_once_with(self.app)
+
+    def test_notifier_failures_keep_ready_update_and_do_not_retry_immediately(self):
+        for error in (FileNotFoundError('missing notifier'),
+                      subprocess.CalledProcessError(1, '/usr/bin/notify-send'),
+                      subprocess.TimeoutExpired('/usr/bin/notify-send', 3)):
+            with self.subTest(error=type(error).__name__):
+                (self.updater.root / 'reminder-status.json').unlink(missing_ok=True)
+                self.notifier.reset_mock()
+                self.notifier.side_effect = error
+                self.assertEqual(self.to_second()['status'], 'ready')
+                self.assertEqual(self.updater.check()['status'], 'ready')
+                self.notifier.assert_called_once_with(self.app)
+                self.assertEqual(self.current_version(), '1-test')
+                self.assertIsNotNone(self.state()['staged'])
+
+    def test_malformed_or_unsafe_reminder_ledger_keeps_ready_without_prompting(self):
+        self.to_second()
+        self.notifier.reset_mock()
+        path = self.updater.root / 'reminder-status.json'
+        for raw in (b'not JSON', b'{}', b'{"format":true,"last_attempt_at":0}',
+                    b'{"format":1,"last_attempt_at":false}',
+                    b'{"format":1,"last_attempt_at":-1}',
+                    b'{"format":1,"last_attempt_at":0,"extra":0}', b' ' * 1025):
+            with self.subTest(raw=raw[:60]):
+                path.write_bytes(raw)
+                self.assertEqual(self.updater.check()['status'], 'ready')
+                self.assertEqual(path.read_bytes(), raw)
+                self.notifier.assert_not_called()
+        path.chmod(0o666)
+        self.assertEqual(self.updater.check()['status'], 'ready')
+        self.notifier.assert_not_called()
+        path.unlink()
+        outside = self.root / 'outside-reminder'
+        outside.write_bytes(b'keep')
+        path.symlink_to(outside)
+        self.assertEqual(self.updater.check()['status'], 'ready')
+        self.assertEqual(outside.read_bytes(), b'keep')
+        self.notifier.assert_not_called()
+
+    def test_reminder_ledger_write_failure_keeps_update_ready(self):
+        original = desktop.tempfile.mkstemp
+        def fail_reminder(*args, **kwargs):
+            if kwargs.get('prefix') == '.reminder-':
+                raise OSError('injected reminder ledger failure')
+            return original(*args, **kwargs)
+        with patch.object(desktop.tempfile, 'mkstemp', side_effect=fail_reminder):
+            self.assertEqual(self.to_second()['status'], 'ready')
+        self.notifier.assert_not_called()
+        self.assertIsNotNone(self.state()['staged'])
+
+    def test_install_space_check_precedes_ready_notification(self):
+        with patch.object(self.updater, 'require_install_space',
+                          side_effect=ValueError('Not enough free disk space')):
+            with self.assertRaisesRegex(ValueError, 'free disk space'):
+                self.to_second()
+        self.notifier.assert_not_called()
+        self.assertFalse((self.updater.root / 'reminder-status.json').exists())
+
+    def test_system_notifier_uses_fixed_message_and_system_libraries(self):
+        self.notification_patcher.stop()
+        env = {'PATH': '/untrusted', 'LD_LIBRARY_PATH': '/bundled-libs',
+               'LD_PRELOAD': '/bundled.so', 'LD_AUDIT': '/bundled-audit.so',
+               'GTK_PATH': '/bundled-gtk', 'GIO_EXTRA_MODULES': '/bundled-gio',
+               'GIO_MODULE_DIR': '/bundled-gio-dir', 'GI_TYPELIB_PATH': '/bundled-gi',
+               'GDK_PIXBUF_MODULE_FILE': '/bundled-pixbuf', 'GSETTINGS_SCHEMA_DIR': '/schemas',
+               'DBUS_SESSION_BUS_ADDRESS': 'unix:path=/owned-private-bus',
+               'XDG_RUNTIME_DIR': '/owned-runtime', 'HOME': str(self.home)}
+        with patch.object(desktop, 'ORIGINAL_ENV', env), \
+                patch.object(desktop.subprocess, 'run') as run:
+            desktop.send_update_notification(self.app)
+        args, kwargs = run.call_args
+        self.assertEqual(args[0], ['/usr/bin/notify-send', '--app-name=Noventra',
+                                  f'--icon={self.app / "noventra-browser.png"}', '--urgency=normal',
+                                  '--hint=string:desktop-entry:noventra-browser',
+                                  '--hint=boolean:suppress-sound:true', '--',
+                                  'Noventra update ready',
+                                  'Close all Noventra windows and open Noventra again to install the verified update.'])
+        self.assertEqual(kwargs['env'], {'PATH': '/usr/bin:/bin',
+                                        'DBUS_SESSION_BUS_ADDRESS': 'unix:path=/owned-private-bus',
+                                        'XDG_RUNTIME_DIR': '/owned-runtime', 'HOME': str(self.home)})
+        self.assertEqual(kwargs['timeout'], 3)
+        self.assertTrue(kwargs['check'])
+        self.assertNotIn('shell', kwargs)
+
     def test_invalid_signature_and_expired_manifest_do_not_modify_app(self):
         self.http.release_root = self.releases[2]
         manifest = self.releases[2] / 'manifest.json'
@@ -285,6 +481,7 @@ class DesktopUpdateTests(unittest.TestCase):
         manifest.write_bytes(original.replace(b'2-test', b'3-test'))
         with self.assertRaises(ValueError): self.updater.check()
         self.assertEqual(self.current_version(), '1-test')
+        self.notifier.assert_not_called()
         value = release.parse(original)
         value.update(created_at=int(time.time()) - 10, expires_at=int(time.time()) - 1)
         manifest.write_bytes(release.encode(value))
@@ -292,6 +489,7 @@ class DesktopUpdateTests(unittest.TestCase):
                         '-out', self.releases[2] / 'manifest.sig')
         with self.assertRaises(ValueError): self.updater.check()
         self.assertEqual(self.current_version(), '1-test')
+        self.notifier.assert_not_called()
         result, value = self.cli('check')
         self.assertEqual(result.returncode, 1)
         self.assertIn('out of date', value['message'])
@@ -302,11 +500,15 @@ class DesktopUpdateTests(unittest.TestCase):
         original = artifact.read_bytes()
         artifact.write_bytes(original[:-1] + bytes([original[-1] ^ 1]))
         with self.assertRaises(ValueError): self.updater.check()
+        self.notifier.assert_not_called()
         self.assertEqual(self.current_version(), '1-test')
         artifact.write_bytes(original)
         self.to_second()
+        self.notifier.reset_mock()
         staged = Path(self.updater.cfg['install_root']) / 'releases' / self.state()['staged']
         (staged / 'Noventra.AppDir/opt/noventra/icudtl.dat').write_bytes(b'changed')
+        with self.assertRaises(ValueError): self.updater.check()
+        self.notifier.assert_not_called()
         with self.assertRaises(ValueError): self.updater.apply()
         self.assertEqual(self.current_version(), '1-test')
 
@@ -382,6 +584,7 @@ class DesktopUpdateTests(unittest.TestCase):
         self.assertIsNone(self.state()['staged'])
         self.assertEqual(self.current_version(), '1-test')
         self.assertEqual(list((Path(self.updater.cfg['install_root']) / '.staging').iterdir()), [])
+        self.notifier.assert_not_called()
         self.assertEqual(self.updater.check()['status'], 'ready')
 
     def test_low_space_apply_retains_app_and_pending_version(self):

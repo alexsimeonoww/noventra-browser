@@ -333,10 +333,13 @@ if (is_linux && use_dbus) {
     sources = [
       "importer/chrome_password_importer.cc",
       "importer/chrome_password_importer.h",
+      "importer/noventra_cookie_importer.cc",
+      "importer/noventra_cookie_importer.h",
     ]
     public_deps = [
       "//base",
       "//components/os_crypt/async/common",
+      "//net",
       "//components/user_data_importer/common",
     ]
     deps = [

@@ -16,6 +16,20 @@ the same window. Its tabs use an off-the-record profile with separate cookies
 and site storage. Closing its last tab removes that Space; regular Spaces stay
 available beside it.
 
+## Cookie import and update reminders
+
+Linux preview 2 adds optional cookie import for supported Chromium-family and
+Firefox source formats. Select **Cookies and signed-in sessions** in setup or
+Settings. The choice starts unchecked, and imported sessions belong to the
+Space where the import started. Some websites still require another sign-in.
+See [cookie import limits](docs/noventra/cookie-import-2026-11-03.md).
+
+The installed launcher checks for updates while Noventra remains open. Preview 2
+can send a desktop reminder after a verified update is ready, at most once every
+twelve hours. It never forces a restart. Desktop reminders require `notify-send`
+and a notification service. Preview 1 gains this feature through its upgrade;
+use About Noventra to check immediately for that first update.
+
 ## Source and builds
 
 This repository contains Noventra's complete modified prepared source overlay

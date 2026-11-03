@@ -98,6 +98,11 @@ bool SnapshotDatabase(const base::FilePath& source,
 
 }  // namespace
 
+bool SnapshotBrowserDatabase(const base::FilePath& source,
+                             const base::FilePath& destination) {
+  return SnapshotDatabase(source, destination);
+}
+
 std::optional<os_crypt_async::Encryptor::Key> ReadChromePasswordKey(
     const std::u16string& importer_name,
     base::RepeatingCallback<bool()> cancelled) {

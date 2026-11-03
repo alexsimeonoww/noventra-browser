@@ -30,6 +30,7 @@
 #if BUILDFLAG(USE_DBUS)
 #include "base/functional/bind.h"
 #include "chrome/utility/importer/chrome_password_importer.h"
+#include "chrome/utility/importer/noventra_cookie_importer.h"
 #endif
 #endif
 
@@ -49,6 +50,23 @@ void ChromeImporter::StartImport(
   bridge_->NotifyStarted();
 
 #if BUILDFLAG(IS_LINUX) && BUILDFLAG(USE_DBUS)
+  std::optional<noventra::CookieImportBatch> cookies;
+  if ((items & user_data_importer::COOKIES) && !cancelled()) {
+    bridge_->NotifyItemStarted(user_data_importer::COOKIES);
+    auto is_cancelled = base::BindRepeating(
+        [](ChromeImporter* importer) { return importer->cancelled(); },
+        base::Unretained(this));
+    auto result = noventra::ReadChromeCookies(
+        source_path_,
+        base::BindOnce(&noventra::ReadChromePasswordKey, importer_name_,
+                       is_cancelled),
+        is_cancelled);
+    if (!result.has_value()) {
+      bridge_->NotifyFailed(noventra::CookieImportErrorMessage(result.error()));
+      return;
+    }
+    cookies = std::move(result.value());
+  }
   std::vector<user_data_importer::ImportedPasswordForm> passwords;
   if ((items & user_data_importer::PASSWORDS) && !cancelled()) {
     bridge_->NotifyItemStarted(user_data_importer::PASSWORDS);
@@ -111,6 +129,21 @@ void ChromeImporter::StartImport(
   }
 #endif
 
+#if BUILDFLAG(IS_LINUX) && BUILDFLAG(USE_DBUS)
+  if (cookies) {
+    auto is_cancelled = base::BindRepeating(
+        [](ChromeImporter* importer) { return importer->cancelled(); },
+        base::Unretained(this));
+    if (!bridge_->SetCookies(cookies->cookies, cookies->skipped,
+                             is_cancelled)) {
+      bridge_->NotifyFailed(
+          "Cookie import did not finish. Some cookies may already have been "
+          "copied.");
+      return;
+    }
+    bridge_->NotifyItemEnded(user_data_importer::COOKIES);
+  }
+#endif
   bridge_->NotifyEnded();
 }
 

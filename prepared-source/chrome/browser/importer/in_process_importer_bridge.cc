@@ -8,6 +8,7 @@
 
 #include <iterator>
 
+#include "base/functional/bind.h"
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
 #include "build/build_config.h"
@@ -95,8 +96,9 @@ password_manager::PasswordForm ConvertImportedPasswordForm(
 std::unique_ptr<TemplateURL> CreateTemplateURL(const std::u16string& url,
                                                const std::u16string& keyword,
                                                const std::u16string& title) {
-  if (url.empty() || keyword.empty())
+  if (url.empty() || keyword.empty()) {
     return nullptr;
+  }
   TemplateURLData data;
   data.SetKeyword(keyword);
   // We set short name by using the title if it exists.
@@ -110,9 +112,8 @@ std::unique_ptr<TemplateURL> CreateTemplateURL(const std::u16string& url,
 
 InProcessImporterBridge::InProcessImporterBridge(
     ProfileWriter* writer,
-    base::WeakPtr<ExternalProcessImporterHost> host) : writer_(writer),
-                                                       host_(host) {
-}
+    base::WeakPtr<ExternalProcessImporterHost> host)
+    : writer_(writer), host_(host) {}
 
 void InProcessImporterBridge::AddBookmarks(
     const std::vector<user_data_importer::ImportedBookmarkEntry>& bookmarks,
@@ -139,6 +140,24 @@ void InProcessImporterBridge::SetHistoryItems(
   writer_->AddHistoryPage(converted_rows, converted_visit_source);
 }
 
+void InProcessImporterBridge::WriteCookies(
+    const std::vector<net::CanonicalCookie>& cookies,
+    uint32_t skipped,
+    base::OnceCallback<void(bool)> callback) {
+  if (!host_) {
+    std::move(callback).Run(false);
+    return;
+  }
+  writer_->WriteCookies(
+      cookies, skipped,
+      base::BindRepeating(
+          [](base::WeakPtr<ExternalProcessImporterHost> host) {
+            return !!host;
+          },
+          host_),
+      std::move(callback));
+}
+
 void InProcessImporterBridge::SetKeywords(
     const std::vector<user_data_importer::SearchEngineInfo>& search_engines,
     bool unique_on_host_and_path) {
@@ -146,8 +165,9 @@ void InProcessImporterBridge::SetKeywords(
   for (const auto& search_engine : search_engines) {
     std::unique_ptr<TemplateURL> owned_template_url = CreateTemplateURL(
         search_engine.url, search_engine.keyword, search_engine.display_name);
-    if (owned_template_url)
+    if (owned_template_url) {
       owned_template_urls.push_back(std::move(owned_template_url));
+    }
   }
   writer_->AddKeywords(std::move(owned_template_urls), unique_on_host_and_path);
 }
@@ -165,8 +185,9 @@ void InProcessImporterBridge::SetAutofillFormData(
     // terminating symbols.
     const std::u16string name = entry.name.c_str();
     const std::u16string value = entry.value.c_str();
-    if (name.empty() || value.empty())
+    if (name.empty() || value.empty()) {
       continue;
+    }
     autocomplete_entries.emplace_back(autofill::AutocompleteKey(name, value),
                                       entry.first_used, entry.last_used);
   }

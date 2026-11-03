@@ -22,16 +22,16 @@
     const defaultProxy = DefaultBrowserBrowserProxyImpl.getInstance();
     const choiceKey = 'noventra.setup.imports.v2';
     const legacyChoiceKey = 'noventra.setup.imports.v1';
-    type DataKind = 'bookmarks' | 'history' | 'passwords';
+    type DataKind = 'bookmarks' | 'history' | 'passwords' | 'cookies';
     type Choices = Record<DataKind, boolean>;
     type Completed = Record<number, DataKind[]>;
-    const kinds: DataKind[] = ['bookmarks', 'history', 'passwords'];
-    const kindLabels: Record<DataKind, string> = { bookmarks: 'Bookmarks', history: 'History', passwords: 'Passwords' };
+    const kinds: DataKind[] = ['bookmarks', 'history', 'passwords', 'cookies'];
+    const kindLabels: Record<DataKind, string> = { bookmarks: 'Bookmarks', history: 'History', passwords: 'Passwords', cookies: 'Cookies and signed-in sessions' };
     const validId = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
     const validCount = (value: unknown): number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : 0;
 
     function restoreChoices(): { id?: number; data: Choices; completed: Completed; bookmarks: number; history: number; passwords: number; interrupted: boolean; csv: boolean; restorable: boolean; version: number; searchId?: number; searchChanged: boolean; makeDefault: boolean } {
-        const empty = { data: { bookmarks: true, history: true, passwords: true }, completed: {} as Completed, bookmarks: 0, history: 0, passwords: 0, interrupted: false, csv: false, restorable: false, version: 0, searchId: undefined as number | undefined, searchChanged: false, makeDefault: false };
+        const empty = { data: { bookmarks: true, history: true, passwords: true, cookies: false }, completed: {} as Completed, bookmarks: 0, history: 0, passwords: 0, interrupted: false, csv: false, restorable: false, version: 0, searchId: undefined as number | undefined, searchChanged: false, makeDefault: false };
         try {
             const value = JSON.parse(sessionStorage.getItem(choiceKey) ?? sessionStorage.getItem(legacyChoiceKey) ?? 'null');
             if (!value || ![1, 2].includes(value.version)) return empty;
@@ -42,7 +42,7 @@
                 }
             }
             return { id: validId(value.id) ? value.id : undefined,
-                data: Object.fromEntries(kinds.map(kind => [kind, value.data?.[kind] === true])) as Choices,
+                data: Object.fromEntries(kinds.map(kind => [kind, kind !== 'cookies' && value.data?.[kind] === true])) as Choices,
                 completed, bookmarks: validCount(value.bookmarks), history: validCount(value.history), passwords: validCount(value.passwords),
                 interrupted: value.inFlight === true || value.interrupted === true, csv: value.csv === true, restorable: true,
                 version: value.version, searchId: value.version === 2 && validId(value.searchId) ? value.searchId : undefined,
@@ -66,6 +66,9 @@
     let bookmarkImports = $state(restored.bookmarks);
     let historyImports = $state(restored.history);
     let passwordImports = $state(restored.passwords);
+    let cookieImports = $state(0);
+    let cookieSkipped = $state(0);
+    let cookieResult = $state('');
     let passwordOpened = $state(restored.csv);
     let interruptedImport = $state(restored.interrupted);
     let importInFlight = $state(false);
@@ -120,18 +123,19 @@
 
     function availableData(profile: BrowserProfile): DataKind[] {
         return [...(profile.favorites ? ['bookmarks' as const] : []), ...(profile.history ? ['history' as const] : []),
-            ...(canImportBrowserPasswords && profile.passwords ? ['passwords' as const] : [])];
+            ...(canImportBrowserPasswords && profile.passwords ? ['passwords' as const] : []),
+            ...(profile.cookies ? ['cookies' as const] : [])];
     }
 
     function dataComplete(profile: BrowserProfile) {
-        const available = availableData(profile);
+        const available = availableData(profile).filter(kind => kind !== 'cookies' || importedProfileData[profile.id]?.includes(kind));
         return available.length > 0 && available.every(kind => importedProfileData[profile.id]?.includes(kind));
     }
 
     function selectData(profile: BrowserProfile) {
         status = 'idle';
         importError = '';
-        selectedData = Object.fromEntries(kinds.map(kind => [kind, availableData(profile).includes(kind) && !importedProfileData[profile.id]?.includes(kind)])) as Choices;
+        selectedData = Object.fromEntries(kinds.map(kind => [kind, kind !== 'cookies' && availableData(profile).includes(kind) && !importedProfileData[profile.id]?.includes(kind)])) as Choices;
     }
 
     async function refreshManagerExtensions() {
@@ -283,6 +287,10 @@
     async function importJob(profile: BrowserProfile, selected: DataKind[]) {
         importingProfileId = profile.id;
         importingKinds = selected;
+        if (selected.includes('cookies')) {
+            cookieImports = cookieSkipped = 0;
+            cookieResult = '';
+        }
         importProgress = `Importing ${selected.map(kind => kindLabels[kind].toLowerCase()).join(' and ')} from ${profile.name}…`;
         status = 'importing';
         importInFlight = true;
@@ -291,6 +299,7 @@
             const types = {
                 import_dialog_bookmarks: selected.includes('bookmarks'), import_dialog_history: selected.includes('history'),
                 import_dialog_saved_passwords: selected.includes('passwords'), import_dialog_search_engine: false,
+                import_dialog_cookies: selected.includes('cookies'),
                 import_dialog_autofill_form_data: false, import_dialog_extensions: false,
             };
             importer.importData(profile.index, types);
@@ -324,6 +333,7 @@
                     if (!await importJob(profile, job)) {
                         importError = job.includes('passwords')
                             ? 'Passwords couldn’t be copied. Close the source browser and unlock its credential store, then retry. Completed imports are kept.'
+                            : job.includes('cookies') ? 'Cookies could not be copied. Close the source browser and unlock its credential store, then retry. Some sites may require a new sign-in.'
                             : 'Browser data couldn’t be copied. Some data may already have been copied. Close the source browser, then retry.';
                         return;
                     }
@@ -367,6 +377,14 @@
         if (step >= 3) void loadDefaults();
         const extensionListener = addWebUiListener('extension-state-changed', (diff: ExtensionStatus) => { managerExtensions = { ...managerExtensions, ...diff }; });
         void refreshManagerExtensions().catch(() => {});
+        const cookieListener = addWebUiListener('import-cookies-result', (result: { imported: number; skipped: number }) => {
+            if (status !== 'importing' || !importingKinds.includes('cookies') ||
+                !Number.isSafeInteger(result.imported) || result.imported < 0 ||
+                !Number.isSafeInteger(result.skipped) || result.skipped < 0) return;
+            cookieImports += result.imported;
+            cookieSkipped += result.skipped;
+            cookieResult = `${cookieImports} cookies imported. ${cookieSkipped} skipped. Some sites may ask you to sign in again.`;
+        });
         const listener = addWebUiListener('import-data-status-changed', (value: ImportDataStatus) => {
             if (value === ImportDataStatus.IN_PROGRESS) status = 'importing';
             if (value === ImportDataStatus.SUCCEEDED && status === 'importing') {
@@ -391,7 +409,7 @@
             searchLoadError = false;
         });
         const defaultListener = addWebUiListener('browser-default-state-changed', (state: DefaultBrowserInfo) => { defaultBrowserInfo = state; });
-        return () => { removeWebUiListener(listener); removeWebUiListener(extensionListener); removeWebUiListener(defaultListener); removeWebUiListener(searchListener); };
+        return () => { removeWebUiListener(listener); removeWebUiListener(extensionListener); removeWebUiListener(defaultListener); removeWebUiListener(searchListener); removeWebUiListener(cookieListener); };
     });
 </script>
 
@@ -440,6 +458,8 @@
                                 </label>
                             {/each}
                         </fieldset>
+                        {#if chosenProfile?.cookies}<p class="privacy-hint">Cookie import is optional. Cookies already in this Space are kept. Some sites may ask you to sign in again.</p>{/if}
+                        {#if cookieResult}<p id="importCookiesResult" class="import-message" role="status">{cookieResult}</p>{/if}
                     {/if}
                     <div class="discovery-actions">{#if selectedId !== undefined}<button id="clear-import-selection" class="quiet" disabled={busy} onclick={() => { selectedId = undefined; importError = ''; }}>Clear selection</button>{/if}<button id={discovery === 'initial' ? 'find-import-profiles' : 'refresh-import-profiles'} class="quiet" disabled={busy || discoveryBusy} onclick={refreshBrowserProfiles}>{discovery === 'initial' ? 'Find browsers' : discovery === 'loading' ? 'Looking…' : discovery === 'error' ? 'Try again' : 'Refresh browsers'}</button></div>
                     {#if discovery === 'error' && profiles.length > 0}<p class="error" role="alert">Refresh before choosing a profile, or use a file.</p>{/if}
@@ -487,6 +507,7 @@
                     <div class="finish-symbol" aria-hidden="true"><NoventraLogo height="42px" /></div>
                     <h1 id="step-title" tabindex="-1" bind:this={title}>You’re ready to browse.</h1>
                     <p class="intro">Finish setup to copy your selected data.</p>
+                    {#if cookieResult}<p id="finish-cookies-result" class="import-message" role="status">{cookieResult}</p>{/if}
                     <div class="summary-row" id="data-import-summary"><div><strong>Browser data</strong><p>{stagedKinds.length ? `${sourceLabel}: ${stagedDescription}.` : bookmarkImports || historyImports || passwordImports ? 'Selected browser imports finished.' : 'Import later in Settings.'}</p></div><span class="summary-tag">{importError ? 'Check needed' : stagedKinds.length ? 'Queued' : bookmarkImports || historyImports || passwordImports ? 'Finished' : 'Optional'}</span></div>
                     {#if passwordOpened}<div class="summary-row" id="password-import-summary"><div><strong>Password CSV</strong><p>Check the results in your password manager tab.</p></div><span class="summary-tag">Opened</span></div>{/if}
                     <div class="summary-row"><div><strong>Password manager</strong><p role="status">{managerLoading ? 'Checking extensions…' : managerCheckFailed ? 'Couldn’t check extensions. Go back to retry.' : enabledManagers.length ? `${enabledManagers.join(', ')} installed. Sign in through the extension.` : 'Add an extension later.'}</p></div><span class="summary-tag">{managerLoading ? 'Checking' : managerCheckFailed ? 'Check needed' : enabledManagers.length ? 'Installed' : 'Optional'}</span></div>

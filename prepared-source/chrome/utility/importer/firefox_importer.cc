@@ -10,6 +10,7 @@
 
 #include "base/files/file_enumerator.h"
 #include "base/files/file_util.h"
+#include "base/functional/bind.h"
 #include "base/json/json_file_value_serializer.h"
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
@@ -55,14 +56,16 @@ enum BookmarkItemType {
 // filter out the URL with a unsupported scheme.
 bool CanImportURL(const GURL& url) {
   // The URL is not valid.
-  if (!url.is_valid())
+  if (!url.is_valid()) {
     return false;
+  }
 
   // Filter out the URLs with unsupported schemes.
   const char* const kInvalidSchemes[] = {"wyciwyg", "place", "about", "chrome"};
   for (const auto* scheme : kInvalidSchemes) {
-    if (url.SchemeIs(scheme))
+    if (url.SchemeIs(scheme)) {
       return false;
+    }
   }
 
   return true;
@@ -134,6 +137,22 @@ void FirefoxImporter::StartImport(
         "A private copy of browser data could not be created.");
     return;
   }
+#if BUILDFLAG(IS_LINUX) && BUILDFLAG(USE_DBUS)
+  imported_cookies_.reset();
+  if ((items & user_data_importer::COOKIES) && !cancelled()) {
+    bridge_->NotifyItemStarted(user_data_importer::COOKIES);
+    auto result = noventra::ReadFirefoxCookies(
+        source_path_,
+        base::BindRepeating(
+            [](FirefoxImporter* importer) { return importer->cancelled(); },
+            base::Unretained(this)));
+    if (!result.has_value()) {
+      bridge_->NotifyFailed(noventra::CookieImportErrorMessage(result.error()));
+      return;
+    }
+    imported_cookies_ = std::move(result.value());
+  }
+#endif
   if ((items & user_data_importer::HOME_PAGE) && !cancelled()) {
     bridge_->NotifyItemStarted(user_data_importer::HOME_PAGE);
     ImportHomepage();  // Doesn't have a UI item.
@@ -164,6 +183,22 @@ void FirefoxImporter::StartImport(
 }
 
 void FirefoxImporter::ImportRemainingItems() {
+#if BUILDFLAG(IS_LINUX) && BUILDFLAG(USE_DBUS)
+  if (imported_cookies_) {
+    auto is_cancelled = base::BindRepeating(
+        [](FirefoxImporter* importer) { return importer->cancelled(); },
+        base::Unretained(this));
+    if (!bridge_->SetCookies(imported_cookies_->cookies,
+                             imported_cookies_->skipped, is_cancelled)) {
+      bridge_->NotifyFailed(
+          "Cookie import did not finish. Some cookies may already have been "
+          "copied.");
+      return;
+    }
+    imported_cookies_.reset();
+    bridge_->NotifyItemEnded(user_data_importer::COOKIES);
+  }
+#endif
 #if !BUILDFLAG(IS_MAC)
   if ((items_ & user_data_importer::PASSWORDS) && !cancelled()) {
     bridge_->NotifyItemStarted(user_data_importer::PASSWORDS);
@@ -182,12 +217,14 @@ void FirefoxImporter::ImportRemainingItems() {
 
 bool FirefoxImporter::ImportHistory() {
   base::FilePath file = GetCopiedSourcePath("places.sqlite");
-  if (!base::PathExists(file))
+  if (!base::PathExists(file)) {
     return false;
+  }
 
   sql::Database db(kDatabaseTag);
-  if (!db.Open(file))
+  if (!db.Open(file)) {
     return false;
+  }
 
   // |visit_type| represent the transition type of URLs (typed, click,
   // redirect, bookmark, etc.) We eliminate some URLs like sub-frames and
@@ -236,7 +273,7 @@ bool FirefoxImporter::ImportHistory() {
     row.visit_count = s.ColumnInt(2);
     row.hidden = s.ColumnInt(3) == 1;
     row.typed_count = s.ColumnInt(4);
-    row.last_visit = base::Time::FromTimeT(s.ColumnInt64(5)/1000000);
+    row.last_visit = base::Time::FromTimeT(s.ColumnInt64(5) / 1000000);
 
     rows.push_back(row);
   }
@@ -509,8 +546,9 @@ void FirefoxImporter::ImportPasswords() {
 
   // Since Firefox 32, passwords are in logins.json.
   base::FilePath json_file = source_path_.AppendASCII("logins.json");
-  if (!base::PathExists(json_file))
+  if (!base::PathExists(json_file)) {
     return;
+  }
 
   std::vector<user_data_importer::ImportedPasswordForm> forms;
   decryptor.ReadAndParseLogins(json_file, &forms);
@@ -535,12 +573,14 @@ void FirefoxImporter::ImportHomepage() {
 
 void FirefoxImporter::ImportAutofillFormData() {
   base::FilePath file = GetCopiedSourcePath("formhistory.sqlite");
-  if (!base::PathExists(file))
+  if (!base::PathExists(file)) {
     return;
+  }
 
   sql::Database db(kDatabaseTag);
-  if (!db.Open(file))
+  if (!db.Open(file)) {
     return;
+  }
 
   const char query[] =
       "SELECT fieldname, value, timesUsed, firstUsed, lastUsed FROM "
@@ -561,14 +601,16 @@ void FirefoxImporter::ImportAutofillFormData() {
     form_entry.last_used = base::Time::FromTimeT(s.ColumnInt64(4) / 1000000);
 
     // Don't import search bar history.
-    if (base::UTF16ToUTF8(form_entry.name) == "searchbar-history")
+    if (base::UTF16ToUTF8(form_entry.name) == "searchbar-history") {
       continue;
+    }
 
     form_entries.push_back(form_entry);
   }
 
-  if (!form_entries.empty() && !cancelled())
+  if (!form_entries.empty() && !cancelled()) {
     bridge_->SetAutofillFormData(form_entries);
+  }
 }
 
 int FirefoxImporter::LoadNodeIDByGUID(sql::Database* db,
@@ -584,8 +626,9 @@ int FirefoxImporter::LoadNodeIDByGUID(sql::Database* db,
 
   s.BindString(0, GUID);
 
-  if (!s.Step())
+  if (!s.Step()) {
     return -1;
+  }
   return s.ColumnInt(0);
 }
 
@@ -606,8 +649,9 @@ void FirefoxImporter::LoadLivemarkIDs(sql::Database* db,
 
   s.BindString(0, kFeedAnnotation);
 
-  while (s.Step() && !cancelled())
+  while (s.Step() && !cancelled()) {
     livemark->insert(s.ColumnInt(0));
+  }
 }
 
 bool FirefoxImporter::GetTopBookmarkFolder(sql::Database* db,
@@ -653,8 +697,9 @@ bool FirefoxImporter::GetWholeBookmarkFolder(sql::Database* db,
   std::string query =
       "SELECT b.id, h.url, COALESCE(b.title, h.title), "
       "b.type, k.keyword, b.dateAdded ";
-  if (favicons_location == FaviconsLocation::kPlacesDatabase)
+  if (favicons_location == FaviconsLocation::kPlacesDatabase) {
     query += ", h.favicon_id ";
+  }
   query +=
       "FROM moz_bookmarks b "
       "LEFT JOIN moz_places h ON b.fk = h.id "
@@ -684,8 +729,9 @@ bool FirefoxImporter::GetWholeBookmarkFolder(sql::Database* db,
     item->empty_folder = true;
 
     temp_list.push_back(std::move(item));
-    if (empty_folder)
+    if (empty_folder) {
       *empty_folder = false;
+    }
   }
 
   if (cancelled() || !s.Succeeded()) {
@@ -713,8 +759,9 @@ void FirefoxImporter::LoadFavicons(
   const char query[] = "SELECT url, data FROM moz_favicons WHERE id=?";
   sql::Statement s(db->GetUniqueStatement(query));
 
-  if (!s.is_valid())
+  if (!s.is_valid()) {
     return;
+  }
 
   for (const auto& i : favicon_map) {
     s.BindInt64(0, i.first);
@@ -737,12 +784,14 @@ void FirefoxImporter::LoadFavicons(
     const std::vector<user_data_importer::ImportedBookmarkEntry>& bookmarks,
     favicon_base::FaviconUsageDataList* favicons) {
   base::FilePath file = GetCopiedSourcePath("favicons.sqlite");
-  if (!base::PathExists(file))
+  if (!base::PathExists(file)) {
     return;
+  }
 
   sql::Database db(kDatabaseTag);
-  if (!db.Open(file))
+  if (!db.Open(file)) {
     return;
+  }
 
   sql::Statement s(db.GetUniqueStatement(
       "SELECT moz_icons.id, moz_icons.icon_url, moz_icons.data "
@@ -752,8 +801,9 @@ void FirefoxImporter::LoadFavicons(
       "INNER JOIN moz_pages_w_icons "
       "ON moz_pages_w_icons.id = moz_icons_to_pages.page_id "
       "WHERE moz_pages_w_icons.page_url = ?"));
-  if (!s.is_valid())
+  if (!s.is_valid()) {
     return;
+  }
 
   // A map from icon id to the corresponding index in the |favicons| vector.
   std::map<uint64_t, size_t> icon_cache;
@@ -789,8 +839,9 @@ void FirefoxImporter::LoadFavicons(
 base::FilePath FirefoxImporter::GetCopiedSourcePath(
     std::string_view base_file_name) {
   const base::FilePath file = source_path_.AppendASCII(base_file_name);
-  if (!base::PathExists(file))
+  if (!base::PathExists(file)) {
     return {};
+  }
   if (base_file_name.ends_with(".sqlite")) {
     for (const auto& copy : source_database_copies_) {
       if (copy->copied_file_path().BaseName() == file.BaseName()) {
@@ -810,7 +861,8 @@ base::FilePath FirefoxImporter::GetCopiedSourcePath(
   DCHECK(source_path_copy_.IsValid());
   const base::FilePath destination =
       source_path_copy_.GetPath().AppendASCII(base_file_name);
-  if (!base::CopyFile(file, destination))
+  if (!base::CopyFile(file, destination)) {
     return {};
+  }
   return destination;
 }

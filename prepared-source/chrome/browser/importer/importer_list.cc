@@ -34,15 +34,26 @@ namespace {
 
 uint16_t FilterSupportedServices(
     const user_data_importer::SourceProfile& profile) {
-  uint16_t blocked = user_data_importer::PASSWORDS |
+  uint16_t supported = profile.services_supported;
+  uint16_t blocked = user_data_importer::COOKIES |
+                     user_data_importer::PASSWORDS |
                      user_data_importer::AUTOFILL_FORM_DATA;
 #if BUILDFLAG(IS_LINUX) && BUILDFLAG(USE_DBUS)
+  if (profile.importer_type == user_data_importer::TYPE_FIREFOX &&
+      base::PathExists(profile.source_path.AppendASCII("cookies.sqlite"))) {
+    supported |= user_data_importer::COOKIES;
+  }
+  if (profile.importer_type == user_data_importer::TYPE_FIREFOX ||
+      profile.importer_type == user_data_importer::TYPE_CHROME ||
+      profile.importer_type == user_data_importer::TYPE_BRAVE) {
+    blocked &= ~user_data_importer::COOKIES;
+  }
   if (profile.importer_type == user_data_importer::TYPE_CHROME ||
       profile.importer_type == user_data_importer::TYPE_BRAVE) {
     blocked &= ~user_data_importer::PASSWORDS;
   }
 #endif
-  return profile.services_supported & ~blocked;
+  return supported & ~blocked;
 }
 
 #if BUILDFLAG(IS_WIN)

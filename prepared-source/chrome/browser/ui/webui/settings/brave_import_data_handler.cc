@@ -22,6 +22,7 @@
 #include "chrome/browser/importer/brave_external_process_importer_host.h"
 #include "chrome/browser/importer/importer_list.h"
 #include "chrome/browser/importer/profile_writer.h"
+#include "chrome/browser/profiles/noventra_account_spaces.h"
 #include "chrome/browser/profiles/profile.h"
 #include "components/bookmarks/browser/base_bookmark_model_observer.h"
 #include "components/bookmarks/browser/bookmark_model.h"
@@ -37,8 +38,8 @@
 #include "base/files/file_util.h"
 #include "base/task/thread_pool.h"
 #include "chrome/browser/ui/browser_window/public/global_browser_collection.h"
-#include "chrome/browser/ui/webui/settings/brave_full_disk_access_confirm_dialog_delegate.h"
 #include "chrome/browser/ui/tab_modal_confirm_dialog.h"
+#include "chrome/browser/ui/webui/settings/brave_full_disk_access_confirm_dialog_delegate.h"
 #endif  // BUILDFLAG(IS_MAC)
 
 namespace {
@@ -144,7 +145,20 @@ void BraveImportDataHandler::StartImport(
   if (!imported_items) {
     return;
   }
+  if (pending_password_writer_) {
+    return;
+  }
   Profile* profile = Profile::FromWebUI(web_ui());
+  cookie_partition_.reset();
+  if (imported_items & user_data_importer::COOKIES) {
+    if (profile->IsOffTheRecord()) {
+      FireWebUIListener("import-data-status-changed",
+                        base::Value(kImportStatusFailed));
+      return;
+    }
+    cookie_partition_ = noventra::SpaceConfig(
+        profile, noventra::SpaceId(web_ui()->GetWebContents()));
+  }
 #if BUILDFLAG(IS_MAC)
   CheckDiskAccess(imported_items, source_profile.source_path,
                   source_profile.importer_type,
@@ -239,6 +253,18 @@ void BraveImportDataHandler::StartImportWithWriter(
   } else if (!profile_writer) {
     profile_writer = new ProfileWriter(profile);
   }
+  if (imported_items & user_data_importer::COOKIES) {
+    if (!cookie_partition_) {
+      import_observers_.erase(source_profile.source_path);
+      FireWebUIListener("import-data-status-changed",
+                        base::Value(kImportStatusFailed));
+      return;
+    }
+    profile_writer->ConfigureCookieImport(
+        *cookie_partition_,
+        base::BindRepeating(&ImportDataHandler::OnCookieImportResult,
+                            cookie_weak_factory_.GetWeakPtr()));
+  }
   importer_host->StartImportSettings(source_profile, profile, imported_items,
                                      profile_writer.get());
 }
@@ -255,7 +281,8 @@ void BraveImportDataHandler::NotifyImportProgress(
     import_did_succeed_ = false;
   } else if (*event == "ImportItemEnded") {
     if (source_profile.importer_type !=
-        user_data_importer::TYPE_BOOKMARKS_FILE && !import_failed_) {
+            user_data_importer::TYPE_BOOKMARKS_FILE &&
+        !import_failed_) {
       import_did_succeed_ = true;
     }
   } else if (*event == "ImportEnded") {
@@ -273,8 +300,9 @@ void BraveImportDataHandler::OnImportEnded(
     const user_data_importer::SourceProfile& source_profile) {
   import_observers_.erase(source_profile.source_path);
   FireWebUIListener("import-data-status-changed",
-                    base::Value(import_did_succeed_ && !import_failed_ ? kImportStatusSucceeded
-                                                    : kImportStatusFailed));
+                    base::Value(import_did_succeed_ && !import_failed_
+                                    ? kImportStatusSucceeded
+                                    : kImportStatusFailed));
 }
 
 void BraveImportDataHandler::OnJavascriptDisallowed() {

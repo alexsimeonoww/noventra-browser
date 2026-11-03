@@ -26,6 +26,7 @@
 #include "chrome/browser/importer/external_process_importer_host.h"
 #include "chrome/browser/importer/importer_list.h"
 #include "chrome/browser/importer/importer_uma.h"
+#include "chrome/browser/profiles/noventra_account_spaces.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser_window.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
@@ -33,6 +34,7 @@
 #include "chrome/browser/ui/select_file_policy/chrome_select_file_policy.h"
 #include "chrome/common/pref_names.h"
 #include "content/public/browser/browser_thread.h"
+#include "content/public/browser/web_contents.h"
 #include "content/public/browser/web_ui.h"
 #include "crypto/hash.h"
 #include "ui/shell_dialogs/selected_file_info.h"
@@ -68,6 +70,9 @@ ImportDataHandler::~ImportDataHandler() {
 
   if (importer_host_) {
     importer_host_->set_observer(nullptr);
+    if (importing_cookies_) {
+      importer_host_->Cancel();
+    }
   }
 
   if (select_file_dialog_.get()) {
@@ -92,6 +97,7 @@ void ImportDataHandler::RegisterMessages() {
 }
 
 void ImportDataHandler::OnJavascriptDisallowed() {
+  cookie_weak_factory_.InvalidateWeakPtrs();
   // Cancels outstanding profile list detections.
   importer_list_.reset();
 
@@ -100,8 +106,12 @@ void ImportDataHandler::OnJavascriptDisallowed() {
   // also clear our pointer, as otherwise this can lead to a use-after-free
   // in the destructor. https://crbug.com/40058962.
   if (importer_host_) {
-    importer_host_->set_observer(nullptr);
+    auto* host = importer_host_.get();
+    host->set_observer(nullptr);
     importer_host_ = nullptr;
+    if (importing_cookies_) {
+      host->Cancel();
+    }
   }
 }
 
@@ -132,8 +142,17 @@ void ImportDataHandler::StartImport(
       web_ui()->GetWebContents()->GetTopLevelNativeWindow());
   importer_host_->set_parent_view(web_ui()->GetWebContents()->GetNativeView());
 
+  scoped_refptr<ProfileWriter> writer = new ProfileWriter(profile);
+  importing_cookies_ = (imported_items & user_data_importer::COOKIES) != 0;
+  if (importing_cookies_) {
+    writer->ConfigureCookieImport(
+        noventra::SpaceConfig(profile,
+                              noventra::SpaceId(web_ui()->GetWebContents())),
+        base::BindRepeating(&ImportDataHandler::OnCookieImportResult,
+                            cookie_weak_factory_.GetWeakPtr()));
+  }
   importer_host_->StartImportSettings(source_profile, profile, imported_items,
-                                      new ProfileWriter(profile));
+                                      writer.get());
 
   importer::LogImporterUseToMetrics("ImportDataHandler",
                                     source_profile.importer_type);
@@ -156,6 +175,12 @@ void ImportDataHandler::HandleImportData(const base::ListValue& args) {
   }
 
   const base::DictValue& type_dict = types.GetDict();
+  if (type_dict.FindBool("import_dialog_cookies").value_or(false) &&
+      Profile::FromWebUI(web_ui())->IsOffTheRecord()) {
+    FireWebUIListener("import-data-status-changed",
+                      base::Value(kImportStatusFailed));
+    return;
+  }
   uint16_t selected_items = user_data_importer::NONE;
   if (*type_dict.FindBool(prefs::kImportDialogAutofillFormData)) {
     selected_items |= user_data_importer::AUTOFILL_FORM_DATA;
@@ -178,7 +203,16 @@ void ImportDataHandler::HandleImportData(const base::ListValue& args) {
 
   const user_data_importer::SourceProfile& source_profile =
       importer_list_->GetSourceProfileAt(browser_index);
+  if (type_dict.FindBool("import_dialog_cookies").value_or(false)) {
+    selected_items |= user_data_importer::COOKIES;
+  }
   uint16_t supported_items = source_profile.services_supported;
+  if ((selected_items & user_data_importer::COOKIES) &&
+      !(supported_items & user_data_importer::COOKIES)) {
+    FireWebUIListener("import-data-status-changed",
+                      base::Value(kImportStatusFailed));
+    return;
+  }
 
   uint16_t imported_items = (selected_items & supported_items);
   if (imported_items) {
@@ -234,6 +268,17 @@ void ImportDataHandler::HandleImportFromBookmarksFile(
       browser->GetWindow()->GetNativeWindow(), nullptr);
 }
 
+void ImportDataHandler::OnCookieImportResult(uint32_t imported,
+                                             uint32_t skipped) {
+  if (!IsJavascriptAllowed()) {
+    return;
+  }
+  base::DictValue result;
+  result.Set("imported", static_cast<int>(imported));
+  result.Set("skipped", static_cast<int>(skipped));
+  FireWebUIListener("import-cookies-result", result);
+}
+
 void ImportDataHandler::SendBrowserProfileData(const std::string& callback_id) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
   importer_list_loaded_ = true;
@@ -249,6 +294,8 @@ void ImportDataHandler::SendBrowserProfileData(const std::string& callback_id) {
     browser_profile.Set("name", source_profile.importer_name);
     browser_profile.Set("index", static_cast<int>(i));
     browser_profile.Set("profileName", source_profile.profile);
+    browser_profile.Set("cookies",
+                        (browser_services & user_data_importer::COOKIES) != 0);
     browser_profile.Set("history",
                         (browser_services & user_data_importer::HISTORY) != 0);
     browser_profile.Set(
@@ -260,8 +307,8 @@ void ImportDataHandler::SendBrowserProfileData(const std::string& callback_id) {
     browser_profile.Set(
         "autofillFormData",
         (browser_services & user_data_importer::AUTOFILL_FORM_DATA) != 0);
-    browser_profile.Set("extensions",
-                        (browser_services & user_data_importer::EXTENSIONS) != 0);
+    browser_profile.Set(
+        "extensions", (browser_services & user_data_importer::EXTENSIONS) != 0);
 
     browser_profiles.Append(std::move(browser_profile));
   }
@@ -293,8 +340,9 @@ void ImportDataHandler::ImportEnded() {
   importer_host_ = nullptr;
 
   FireWebUIListener("import-data-status-changed",
-                    base::Value(import_did_succeed_ && !import_failed_ ? kImportStatusSucceeded
-                                                    : kImportStatusFailed));
+                    base::Value(import_did_succeed_ && !import_failed_
+                                    ? kImportStatusSucceeded
+                                    : kImportStatusFailed));
 }
 
 void ImportDataHandler::FileSelected(const ui::SelectedFileInfo& file,

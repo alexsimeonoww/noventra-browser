@@ -10,9 +10,12 @@
 #include "base/check_op.h"
 #include "base/debug/dump_without_crashing.h"
 #include "base/functional/bind.h"
+#include "base/memory/weak_ptr.h"
+#include "base/run_loop.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/task/task_runner.h"
+#include "base/timer/timer.h"
 #include "build/build_config.h"
 #include "chrome/common/importer/importer_autofill_form_data_entry.h"
 #include "components/user_data_importer/common/imported_bookmark_entry.h"
@@ -27,6 +30,21 @@ const int kNumBookmarksToSend = 100;
 const int kNumHistoryRowsToSend = 100;
 const int kNumFaviconsToSend = 100;
 const int kNumAutofillFormDataToSend = 100;
+
+class CookieWriteReply {
+ public:
+  void Done(bool value) {
+    succeeded = value;
+    completed = true;
+    if (quit) {
+      std::move(quit).Run();
+    }
+  }
+  bool completed = false;
+  bool succeeded = false;
+  base::OnceClosure quit;
+  base::WeakPtrFactory<CookieWriteReply> weak_factory{this};
+};
 
 }  // namespace
 
@@ -111,6 +129,48 @@ void ExternalProcessImporterBridge::SetKeywords(
 void ExternalProcessImporterBridge::SetPasswordForm(
     const user_data_importer::ImportedPasswordForm& form) {
   observer_->OnPasswordFormImportReady(form);
+}
+
+bool ExternalProcessImporterBridge::SetCookies(
+    const std::vector<net::CanonicalCookie>& cookies,
+    uint32_t skipped,
+    base::RepeatingCallback<bool()> cancelled) {
+  for (size_t offset = 0; offset < cookies.size() || offset == 0;
+       offset += 100) {
+    if (cancelled.Run()) {
+      return false;
+    }
+    const size_t end = std::min(offset + 100, cookies.size());
+    std::vector<net::CanonicalCookie> group(cookies.begin() + offset,
+                                            cookies.begin() + end);
+    base::RunLoop loop(base::RunLoop::Type::kNestableTasksAllowed);
+    CookieWriteReply reply;
+    reply.quit = loop.QuitClosure();
+    observer_->OnCookiesImportReady(
+        group, offset == 0 ? skipped : 0,
+        base::BindOnce(&CookieWriteReply::Done,
+                       reply.weak_factory.GetWeakPtr()));
+    base::OneShotTimer timeout;
+    timeout.Start(FROM_HERE, base::Seconds(45), loop.QuitClosure());
+    base::RepeatingTimer cancellation;
+    cancellation.Start(
+        FROM_HERE, base::Milliseconds(100),
+        base::BindRepeating(
+            [](base::RepeatingCallback<bool()> cancelled, base::RunLoop* loop) {
+              if (cancelled.Run()) {
+                loop->Quit();
+              }
+            },
+            cancelled, &loop));
+    loop.Run();
+    if (!reply.completed || !reply.succeeded || cancelled.Run()) {
+      return false;
+    }
+    if (end == cookies.size()) {
+      break;
+    }
+  }
+  return true;
 }
 
 void ExternalProcessImporterBridge::SetAutofillFormData(

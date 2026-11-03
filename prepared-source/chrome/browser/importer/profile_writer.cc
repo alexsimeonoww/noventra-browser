@@ -19,6 +19,7 @@
 #include "chrome/browser/favicon/favicon_service_factory.h"
 #include "chrome/browser/first_run/first_run.h"
 #include "chrome/browser/history/history_service_factory.h"
+#include "chrome/browser/importer/noventra_cookie_profile_writer.h"
 #include "chrome/browser/password_manager/factories/profile_password_store_factory.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/search_engines/template_url_service_factory.h"
@@ -53,20 +54,23 @@ std::u16string GenerateUniqueFolderName(const BookmarkNode* parent,
   // Build a set containing the bookmark bar folder names.
   std::set<std::u16string> existing_folder_names;
   for (const auto& node : parent->children()) {
-    if (node->is_folder())
+    if (node->is_folder()) {
       existing_folder_names.insert(node->GetTitle());
+    }
   }
 
   // If the given name is unique, use it.
-  if (existing_folder_names.find(folder_name) == existing_folder_names.end())
+  if (existing_folder_names.find(folder_name) == existing_folder_names.end()) {
     return folder_name;
+  }
 
   // Otherwise iterate until we find a unique name.
   for (size_t i = 1; i <= existing_folder_names.size(); ++i) {
     std::u16string name =
         folder_name + u" (" + base::NumberToString16(i) + u")";
-    if (existing_folder_names.find(name) == existing_folder_names.end())
+    if (existing_folder_names.find(name) == existing_folder_names.end()) {
       return name;
+    }
   }
 
   NOTREACHED();
@@ -79,7 +83,29 @@ void ShowBookmarkBar(Profile* profile) {
 
 }  // namespace
 
-ProfileWriter::ProfileWriter(Profile* profile) : profile_(profile) {}
+ProfileWriter::ProfileWriter(Profile* profile)
+    : profile_(profile), cookie_profile_(profile->GetWeakPtr()) {}
+
+void ProfileWriter::ConfigureCookieImport(
+    const content::StoragePartitionConfig& config,
+    base::RepeatingCallback<void(uint32_t, uint32_t)> summary) {
+  cookie_partition_ = config;
+  cookie_summary_ = std::move(summary);
+}
+
+void ProfileWriter::WriteCookies(
+    const std::vector<net::CanonicalCookie>& cookies,
+    uint32_t skipped,
+    base::RepeatingCallback<bool()> can_continue,
+    base::OnceCallback<void(bool)> callback) {
+  if (!cookie_profile_ || !cookie_partition_) {
+    std::move(callback).Run(false);
+    return;
+  }
+  noventra::WriteImportedCookies(cookie_profile_, *cookie_partition_, cookies,
+                                 skipped, std::move(can_continue),
+                                 cookie_summary_, std::move(callback));
+}
 
 bool ProfileWriter::BookmarkModelIsLoaded() const {
   return BookmarkModelFactory::GetForBrowserContext(profile_)->loaded();
@@ -124,8 +150,9 @@ void ProfileWriter::AddHomepage(const GURL& home_page) {
 void ProfileWriter::AddBookmarks(
     const std::vector<user_data_importer::ImportedBookmarkEntry>& bookmarks,
     const std::u16string& top_level_folder_name) {
-  if (bookmarks.empty())
+  if (bookmarks.empty()) {
     return;
+  }
 
   BookmarkModel* model = BookmarkModelFactory::GetForBrowserContext(profile_);
   DCHECK(model->loaded());
@@ -141,10 +168,11 @@ void ProfileWriter::AddBookmarks(
   std::vector<user_data_importer::ImportedBookmarkEntry> toolbar_bookmarks;
   std::vector<user_data_importer::ImportedBookmarkEntry> reordered_bookmarks;
   for (auto it = bookmarks.begin(); it != bookmarks.end(); ++it) {
-    if (it->in_toolbar)
+    if (it->in_toolbar) {
       toolbar_bookmarks.push_back(*it);
-    else
+    } else {
       reordered_bookmarks.push_back(*it);
+    }
   }
   reordered_bookmarks.insert(reordered_bookmarks.begin(),
                              toolbar_bookmarks.begin(),
@@ -164,8 +192,9 @@ void ProfileWriter::AddBookmarks(
            bookmark = reordered_bookmarks.begin();
        bookmark != reordered_bookmarks.end(); ++bookmark) {
     // Disregard any bookmarks with invalid urls.
-    if (!bookmark->is_folder && !bookmark->url.is_valid())
+    if (!bookmark->is_folder && !bookmark->url.is_valid()) {
       continue;
+    }
 
     const BookmarkNode* parent = nullptr;
     if (import_to_top_level && (add_all_to_top_level || bookmark->in_toolbar)) {
@@ -234,7 +263,8 @@ void ProfileWriter::AddBookmarks(
           visibility->IsUserModifiable()) {
         pref_service->SetInteger(
             bookmarks::prefs::kBookmarkBarVisibilityState,
-            static_cast<int>(bookmarks::BookmarkBarVisibilityState::kAlwaysHide));
+            static_cast<int>(
+                bookmarks::BookmarkBarVisibilityState::kAlwaysHide));
       }
     } else {
       // Preserve the other layouts' existing toolbar-import behavior.
@@ -274,8 +304,9 @@ static std::string HostPathKeyForURL(const GURL& url) {
 static std::string BuildHostPathKey(const TemplateURL* t_url,
                                     const SearchTermsData& search_terms_data,
                                     bool try_url_if_invalid) {
-  if (try_url_if_invalid && !t_url->url_ref().IsValid(search_terms_data))
+  if (try_url_if_invalid && !t_url->url_ref().IsValid(search_terms_data)) {
     return HostPathKeyForURL(GURL(t_url->url()));
+  }
 
   if (t_url->url_ref().SupportsReplacement(search_terms_data)) {
     return HostPathKeyForURL(GURL(t_url->url_ref().ReplaceSearchTerms(
@@ -291,8 +322,8 @@ static void BuildHostPathMap(TemplateURLService* model,
   TemplateURLService::TemplateURLVector template_urls =
       model->GetTemplateURLs();
   for (size_t i = 0; i < template_urls.size(); ++i) {
-    const std::string host_path = BuildHostPathKey(
-        template_urls[i], model->search_terms_data(), false);
+    const std::string host_path =
+        BuildHostPathKey(template_urls[i], model->search_terms_data(), false);
     if (!host_path.empty()) {
       const TemplateURL* existing_turl = (*host_path_map)[host_path];
       TemplateURL* t_url = template_urls[i];
@@ -315,20 +346,23 @@ void ProfileWriter::AddKeywords(
   TemplateURLService* model =
       TemplateURLServiceFactory::GetForProfile(profile_);
   HostPathMap host_path_map;
-  if (unique_on_host_and_path)
+  if (unique_on_host_and_path) {
     BuildHostPathMap(model, &host_path_map);
+  }
 
   for (auto& turl : template_urls) {
     // TemplateURLService requires keywords to be unique. If there is already a
     // TemplateURL with this keyword, don't import it again.
-    if (model->GetTemplateURLForKeyword(turl->keyword()) != nullptr)
+    if (model->GetTemplateURLForKeyword(turl->keyword()) != nullptr) {
       continue;
+    }
 
     // The omnibox doesn't properly handle search keywords with whitespace,
     // so skip importing them.
     if (turl->keyword().find_first_of(base::kWhitespaceUTF16) !=
-        std::u16string::npos)
+        std::u16string::npos) {
       continue;
+    }
 
     // For search engines if there is already a keyword with the same
     // host+path, we don't import it. This is done to avoid both duplicate
@@ -337,12 +371,14 @@ void ProfileWriter::AddKeywords(
     // imported browser.
     if (unique_on_host_and_path && (host_path_map.find(BuildHostPathKey(
                                         turl.get(), model->search_terms_data(),
-                                        true)) != host_path_map.end()))
+                                        true)) != host_path_map.end())) {
       continue;
+    }
 
     // Only add valid TemplateURLs to the model.
-    if (turl->url_ref().IsValid(model->search_terms_data()))
+    if (turl->url_ref().IsValid(model->search_terms_data())) {
       model->Add(std::move(turl));
+    }
   }
 }
 
@@ -351,8 +387,9 @@ void ProfileWriter::AddAutocompleteFormDataEntries(
   scoped_refptr<autofill::AutofillWebDataService> web_data_service =
       WebDataServiceFactory::GetAutofillWebDataForProfile(
           profile_, ServiceAccessType::EXPLICIT_ACCESS);
-  if (web_data_service.get())
+  if (web_data_service.get()) {
     web_data_service->UpdateAutocompleteEntries(autocomplete_entries);
+  }
 }
 
 ProfileWriter::~ProfileWriter() = default;

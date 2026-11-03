@@ -62,6 +62,10 @@ class ExternalProcessImporterBridge : public ImporterBridge {
   void SetPasswordForm(
       const user_data_importer::ImportedPasswordForm& form) override;
 
+  bool SetCookies(const std::vector<net::CanonicalCookie>& cookies,
+                  uint32_t skipped,
+                  base::RepeatingCallback<bool()> cancelled) override;
+
   void SetAutofillFormData(
       const std::vector<ImporterAutofillFormDataEntry>& entries) override;
 
