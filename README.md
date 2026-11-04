@@ -9,6 +9,17 @@ vertical tabs, Spaces, split views and configurable browser controls.
 The first public target is **Linux x86_64 preview**. Windows and macOS downloads
 are not available yet. Preview builds need testing before everyday use.
 
+## Visible leave confirmations
+
+Linux preview 6 fixes an invisible leave confirmation on Wayland. A misplaced
+prompt could dim the browser and block tab switching when closing sites such
+as Gmail. Cancel and Leave now remain visible. Cancel or Escape preserves the
+page and its draft; Leave closes the intended tab.
+
+The corrected binary passed 116 native checks across both tab layouts on
+private Wayland and X11 displays. The tests use local pages, not a signed-in
+mail account. Native Mac, Windows and full Chromium suites were not run.
+
 ## Sidebar space controls and floating resize
 
 Linux preview 5 fixes the hidden third space in the default expanded sidebar
@@ -43,7 +54,7 @@ verified update is ready. It closes the browser normally, installs the signed
 update, then reopens regular tabs and Spaces. Cancelling an unsaved-page or
 Incognito warning cancels the restart. Incognito sessions are not restored.
 
-To receive preview 5 from preview 4, open About Noventra and use **Update and
+To receive preview 6 from an earlier preview, open About Noventra and use **Update and
 restart** once the verified update is ready. Preview 2 uses its existing flow:
 let About prepare the update, then close every Noventra window and reopen it
 once. The button is hidden while the installed version is current.
