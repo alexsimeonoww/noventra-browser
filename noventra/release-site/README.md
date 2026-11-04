@@ -1,5 +1,29 @@
 # Noventra downloads and signed updates
 
+The download page uses the main Studio site's Open Horizon design: an always-light
+Geist layout, approved logo, mountain hero and black pill actions. Its font and
+image resources come from `https://www.noventrastudio.com/assets/`. Only HTML CSP
+allows that stylesheet/font/image origin; scripts remain disabled and signed-feed
+and artifact responses retain their existing policy. Keep the actual release
+catalog, checksums and unavailable-platform state independent of presentation.
+
+The 2026-11-04 OS-aware page update is live in download Worker version
+`2506d1a5-6ee3-4ac8-9e24-a0829766abfb`; the previous version
+`6d8a8885-0b40-4116-90da-87b90489f6e1` is retained for rollback. It changes page
+rendering without writing to R2 or publishing a browser release. This source kit accompanies
+Linux preview 4 / signed sequence 4. Page presentation changes remain separate
+from browser release publication.
+
+HTML uses existing browser platform hints or a bounded User-Agent fallback to
+choose guidance. Compatible Linux visitors receive the Linux download action;
+other systems and known unsupported Linux CPUs see availability guidance and
+an explicit manual Linux link in the platform table. Unknown visitors can
+choose manually. Detection is advisory and cannot establish hardware compatibility;
+Mac User-Agent strings do not reliably identify Apple silicon. The page requests
+no additional client hints, uses no detection script and performs no automatic
+download or redirect. Only HTML varies by these headers; signed payloads and
+artifact transport are unchanged.
+
 This Worker serves `https://downloads.noventrastudio.com/` from the dedicated
 `noventra-browser-releases` R2 bucket. The existing Noventra Studio Worker, site,
 mail and unrelated buckets are not part of this configuration. The public
@@ -162,8 +186,9 @@ Cloudflare permissions, a successful real upload or browser-native behavior.
 The parent release qualification must verify the actual public HTTPS manifest,
 signature, archive/source hashes, fresh install and later update flow.
 
-The landing page has no scripts, trackers or external asset requests. Its labels
-are escaped, metadata reads are bounded, downloads stream with byte ranges and
+The landing page has no scripts or trackers. Fonts, stylesheet and images load
+from the main Studio origin. Its labels are escaped, metadata reads are bounded,
+downloads stream with byte ranges and
 ETags, update metadata is not cached, and immutable archives are cacheable.
 Missing/malformed release metadata returns an honest preparation page or a
 closed failure. Neither Worker changes browser profiles or launches a browser.

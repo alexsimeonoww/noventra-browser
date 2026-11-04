@@ -17,3 +17,5 @@ noventra-incognito-cli-space.patch
 noventra-cookie-import.patch
 noventra-onboarding-device-transfer-entry.patch
 noventra-update-and-restart.patch
+noventra-about-licenses.patch
+noventra-pin-close-private-spaces.patch

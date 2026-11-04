@@ -92,12 +92,8 @@ python3 -B -m unittest discover -s tests/noventra -p test_package_installer.py -
 ```
 
 The tests use disposable installations and signed loopback feeds. They must not
-send notifications to the operator's session bus. The local proof at
-`work/update-reminders-2026-11-03/verify_private_notification.py` starts an owned
-private bus and notification service, then exercises the real system helper
-through the signed update path. That proof requires `dbus-run-session`,
-`notify-send`, and system Python with PyGObject.
-
-The proof verifies the notification request. It does not verify how every Linux
-desktop renders that request. No personal browser, profile, or notification
-service is used.
+send notifications to the operator's session bus. Native notification proofs
+use an owned private bus and notification service, the real system helper,
+`dbus-run-session`, `notify-send`, and system Python with PyGObject. They verify
+the notification request rather than every Linux desktop's rendering. Personal
+browser profiles and notification services are excluded from those fixtures.

@@ -131,7 +131,7 @@
     "chrome/browser/resources/new_tab_shared/customize_buttons/customize_buttons.css": "5d56e8a539fe610b44c8cc8d6cd12dfba83209bb2c5d140df0d6fe0266cbb139",
     "chrome/browser/resources/settings/BUILD.gn": "9c58995f9a60b02108c274ce7d6aec8e3e926ea366abc4cf4568ed2663355a39",
     "chrome/browser/resources/settings/about_page/about_page.css": "99a7b50658a4a8beac8f135da7edf847c0c0ab963c86cda479298b7754a7869a",
-    "chrome/browser/resources/settings/about_page/about_page.html.ts": "22cfb9bfae1ce462d373ce7123fa73eecb0cbc3595c6faf9be00080547ffd391",
+    "chrome/browser/resources/settings/about_page/about_page.html.ts": "5d5cdd6908989de9f22eafdc20fb2c3d599aa136ab571f46887cdefe57cc0c84",
     "chrome/browser/resources/settings/about_page/about_page.ts": "c00678408c688163fe154f3234535aa13ea8c22a905fd4cb6f8b0355449f0f5e",
     "chrome/browser/resources/settings/appearance_page/appearance_page.css": "13b15144bf337ce7a90a94e675bceab0d07ed30de79dda54d7b4ec378aaf6c4c",
     "chrome/browser/resources/settings/appearance_page/appearance_page.html.ts": "423d0a1f51af5461763edd61e9c33b3a105e605edccc7bb8680b5c883f62653b",
@@ -196,7 +196,7 @@
     "chrome/browser/ui/browser.cc": "3fcc4e1a6c0ca8755553fdc26fc3ec0f7e6a0e06cf2611f4fa70fe749c631677",
     "chrome/browser/ui/browser_actions.cc": "4ce2a9a41536e56737de5cd9bdf2a8f1426430b9e1b7049aba5665dd9a1d9d4f",
     "chrome/browser/ui/browser_command_controller.cc": "2e919dfe88b285270c0d822dcd4613ac13e484704bfdf7866609c5eda704810b",
-    "chrome/browser/ui/browser_commands.cc": "cb0ef876ed1466720bc0ffe4c1a9ac039c56541deee97246a6ca35d258fb4848",
+    "chrome/browser/ui/browser_commands.cc": "db1b5115cd145c3ed0e398ccdf6cfc31fb6779bd7c32e2e25be5624b5c8e750f",
     "chrome/browser/ui/browser_live_tab_context.cc": "460ff252b4f647d996ffbef25809b12e1f0a04df45310045356e0808b79cbaea",
     "chrome/browser/ui/browser_live_tab_context.h": "3b414724e2f3b2fac07e7a5e02bf736f4d7fc6b62d316db823667dc5e0fef623",
     "chrome/browser/ui/browser_shortcuts/BUILD.gn": "8f613085b02b5adc33c0531fcfd35c1c638a43ec1e64bce019875cad4cc07202",
@@ -262,7 +262,7 @@
     "chrome/browser/ui/tabs/tab_list_bridge.cc": "f070dc12c9d5b99fe3094b09d58649c544445f6cc3cfb69e45f8355b69915a90",
     "chrome/browser/ui/tabs/tab_menu_model.cc": "5a850c42f4c5f5abbcfe8571fff09d4d711310c3557263048c5915cc6125756d",
     "chrome/browser/ui/tabs/tab_model.cc": "85ccbb4635c240d01d22581f89f4504bc4464929e19bb782c46a8831ba304571",
-    "chrome/browser/ui/tabs/tab_strip_model.cc": "636c7114546efb6b82bb1e9e626c55de9d93bd1cef49cdf1a378d9e2f42ada9f",
+    "chrome/browser/ui/tabs/tab_strip_model.cc": "72e4ca37796a8fd0b7f4362d826ae79bcbff35e598c880ff62d3fd5ec4e24439",
     "chrome/browser/ui/tabs/tab_strip_model.h": "a987c553d571a1fcfd80b27c8e5f980256f9bd2325376711af9c1f4c8d915c6b",
     "chrome/browser/ui/tabs/tab_strip_prefs.cc": "b25a43b0448b26882bf1386727348468bc0a6ad32e010d2fced299e7c59dd371",
     "chrome/browser/ui/tabs/tab_style.cc": "4867826176d147d94b924015d55c87ae938010d92a9f2d0da5a762143821a006",
@@ -326,7 +326,7 @@
     "chrome/browser/ui/views/frame/noventra_window_mirror_view.h": "2830732fdeec56454c59a1a3f601e1bec0c47927ff9e1dbf09f8af06e097bb3b",
     "chrome/browser/ui/views/frame/opaque_browser_frame_view.cc": "e404fe50637015065944ce9af4d807432579eccba0b4969d6acc8ddd3b872a9c",
     "chrome/browser/ui/views/frame/tab_modal_dialog_host.cc": "a3696ccb570342bb45dc452a033dbb04f86fda5f7978519b32f5b0919037ff7a",
-    "chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc": "91836c493bd3903634fc5c6802ea4a28984f4ee47b8063ce8aa8c7df22a46de5",
+    "chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc": "6134d4e3032699ea021afa1979a9aa25294b5cc3c475ad542d2bfe86d34d0578",
     "chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h": "3b3f411c1f1a0f5c8155c4e048dd3292aacff11ae4636cd549682b0c7630c95d",
     "chrome/browser/ui/views/frame/vertical_tab_strip_region_view_browsertest.cc": "5c2c09949bda74ddf2ba412b01ffbd13043bd75be8f0e38a72ae0b7cac0df96c",
     "chrome/browser/ui/views/helium/BUILD.gn": "83fb89f90e7d9068a1aff931469c2731c7b7bef98ab3417fc214d265dafabb54",
@@ -355,12 +355,12 @@
     "chrome/browser/ui/views/tabs/common/tab_strip_view_layout.cc": "6dd40c7f4df27045f5d5f90c030148ea0bb4fa5f3fe6bf323a2dd7352d173187",
     "chrome/browser/ui/views/tabs/common/tab_view.cc": "2c2666c4dc1b5c35762099d8a3813be8d8e2eff3f1f4df53ab4c917ef4c56603",
     "chrome/browser/ui/views/tabs/common/tab_view.h": "5a4f60444d32d886784aaa9fd2955bf9c8034ae7a731259f4fceb814e10dfcb7",
-    "chrome/browser/ui/views/tabs/common/tab_view_vertical_layout.cc": "5745fb51dce667116bfbc85ac17eacdf9533f479e711d8e8170c75e249e4b7c3",
+    "chrome/browser/ui/views/tabs/common/tab_view_vertical_layout.cc": "8d2e758fdd2ae42841e398861c8cf45310fc658bec3d5bdc05966b4abbb16e2b",
     "chrome/browser/ui/views/tabs/common/unpinned_tab_container_view_layout.cc": "6cff6057501964539d3a7264e98b293db3c1bf804b08f8f37426e74c2818bd69",
     "chrome/browser/ui/views/tabs/common/vertical_tab_style_views.cc": "ccaf57084beaf1dc21a04b321ef4cd8cf70e7509a85f690e020b4a78e57bf99b",
     "chrome/browser/ui/views/tabs/dragging/tab_drag_controller.cc": "24c5a6cfafd5b4af81ed4037b9b1b455f283152fd0b1f6707209f5f11db79b78",
     "chrome/browser/ui/views/tabs/dragging/tab_drag_controller.h": "adf878ccbdb580d6e9f34b14b018c2c90ccd3ef476677b19d64dcf6efe827d8e",
-    "chrome/browser/ui/views/tabs/tab.cc": "4378e811bc6d23ba41bae28a687a452df17f0deea1804ca5a8500fa552ad2e35",
+    "chrome/browser/ui/views/tabs/tab.cc": "cebd44a9a2717e61a31ca459573ff829178d91c61ed96ff2ee413d51a2a46b11",
     "chrome/browser/ui/views/tabs/tab.h": "9f7fbfe7faaead439752aae036552a6ef1c1160934d8e8fc1b1a4c0008acb042",
     "chrome/browser/ui/views/tabs/tab/tab_accessibility.cc": "abab718fc6802349c102d11f1dbd7569ffd82a0e63cc7bf3291eee3cadb6789d",
     "chrome/browser/ui/views/tabs/tab/tab_icon.cc": "b3ab0974440985b949ac82f71b8f935f5e486dab5207867b349f096009a7309d",
@@ -767,6 +767,14 @@
     {
       "file": "noventra-update-and-restart.patch",
       "sha256": "339a95fd9490d3a72fbd990cad7f583de7fac5be7032047bbdef3a5b043832a6"
+    },
+    {
+      "file": "noventra-about-licenses.patch",
+      "sha256": "4e4f427d09fa84161040d167117fa3f84d7968a79d9af775afbb124b16b712bb"
+    },
+    {
+      "file": "noventra-pin-close-private-spaces.patch",
+      "sha256": "54eaeaca48c72be1ac29e7e75576d024b201d19d8ee57c77b3b16e40a139cf45"
     }
   ],
   "pristine_files": {
@@ -1521,7 +1529,7 @@
     "wordmark.svg": "a8b007ca4d0a67c33a2426b2db320d5561ba960cab8f2baa46500c1af65ba803"
   },
   "schema": 1,
-  "series_sha256": "c42d52b378b298d42cfe0a831284d386bf99fc936f288db6cbfe98c2fbf54158",
+  "series_sha256": "b2e700780125d466b859bcfcbab316e9d3acef1733edc5deaccbe6f0dcfa7f0d",
   "tooling": {
     ".github/scripts/build.sh": "fd92ff208ef7439765d7b3a5b89b422234abf7408137646e4d615e68df128537",
     "docker/build.Dockerfile": "f133ae4b6340e0bfc42338e6bd1d42d85d8a850652aa10dba6e37f82fe3ca080",

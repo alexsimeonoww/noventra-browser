@@ -53,6 +53,7 @@
 #include "chrome/browser/reading_list/reading_list_model_factory.h"
 #include "chrome/browser/resource_coordinator/lifecycle_unit_state.mojom.h"
 #include "chrome/browser/resource_coordinator/tab_helper.h"
+#include "chrome/browser/resource_coordinator/tab_lifecycle_unit_external.h"
 #include "chrome/browser/send_tab_to_self/send_tab_to_self_util.h"
 #include "chrome/browser/ui/bookmarks/bookmark_utils.h"
 #include "chrome/browser/ui/browser_command_controller.h"
@@ -259,6 +260,50 @@ base::WeakPtr<performance_manager::PageNode> GetDiscardCandidatePageNode(
   }
 
   return page_node;
+}
+
+void UnloadPinnedTab(base::WeakPtr<TabStripModel> model,
+                     base::WeakPtr<tabs::TabInterface> tab) {
+  if (!model || !tab || model->closing_all() || !tab->IsPinned() ||
+      model->GetIndexOfTab(tab.get()) == TabStripModel::kNoTab) {
+    return;
+  }
+
+  // Split partners must not keep a closed page visible or reload it. Work in
+  // identities because separation, selection and extensions may move tabs.
+  model->DetachNoventraSplitTab(model->GetIndexOfTab(tab.get()));
+  if (!model || !tab || !tab->IsPinned() ||
+      model->GetIndexOfTab(tab.get()) == TabStripModel::kNoTab) {
+    return;
+  }
+  if (tab->IsActivated()) {
+    const std::string space = noventra::SpaceId(tab->GetContents());
+    int next = TabStripModel::kNoTab;
+    for (int i = 0; i < model->count(); ++i) {
+      if (model->GetTabAtIndex(i) != tab.get() && !model->IsTabPinned(i) &&
+          noventra::SpaceId(model->GetWebContentsAt(i)) == space) {
+        next = i;
+        break;
+      }
+    }
+    if (next != TabStripModel::kNoTab) {
+      model->ActivateTabAt(next);
+    } else {
+      model->delegate()->AddTabAt(GURL(chrome::kChromeUINewTabURL), -1, true);
+    }
+  }
+  if (!model || !tab ||
+      model->GetIndexOfTab(tab.get()) == TabStripModel::kNoTab ||
+      !tab->IsPinned() || tab->IsActivated()) {
+    return;
+  }
+  tab->GetContents()->SetClosedByUserGesture(false);
+  if (auto* lifecycle =
+          resource_coordinator::TabLifecycleUnitExternal::FromWebContents(
+              tab->GetContents())) {
+    lifecycle->DiscardTab(
+        mojom::LifecycleUnitDiscardReason::EXTERNAL);
+  }
 }
 
 }  // namespace
@@ -4319,6 +4364,23 @@ void TabStripModel::CloseTabs(base::span<content::WebContents* const> items,
   for (content::WebContents* contents : items) {
     tabs::TabInterface* tab = GetTabForWebContents(contents);
     if (IsTabClosable(tab)) {
+      // A normal-window pin is a saved site. Closing its page releases the
+      // renderer, while only Unpin removes the saved shortcut. Window shutdown
+      // and private tabs retain the ordinary close/profile cleanup path.
+      if (!closing_all_ && delegate_->IsNormalWindow() &&
+          !profile_->IsOffTheRecord() && tab->IsPinned()) {
+        contents->SetClosedByUserGesture(close_types &
+                                         TabCloseTypes::CLOSE_USER_GESTURE);
+        if (RunUnloadListenerBeforeClosing(contents)) {
+          TabCloseTypesData::CreateForWebContents(contents, close_types);
+        } else {
+          base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+              FROM_HERE,
+              base::BindOnce(&UnloadPinnedTab, weak_factory_.GetWeakPtr(),
+                             tab->GetWeakPtr()));
+        }
+        continue;
+      }
       filtered_items.push_back(contents);
     } else {
       for (auto& observer : observers_) {

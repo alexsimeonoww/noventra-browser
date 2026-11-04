@@ -604,6 +604,11 @@ void Tab::Layout(PassKey) {
     close_button_->SetBoundsRect(
         {gfx::Point(visible_left - non_visible_left_padding, top),
          close_button_actual_size});
+    if (data().pinned) {
+      constexpr int kPinCloseSize = 18;
+      close_button_->SetBounds(width() - kPinCloseSize, 0, kPinCloseSize,
+                               kPinCloseSize);
+    }
     close_x = visible_left - after_title_padding;
   }
   auto* browser = controller_->GetBrowserWindowInterface();
@@ -1499,11 +1504,12 @@ void Tab::UpdateIconVisibility() {
   is_animating_from_pinned_ &= animating();
 
   if (data().pinned || is_animating_from_pinned_) {
-    // When the tab is pinned, we can show one of the two icons; the alert icon
-    // is given priority over the favicon. The close button is never shown.
+    // Pinned sites retain their icon and reveal a corner close target on hover
+    // or keyboard focus. Closing unloads the page without removing the pin.
     showing_alert_indicator_ = has_alert_icon;
     showing_icon_ = has_favicon && !has_alert_icon;
-    showing_close_button_ = false;
+    showing_close_button_ = data().pinned && (mouse_hovered_ || HasFocus() ||
+                                              close_button_->HasFocus());
 
     // While animating to or from the pinned state, pinned tabs are rendered as
     // normal tabs. Force the extra padding on so the favicon doesn't jitter

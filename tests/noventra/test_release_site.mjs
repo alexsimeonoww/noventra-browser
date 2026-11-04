@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import site, {byteRange, escapeHtml, validateCatalog} from '../../noventra/release-site/worker.mjs';
+import site, {byteRange, detectDevice, escapeHtml, validateCatalog} from '../../noventra/release-site/worker.mjs';
 import {Bucket, sha} from './release_site_test_helpers.mjs';
 
 const FEED = '/browser/updates/stable/linux-x86_64/';
@@ -35,7 +35,7 @@ function fixture() {
 
 test('landing provides actual Linux preview, checksum, source kit and honest unavailable platforms', async () => {
   const {env, catalog} = fixture();
-  const response = await site.fetch(req('/'), env);
+  const response = await site.fetch(req('/', {headers: {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64)'}}), env);
   assert.equal(response.status, 200);
   assert.match(response.headers.get('Content-Security-Policy'), /default-src 'none'/);
   const html = await response.text();
@@ -43,16 +43,122 @@ test('landing provides actual Linux preview, checksum, source kit and honest una
   assert.ok(html.includes(catalog.artifact.sha256));
   assert.match(html, /source &amp; build kit/);
   assert.match(html, /not a bundled Chromium source tree/);
-  assert.match(html, /macOS \/ Apple silicon<\/td><td>Not available yet/);
-  assert.match(html, /Windows<\/td><td>Not available yet/);
+  assert.match(html, /<tr><th scope="row">macOS \/ Apple silicon<\/th><td>Not available yet/);
+  assert.match(html, /<tr><th scope="row">Windows<\/th><td>Not available yet/);
   assert.doesNotMatch(html, /href="[^" ]+\.(exe|dmg)"/);
   assert.ok(html.includes('./Noventra.AppDir/install.sh'));
+});
+
+test('download page shares Studio navigation, assets and open source links without scripts', async () => {
+  const {env, catalog} = fixture();
+  const html = await (await site.fetch(req('/'), env)).text();
+  const navigation = html.match(/<nav aria-label="Main navigation">([\s\S]*?)<\/nav>/)?.[1];
+  assert.ok(navigation);
+  const links = [...navigation.matchAll(/<a[^>]+href="([^"]+)"[^>]*>([^<]+)<\/a>/g)]
+      .map(([, href, label]) => [href, label]);
+  assert.deepEqual(links, [
+    ['https://www.noventrastudio.com/', 'Home'],
+    ['https://www.noventrastudio.com/browser', 'Browser'],
+    ['https://downloads.noventrastudio.com/', 'Download'],
+    ['https://www.noventrastudio.com/about', 'About'],
+    ['https://www.noventrastudio.com/support', 'Support'],
+    ['https://github.com/alexsimeonoww/noventra-browser', 'GitHub'],
+    ['mailto:hello@noventrastudio.com', 'Contact'],
+  ]);
+  assert.match(navigation, /href="https:\/\/downloads\.noventrastudio\.com\/" aria-current="page"/);
+  assert.match(html, /href="https:\/\/www\.noventrastudio\.com\/assets\/fonts\/geist\.css"/);
+  assert.match(html, /src="https:\/\/www\.noventrastudio\.com\/assets\/noventra-symbol\.png"/);
+  assert.match(html, /src="https:\/\/www\.noventrastudio\.com\/assets\/open-horizon\.webp"/);
+  assert.ok(html.includes(`id="download-linux" href="/browser/artifacts/linux-x86_64/${catalog.artifact.filename}"`));
+  assert.match(html, /View on GitHub/);
+  assert.match(html, /Update and restart/);
+  assert.match(html, /<summary>Licenses and credits<\/summary>/);
+  assert.match(html, /Original copyright notices and licenses are retained/);
+  assert.doesNotMatch(html, /<script\b/);
+});
+
+const devices = [
+  ['Linux desktop', 'Mozilla/5.0 (X11; Linux x86_64)', 'linux', 'x86_64', true],
+  ['Windows desktop', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', 'windows', 'x86_64', false],
+  ['Mac desktop', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', 'macos', 'unknown', false],
+  ['Android', 'Mozilla/5.0 (Linux; Android 16; Pixel 9)', 'android', 'unknown', false],
+  ['iPhone', 'Mozilla/5.0 (iPhone; CPU iPhone OS 19_0 like Mac OS X) Mobile', 'ios', 'unknown', false],
+  ['iPad desktop mode', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) Mobile/15E148', 'ios', 'unknown', false],
+  ['ChromeOS', 'Mozilla/5.0 (X11; CrOS x86_64 16267.0.0)', 'chromeos', 'x86_64', false],
+  ['Linux ARM', 'Mozilla/5.0 (X11; Linux aarch64)', 'linux', 'arm64', false],
+  ['32-bit Linux', 'Mozilla/5.0 (X11; Linux i686)', 'linux', 'x86', false],
+  ['unknown visitor', '', 'unknown', 'unknown', false],
+];
+for (const [label, ua, platform, architecture, directLinux] of devices) {
+  test(`${label} gets platform-aware guidance and an explicit manual Linux download`, async () => {
+    const {env, catalog} = fixture();
+    const request = req('/', {headers: {'User-Agent': ua}});
+    assert.deepEqual(detectDevice(request), {platform, architecture});
+    const response = await site.fetch(request, env);
+    assert.equal(response.status, 200);
+    const html = await response.text();
+    const hero = html.match(/<section class="horizon-hero"[\s\S]*?<\/section>/)?.[0];
+    assert.ok(hero);
+    if (directLinux) {
+      assert.match(hero, /id="download-linux"/);
+      assert.match(hero, /Linux x86_64/);
+    } else {
+      assert.match(hero, /href="#available-downloads"/);
+      assert.doesNotMatch(hero, /id="download-linux"/);
+      assert.match(hero, /current preview is for Linux x86_64|Linux ARM or 32-bit build is not available/);
+    }
+    assert.equal([...html.matchAll(/id="download-linux"/g)].length, 1);
+    assert.ok(html.includes(`id="download-linux" href="/browser/artifacts/linux-x86_64/${catalog.artifact.filename}"`));
+    assert.doesNotMatch(html, /href="[^" ]+\.(exe|dmg)"/);
+    assert.match(response.headers.get('Vary'), /User-Agent/);
+    assert.equal(response.headers.get('Accept-CH'), null, 'does not solicit additional device hints');
+  });
+}
+
+test('existing client hints override reduced UAs and identify unsupported Linux CPUs', async () => {
+  assert.deepEqual(detectDevice(req('/', {headers: {
+    'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64)', 'Sec-CH-UA-Platform': '"Windows"',
+  }})), {platform: 'windows', architecture: 'x86_64'});
+  for (const [arch, bits, expected] of [['"arm"', '"64"', 'arm64'], ['"x86"', '"32"', 'x86']]) {
+    const request = req('/', {headers: {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64)',
+      'Sec-CH-UA-Platform': '"Linux"', 'Sec-CH-UA-Arch': arch, 'Sec-CH-UA-Bitness': bits}});
+    assert.deepEqual(detectDevice(request), {platform: 'linux', architecture: expected});
+    const html = await (await site.fetch(request, fixture().env)).text();
+    assert.match(html, /Linux ARM or 32-bit build is not available/);
+  }
+});
+
+test('invalid hints fall back safely without reflecting request headers into HTML', async () => {
+  for (const hint of ['"<img src=x onerror=alert(1)>"', '__proto__', 'constructor', 'toString']) {
+    const request = req('/', {headers: {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0)', 'Sec-CH-UA-Platform': hint}});
+    assert.equal(detectDevice(request).platform, 'windows');
+    const html = await (await site.fetch(request, fixture().env)).text();
+    assert.match(html, /No Windows download is available yet/);
+    assert.ok(!html.includes(hint));
+  }
+});
+
+test('only HTML permits the Studio font, image and stylesheet origin', async () => {
+  const {env, catalog} = fixture();
+  const html = await site.fetch(req('/'), env);
+  const policy = html.headers.get('Content-Security-Policy');
+  assert.equal(policy, "default-src 'none'; style-src 'unsafe-inline' https://www.noventrastudio.com; font-src https://www.noventrastudio.com; img-src https://www.noventrastudio.com; frame-ancestors 'none'; base-uri 'none'; form-action 'none'");
+  for (const path of [FEED + 'manifest.json', '/browser/artifacts/linux-x86_64/' + catalog.artifact.filename]) {
+    const response = await site.fetch(req(path), env);
+    assert.equal(response.headers.get('Content-Security-Policy'),
+        "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'");
+    assert.equal(response.headers.get('Vary'), null, 'signed payloads do not vary by visitor platform');
+  }
 });
 
 test('no catalog gives preparation page; HEAD returns no body', async () => {
   const env = {RELEASES: new Bucket()};
   const response = await site.fetch(req('/browser'), env);
-  assert.match(await response.text(), /first Linux preview is being prepared/);
+  const html = await response.text();
+  assert.match(html, /first Linux preview is being prepared/);
+  assert.match(html, /Linux preview in preparation/);
+  assert.match(html, /View on GitHub/);
+  assert.doesNotMatch(html, /id="download-linux"|href="[^" ]+\.tar\.xz"/);
   assert.equal((await site.fetch(req('/browser', {method: 'HEAD'}), env)).body, null);
   assert.equal((await site.fetch(req(FEED + 'manifest.json'), env)).status, 404);
 });

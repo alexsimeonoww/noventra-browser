@@ -29,3 +29,18 @@ The public `.github/workflows/noventra-checks.yml` workflow instead runs the
 self-contained package, signed-delivery, desktop-updater, recovery, publisher,
 GitHub helper and hosting unit tests. Those tests use disposable inputs and
 their own test signing keys; they do not need the private GUI adapter.
+
+## Saved pin and Incognito shortcut regression source
+
+`../pin_close_smoke.py` and its helper `../pinned_tabs_smoke.py` cover native
+closing/unloading, clicking a saved pin to reload it, beforeunload Cancel/Leave,
+pinned split retention, account-correct replacement New Tab and restart metadata.
+`../incognito_space_visibility_smoke.py` creates Incognito through the actual
+browser menu, then verifies its shortcut in crowded and 48-DIP compact regular
+sidebars, exact private document/draft retention and last-tab removal.
+
+The preview 4 candidate passed 185 native Linux X11 checks across those new
+cases and the existing pin lifecycle/editing cases. The exporter includes these
+fixtures and their Python/helper closure for review. Their private display and
+namespace ownership requirements remain in force; they are not public CI jobs.
+No Windows, native Mac or Wayland/GPU result is implied by these X11 checks.

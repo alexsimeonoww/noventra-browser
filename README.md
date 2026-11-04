@@ -9,12 +9,23 @@ vertical tabs, Spaces, split views and configurable browser controls.
 The first public target is **Linux x86_64 preview**. Windows and macOS downloads
 are not available yet. Preview builds need testing before everyday use.
 
+## Closing pinned sites
+
+Linux preview 4 keeps a pinned site's shortcut when its page is closed. Hover
+or focus a pin to reveal its small X, or press Ctrl+W to unload the page. Click
+the pin to load it again. Its name, saved home and account stay attached to the
+shortcut; Unpin turns it into an ordinary tab. Normal leave confirmations apply,
+and closing one pinned split pane preserves its partner. See
+[pin closing and Incognito](docs/noventra/pin-close-incognito-spaces-2026-11-04.md).
+
 ## Incognito Spaces
 
 On Linux, New Incognito (`Ctrl+Shift+N`) opens a temporary Incognito Space in
 the same window. Its tabs use an off-the-record profile with separate cookies
 and site storage. Closing its last tab removes that Space; regular Spaces stay
-available beside it.
+available beside it. Preview 4 keeps a live private shortcut visible after
+returning to Personal, including in the compact rail or a crowded sidebar.
+Returning to it preserves the loaded private page and its draft.
 
 ## Updates and moving to another PC
 
@@ -23,11 +34,10 @@ verified update is ready. It closes the browser normally, installs the signed
 update, then reopens regular tabs and Spaces. Cancelling an unsaved-page or
 Incognito warning cancels the restart. Incognito sessions are not restored.
 
-To receive preview 3 from preview 2, open About Noventra, let it prepare the
-update, then close every Noventra window and reopen it once. Preview 2 uses its
-existing close-and-reopen flow; the new button becomes available for subsequent
-updates after preview 3 is installed. The button is hidden while the installed
-version is current.
+To receive preview 4 from preview 3, open About Noventra and use **Update and
+restart** once the verified update is ready. Preview 2 uses its existing flow:
+let About prepare the update, then close every Noventra window and reopen it
+once. The button is hidden while the installed version is current.
 
 Setup now offers **Move from another Noventra PC** above imports from other
 browsers on the current PC. It opens **Data & devices** in a separate tab for a

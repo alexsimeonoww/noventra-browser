@@ -91,11 +91,9 @@ export function getHtml(this: SettingsAboutPageElement) {
 <settings-section>
   <div class="info-sections">
     <div class="info-section">
-      <div class="secondary">$i18n{aboutProductCopyright}</div>
-    </div>
-
-    <div class="info-section">
-      <div class="secondary">$i18nRaw{aboutProductLicense}</div>
+      <a id="openSourceLicenses" href="chrome://credits/" target="_blank">
+        Open source licenses
+      </a>
     </div>
 <if expr="_google_chrome or _is_chrome_for_testing_branded">
     <div class="secondary">

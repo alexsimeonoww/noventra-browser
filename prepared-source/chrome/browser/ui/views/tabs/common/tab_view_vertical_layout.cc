@@ -68,6 +68,15 @@ views::ProposedLayout TabViewVerticalLayout::CalculateProposedLayout(
 
   int placed_children = 0;
   for (const auto& child : tab_children_configs_) {
+    if (TabView().pinned_ && child.view == TabView().close_button_) {
+      // Keep the favicon centered and give the close affordance its own corner
+      // target, including in the icon rail. Hover/focus reveals the small X.
+      constexpr int kPinCloseSize = 18;
+      layouts.child_layouts.emplace_back(
+          child.view.get(), IsChildVisible(child.view, width),
+          gfx::Rect(width - kPinCloseSize, 0, kPinCloseSize, kPinCloseSize));
+      continue;
+    }
     const bool can_render_child =
         is_centered
             ? (placed_children == 0)
@@ -173,7 +182,8 @@ bool TabViewVerticalLayout::IsChildVisible(const views::View* child_view,
 
   if (child_view == TabView().close_button_) {
     if (TabView().pinned_) {
-      return false;
+      return TabView().hovered_ || TabView().HasFocus() ||
+             TabView().close_button_->HasFocus();
     }
 
     if (base::CommandLine::ForCurrentProcess()->HasSwitch("hide-tab-close-buttons")) {

@@ -1519,6 +1519,14 @@ void CloseTab(BrowserWindowInterface* browser) {
     return;
   }
 
+  // Saved pins close into unloaded shortcuts; they no longer need a second
+  // accelerator press to confirm deleting the pin.
+  if (browser->GetType() == BrowserWindowInterface::TYPE_NORMAL &&
+      !browser->GetProfile()->IsOffTheRecord() && active_tab->IsPinned()) {
+    CloseSelectedTabAndRecordTabCountMetric(browser);
+    return;
+  }
+
 #if !BUILDFLAG(IS_ANDROID)
   if (base::FeatureList::IsEnabled(
           contextual_tasks::kContextualTasksCloseTabExpandsSidePanel)) {

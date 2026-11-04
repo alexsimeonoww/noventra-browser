@@ -409,7 +409,7 @@ class AccountSpacesButton : public views::View, public TabStripModelObserver {
   gfx::Size CalculatePreferredSize(const views::SizeBounds& available) const override {
     const int width = available.width().value_or(180);
     const bool vertical =
-        (width < kSpaceRowMinWidth && !SharedMenu());
+        (width < kSpaceRowMinWidth && (!SharedMenu() || HasPrivateSpaces()));
     const int rows =
         vertical
             ? static_cast<int>(VisibleDotCount(width)) + (SharedMenu() ? 0 : 1)
@@ -438,15 +438,27 @@ class AccountSpacesButton : public views::View, public TabStripModelObserver {
   }
   void Layout(PassKey) override {
     const bool vertical =
-        (width() < kSpaceRowMinWidth && !SharedMenu());
+        (width() < kSpaceRowMinWidth && (!SharedMenu() || HasPrivateSpaces()));
     const size_t count = VisibleDotCount(width());
     std::vector<size_t> shown;
-    for (size_t i = 0; i < count; ++i) shown.push_back(i);
     const auto active = std::ranges::find(space_ids_, CurrentSpace());
     if (count && active != space_ids_.end()) {
-      const size_t index = active - space_ids_.begin();
-      if (index >= count) shown.back() = index;
+      shown.push_back(active - space_ids_.begin());
     }
+    // A live private Space remains directly reachable after returning to a
+    // regular Space. Saved spaces may overflow into More; hiding the private
+    // shortcut makes a still-running session look as though it was closed.
+    for (size_t i = 0; i < space_ids_.size() && shown.size() < count; ++i) {
+      if (IsPrivate(space_ids_[i]) && !std::ranges::contains(shown, i)) {
+        shown.push_back(i);
+      }
+    }
+    for (size_t i = 0; i < space_ids_.size() && shown.size() < count; ++i) {
+      if (!std::ranges::contains(shown, i)) {
+        shown.push_back(i);
+      }
+    }
+    std::ranges::sort(shown);
     const int cell_height = vertical ? kSpaceRailRowHeight : kSpaceTargetSize;
     const int cell_inset = (cell_height - kSpaceTargetSize) / 2;
     const int extent = static_cast<int>(count) * cell_height;
@@ -627,6 +639,10 @@ class AccountSpacesButton : public views::View, public TabStripModelObserver {
     const std::string current_;
   };
   size_t VisibleDotCount(int width) const {
+    if (SharedMenu() && GetProperty(kNoventraDockCompact) &&
+        HasPrivateSpaces()) {
+      return std::min(space_ids_.size(), kMaxRailSpaceDots);
+    }
     const size_t capacity = SharedMenu()
         ? static_cast<size_t>(std::clamp(
               (width - 2 * kSpaceFooterPadding) / kSpaceTargetSize, 1,
@@ -636,6 +652,10 @@ class AccountSpacesButton : public views::View, public TabStripModelObserver {
             : static_cast<size_t>(std::max(
                   1, (width - 2 * kSpaceFooterPadding) / kSpaceTargetSize - 1));
     return std::min(space_ids_.size(), capacity);
+  }
+
+  bool HasPrivateSpaces() const {
+    return !noventra::IncognitoSpaces(browser_->browser()).empty();
   }
 
   BrowserWindowInterface* RegularBrowser() const {
