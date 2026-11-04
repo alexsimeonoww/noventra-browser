@@ -90,5 +90,5 @@ files remained unchanged.
 
 Native fixtures use disposable profiles, authenticated private displays and
 local pages. The complete Chromium test suite, power-loss fault injection and
-native macOS/Windows qualification were not run. This is source qualification;
-no signed browser update is published by these changes.
+native macOS/Windows qualification were not run. Signed package and in-browser
+update qualification is recorded separately for each release.

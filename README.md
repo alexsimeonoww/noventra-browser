@@ -9,7 +9,7 @@ vertical tabs, Spaces, split views and configurable browser controls.
 The first public target is **Linux x86_64 preview**. Windows and macOS downloads
 are not available yet. Preview builds need testing before everyday use.
 
-## Unreleased: separate Space profiles and compact pins
+## Linux preview 7: separate Space profiles and compact pins
 
 Regular Linux Spaces use independent profiles for history, bookmarks, saved
 passwords, download lists, extensions and settings. Switching Spaces retains
@@ -22,7 +22,7 @@ saves use that parent Space.
 Pins use smaller tiles, keep their favicon colors while closed, and show Close
 only while loaded. Pinned and ordinary tabs can join a split in the same Space;
 the resulting split stays pinned. See [profile and migration details](docs/noventra/profile-spaces.md).
-These changes are unreleased. The signed download remains preview 6.
+Preview 7 packages are delivered through the existing signed update feed.
 
 ## Visible leave confirmations
 

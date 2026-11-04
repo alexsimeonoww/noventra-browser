@@ -48,9 +48,9 @@
       "sha256": "a0ec85d89903a2ac9e2e008ca25d3514339b319bbf9a159076ee509e82476d60"
     },
     "build-inputs/docs/noventra/profile-spaces.md": {
-      "bytes": 5327,
+      "bytes": 5333,
       "mode": 420,
-      "sha256": "c4a9355131ca04b11cfd2791229c835f0d469198652a448c7ac9434664581036"
+      "sha256": "ef31a1c038d74521497999535a1df02a3c7e8dc301ac3b43015976890c3afd26"
     },
     "build-inputs/docs/noventra/sidebar-space-capacity-animation-2026-11-04.md": {
       "bytes": 1797,
@@ -4623,5 +4623,5 @@
   "product": "local.noventra.browser",
   "snapshot_sha256": "af59116d87f55ca931fc99e6792e833f01a642a9586b51f2308fa56f3ba5ab41",
   "source_freeze_sha256": "2656107a2d8aeb28bc9927145b3f7d44032f1ef5de4d7fc0d5e01c0ffc98d817",
-  "version_label": "156.0.8078.79-unreleased-profile-spaces"
+  "version_label": "156.0.8078.79-preview.7"
 }
