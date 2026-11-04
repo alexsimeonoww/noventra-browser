@@ -38,9 +38,9 @@
       "sha256": "5abdb64ae061ab709bd025aa4c44c2558eac0659e8a7ef17b80b97adf8adbee4"
     },
     "build-inputs/docs/noventra/github-releases.md": {
-      "bytes": 7985,
+      "bytes": 8340,
       "mode": 420,
-      "sha256": "5e5cefb11ca46307183f6b3eb586d4583b9cf1de22704d9a0fe30a520ecd272e"
+      "sha256": "4e97d3bcb247ed57612664663eb1b8dabf84e4b313651173e3438dac6f8e2c83"
     },
     "build-inputs/docs/noventra/pin-close-incognito-spaces-2026-11-04.md": {
       "bytes": 2283,
@@ -1048,9 +1048,9 @@
       "sha256": "c3ef58793df5e7c67d106c8d653c3adf73148bbe959cedfa6fae657bb384a35e"
     },
     "build-inputs/tools/noventra/github_release.py": {
-      "bytes": 23966,
+      "bytes": 23950,
       "mode": 420,
-      "sha256": "8d6b25aa5b751d4bcd9cd6ecdde66de774301e0224caa1e4c8a2fe8171154ff2"
+      "sha256": "22e390daf898b51a0f41bd70e9dc5444dfe515936eb0a61ead836a63c58e2746"
     },
     "build-inputs/tools/noventra/local_delivery_server.py": {
       "bytes": 3464,
@@ -4623,5 +4623,5 @@
   "product": "local.noventra.browser",
   "snapshot_sha256": "af59116d87f55ca931fc99e6792e833f01a642a9586b51f2308fa56f3ba5ab41",
   "source_freeze_sha256": "2656107a2d8aeb28bc9927145b3f7d44032f1ef5de4d7fc0d5e01c0ffc98d817",
-  "version_label": "156.0.8078.79-preview.7"
+  "version_label": "0.1.7"
 }

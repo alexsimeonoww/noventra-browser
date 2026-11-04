@@ -21,6 +21,14 @@ when a verified update is staged, at most once every twelve hours. Preview 1
 predates these reminders. Every helper change must be shipped
 in a new inventoried package rather than patched into an existing installation.
 
+## Release versions
+
+Noventra uses its own version numbers, starting with `0.1.7` for the seventh
+public update. The Chromium version remains separate in the engine details.
+Signed update ordering uses an increasing sequence number rather than comparing
+version labels. Previously published preview versions and their assets retain
+their original names.
+
 ## Source commit and build kit
 
 Use the same explicit source/build inventory for the qualified binary, its
