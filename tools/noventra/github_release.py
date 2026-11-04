@@ -274,7 +274,7 @@ def inspect(path, key, qualified, api, repo, commit, tag, *, prepared_prefix='pr
     checksums = ''.join(f"{assets[n]['sha256']}  {n}\n" for n in sorted(assets)).encode('ascii')
     generated[CHECKSUMS] = checksums
     assets[CHECKSUMS] = asset_record(CHECKSUMS, checksums)
-    notes = f'''Noventra {manifest['version_label']} — Linux x86_64 preview.
+    notes = f'''Noventra {manifest['version_label']} — Linux x86_64.
 
 Source commit: https://github.com/{repo}/commit/{commit}
 License and upstream notices: https://github.com/{repo}/blob/{commit}/LICENSE
@@ -298,7 +298,7 @@ OS level; Ed25519 signatures protect update delivery.
     return {'repo': repo, 'commit': commit, 'tag': tag, 'tree': tree,
             'catalog': catalog, 'provenance': provenance, 'assets': assets,
             'generated': generated, 'notes': notes,
-            'title': f"Noventra {manifest['version_label']} — Linux preview"}
+            'title': f"Noventra {manifest['version_label']} — Linux"}
 
 
 def verify_assets(api, plan, value, *, complete):

@@ -9,20 +9,21 @@
 #include <algorithm>
 #include <vector>
 
-#include "base/feature_list.h"
 #include "base/barrier_callback.h"
-#include "base/scoped_observation.h"
-#include "chrome/browser/profiles/noventra_account_spaces.h"
+#include "base/feature_list.h"
 #include "base/functional/bind.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/notimplemented.h"
+#include "base/scoped_observation.h"
 #include "base/values.h"
 #include "chrome/browser/browsing_data/browsing_data_important_sites_util.h"
 #include "chrome/browser/browsing_data/chrome_browsing_data_remover_constants.h"
 #include "chrome/browser/browsing_data/counters/browsing_data_counter_factory.h"
 #include "chrome/browser/browsing_data/counters/browsing_data_counter_utils.h"
 #include "chrome/browser/history/web_history_service_factory.h"
+#include "chrome/browser/profiles/noventra_account_spaces.h"
+#include "chrome/browser/profiles/noventra_space_profile_registry.h"
 #include "chrome/browser/search_engines/template_url_service_factory.h"
 #include "chrome/browser/signin/identity_manager_factory.h"
 #include "chrome/browser/sync/sync_service_factory.h"
@@ -268,8 +269,17 @@ void ClearBrowsingDataHandler::HandleClearBrowsingData(
       content::BrowsingDataRemover::DATA_TYPE_ON_STORAGE_PARTITION;
   std::vector<std::string> spaces;
   if (space_mask) {
-    for (const auto [id, name] : prefs->GetDict(noventra::kSpacesPref)) {
-      if (base::Uuid::ParseLowercase(id).is_valid()) spaces.push_back(id);
+    if (noventra::ProfileSpacesEnabled()) {
+      if (noventra::ProfileSpaceStorage(profile_) ==
+          noventra::SpaceProfileStorage::kLegacyPartition) {
+        spaces.push_back(noventra::ProfileSpaceId(profile_));
+      }
+    } else {
+      for (const auto [id, name] : prefs->GetDict(noventra::kSpacesPref)) {
+        if (base::Uuid::ParseLowercase(id).is_valid()) {
+          spaces.push_back(id);
+        }
+      }
     }
   }
   auto complete = base::BarrierCallback<uint64_t>(spaces.size() + 1,

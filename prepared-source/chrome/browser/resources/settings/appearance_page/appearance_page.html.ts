@@ -546,7 +546,9 @@ export function getHtml(this: SettingsAppearancePageElement) {
       <details id="noventraAboutSpaces" class="settings-help"
           ?open="${this.noventraSearchMode}">
         <summary>About spaces and themes</summary>
-        <p>Each space has its own cookies, website logins and site storage. Names save when you finish editing; colors, icons and themes save immediately.</p>
+        <p>${this.noventraSpaces_[0]?.profileIsolated
+            ? 'Each regular space has its own browser profile, including website logins and browsing data.'
+            : 'Each space has its own cookies, website logins and site storage.'} Names save when you finish editing; colors, icons and themes save immediately.</p>
         <p>Drag the sidebar buttons or use the arrows below to reorder spaces.</p>
         <p id="noventraSpaceThemeHint">Use browser theme follows your main appearance settings. Another theme applies to the browser controls while that space is active; websites keep their own appearance.</p>
       </details>
@@ -694,7 +696,9 @@ export function getHtml(this: SettingsAppearancePageElement) {
       <div id="noventraWorkspaceToolsError" role="alert" class="cr-row"
           ?hidden="${!this.noventraToolsError_}">${this.noventraToolsError_}</div>
       <details class="space-details" ?open="${this.noventraSearchMode}"><summary>What is shared between spaces?</summary>
-        <p>History, saved passwords, bookmarks, extensions, settings and notification permissions are shared. Web notifications use the space that created them.</p>
+        <p>${this.noventraSpaces_[0]?.profileIsolated
+            ? 'History, saved passwords, bookmarks, download history, extensions, settings and notification permissions belong to each regular space. Incognito is temporary. Its bookmarks and history suggestions come from the space that opened it.'
+            : 'History, saved passwords, bookmarks, extensions, settings and notification permissions are shared. Web notifications use the space that created them.'}</p>
       </details>
     </div>
     <div id="noventraSpaceError" role="alert" class="cr-row"

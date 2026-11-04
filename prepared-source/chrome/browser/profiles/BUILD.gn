@@ -11,6 +11,7 @@ import("//components/on_device_translation/buildflags/features.gni")
 import("//components/signin/features.gni")
 import("//components/spellcheck/spellcheck_build_features.gni")
 import("//extensions/buildflags/buildflags.gni")
+import("//testing/test.gni")
 
 # This target should be the default place for adding public interface things
 # (ie, non-factory, non-impl). There will likely need to be a :factory or :impl
@@ -387,6 +388,7 @@ source_set("renderer_updater") {
 source_set("profile") {
   public = [
     "noventra_account_spaces.h",
+    "noventra_space_profile_registry.h",
     "profile.h",
     "profile_keyed_service_factory.h",
     "profile_manager_observer.h",
@@ -472,6 +474,7 @@ source_set("profile_manager") {
 
 source_set("profile_manager_impl") {
   sources = [
+    "noventra_space_profile_registry.cc",
     "profile_destroyer.cc",
     "profile_manager.cc",
     "profile_metrics.cc",
@@ -501,6 +504,7 @@ source_set("profile_manager_impl") {
     "//chrome/common:buildflags",
     "//chrome/common:constants",
     "//components/crash/core/common",
+    "//components/prefs",
     "//components/profile_metrics",
     "//components/signin/core/browser",
     "//components/signin/public/base:signin_buildflags",
@@ -1357,5 +1361,39 @@ source_set("profile_test_util") {
 
   if (is_chromeos) {
     deps += [ "//chromeos/ash/components/login/login_state" ]
+  }
+}
+
+source_set("noventra_space_migration") {
+  public = [ "noventra_space_migration.h" ]
+  sources = [ "noventra_space_migration.cc" ]
+  public_deps = [
+    "//base",
+    "//components/os_crypt/async/common",
+    "//components/sessions",
+  ]
+  deps = [ "//crypto" ]
+}
+
+if (is_linux) {
+  test("noventra_space_migration_unittests") {
+    sources = [ "noventra_space_migration_unittest.cc" ]
+    deps = [
+      ":noventra_space_migration",
+      "//base/test:run_all_unittests",
+      "//base/test:test_support",
+      "//testing/gtest",
+    ]
+  }
+
+  test("noventra_space_restore_unittests") {
+    sources =
+        [ "//components/sessions/core/tab_restore_service_helper_unittest.cc" ]
+    deps = [
+      "//base/test:run_all_unittests",
+      "//base/test:test_support",
+      "//components/sessions",
+      "//testing/gtest",
+    ]
   }
 }

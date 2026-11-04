@@ -1,4 +1,5 @@
 #include "chrome/browser/profiles/noventra_account_spaces.h"
+#include "chrome/browser/profiles/noventra_space_profile_registry.h"
 #include "chrome/browser/ui/noventra/layout_model.h"
 #include "chrome/browser/ui/noventra/workspace_routes.h"
 #include "chrome/browser/ui/noventra/workspace_sync_service.h"
@@ -54,11 +55,12 @@ void AppearanceHandler::OnJavascriptAllowed() {
        "helium.browser.show_dynamic_new_tab_button"})
     if (profile_->GetPrefs()->FindPreference(key))
       layout_registrar_.Add(key, base::BindRepeating(&AppearanceHandler::NotifyNoventraLayoutState, base::Unretained(this)));
+  spaces_registrar_.Init(noventra::SpaceCatalogProfile(profile_)->GetPrefs());
   for (const char* key :
        {noventra::kSpacesPref, noventra::kSpaceOrderPref,
         noventra::kArchivedSpacesPref, noventra::kWorkspaceRoutesPref,
         noventra::kSpaceAppearancePref}) {
-    layout_registrar_.Add(
+    spaces_registrar_.Add(
         key,
         base::BindRepeating(&AppearanceHandler::NotifyNoventraSpacesChanged,
                             base::Unretained(this)));
@@ -89,6 +91,7 @@ void AppearanceHandler::OnJavascriptAllowed() {
 void AppearanceHandler::OnJavascriptDisallowed() {
   weak_ptr_factory_.InvalidateWeakPtrs();
   layout_registrar_.RemoveAll();
+  spaces_registrar_.RemoveAll();
   extension_observation_.Reset();
 }
 void AppearanceHandler::OnExtensionLoaded(content::BrowserContext*, const extensions::Extension*) { NotifyNoventraLayoutState(); }
@@ -319,7 +322,7 @@ void AppearanceHandler::HandleNoventraSpaces(const base::ListValue& args) {
   }
   auto* browser = GlobalBrowserCollection::GetInstance()->FindBrowserWithTab(web_ui()->GetWebContents());
   if (!browser) { RejectJavascriptCallback(args[0], base::Value("Browser window unavailable")); return; }
-  auto* prefs = profile_->GetPrefs();
+  auto* prefs = noventra::SpaceCatalogProfile(profile_)->GetPrefs();
   const std::string action = args[1].GetString();
   std::string id = args[2].GetString();
   const std::string& name_or_target = args[3].GetString();
@@ -390,6 +393,7 @@ void AppearanceHandler::HandleNoventraSpaces(const base::ListValue& args) {
     spaces.Append(
         base::DictValue()
             .Set("id", space_id)
+            .Set("profileIsolated", noventra::ProfileSpacesEnabled())
             .Set("name", label              ? *label
                          : space_id.empty() ? "Personal"
                                             : "Account space")
@@ -474,7 +478,8 @@ void AppearanceHandler::HandleNoventraWorkspaceTools(
     reject("Browser window unavailable.");
     return;
   }
-  auto& prefs = *profile_->GetPrefs();
+  auto& prefs = *noventra::SpaceCatalogProfile(profile_)->GetPrefs();
+  auto& layout_prefs = *profile_->GetPrefs();
   const auto& action = args[1].GetString();
   const auto& request = args[2].GetDict();
   const auto routes_value = [&]() {
@@ -541,13 +546,14 @@ void AppearanceHandler::HandleNoventraWorkspaceTools(
       }
     }
     ResolveJavascriptCallback(
-        args[0], base::DictValue()
-                     .Set("format", "noventra-workspace-settings")
-                     .Set("version", 1)
-                     .Set("spaces", std::move(spaces))
-                     .Set("routes", std::move(routes))
-                     .Set("layout", noventra::LayoutToValue(
-                                        noventra::ReadOrMigrateLayout(prefs))));
+        args[0],
+        base::DictValue()
+            .Set("format", "noventra-workspace-settings")
+            .Set("version", 1)
+            .Set("spaces", std::move(spaces))
+            .Set("routes", std::move(routes))
+            .Set("layout", noventra::LayoutToValue(
+                               noventra::ReadOrMigrateLayout(layout_prefs))));
     return;
   }
   if (action != "import") {
@@ -658,8 +664,8 @@ void AppearanceHandler::HandleNoventraWorkspaceTools(
       reject("Reload Settings before importing the layout.");
       return;
     }
-    auto parsed =
-        noventra::ValidateLayout(*raw, noventra::GetLayoutCapabilities(prefs));
+    auto parsed = noventra::ValidateLayout(
+        *raw, noventra::GetLayoutCapabilities(layout_prefs));
     if (!parsed.has_value()) {
       reject("Cannot import layout: " + parsed.error() +
              " You can import spaces without the layout.");
@@ -673,7 +679,7 @@ void AppearanceHandler::HandleNoventraWorkspaceTools(
   // writes.
   if (layout) {
     const auto applied =
-        noventra::ApplyLayout(prefs, *layout, layout->revision);
+        noventra::ApplyLayout(layout_prefs, *layout, layout->revision);
     if (applied.status != "ok") {
       reject(applied.message);
       return;

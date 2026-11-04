@@ -25,6 +25,7 @@
 #include "chrome/browser/lifetime/application_lifetime_desktop.h"
 #include "chrome/browser/lifetime/browser_shutdown.h"
 #include "chrome/browser/prefs/session_startup_pref.h"
+#include "chrome/browser/profiles/noventra_space_profile_registry.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_attributes_entry.h"
 #include "chrome/browser/profiles/profile_attributes_storage.h"
@@ -146,13 +147,21 @@ SessionService::SessionService(Profile* profile)
   closing_all_browsers_subscription_ = chrome::AddClosingAllBrowsersCallback(
       base::BindRepeating(&SessionService::OnClosingAllBrowsersChanged,
                           base::Unretained(this)));
+  RefreshSavingEnabled();
   ExitTypeService* exit_type_service =
       ExitTypeService::GetInstanceForProfile(profile);
   if (exit_type_service && exit_type_service->waiting_for_user_to_ack_crash()) {
-    SetSavingEnabled(false);
     exit_type_service->AddCrashAckCallback(base::BindOnce(
-        &SessionService::SetSavingEnabled, weak_factory_.GetWeakPtr(), true));
+        &SessionService::RefreshSavingEnabled, weak_factory_.GetWeakPtr()));
   }
+}
+
+void SessionService::RefreshSavingEnabled() {
+  ExitTypeService* exit_type_service =
+      ExitTypeService::GetInstanceForProfile(profile());
+  SetSavingEnabled(!SessionRestore::HasPendingProfileSpaceSession(profile()) &&
+                   (!exit_type_service ||
+                    !exit_type_service->waiting_for_user_to_ack_crash()));
 }
 
 SessionService::~SessionService() {
@@ -181,6 +190,12 @@ bool SessionService::IsRelevantWindowType(
 }
 
 bool SessionService::ShouldRestore(BrowserWindowInterface* browser) {
+  // Profile-backed Spaces restore the cold validated cache through their
+  // physical host. Native autoload must not race that path into desktop
+  // windows.
+  if (noventra::IsProfileSpace(profile())) {
+    return false;
+  }
 #if BUILDFLAG(IS_CHROMEOS)
   // Do not restore browser window in the kiosk session.
   if (chromeos::IsKioskSession()) {

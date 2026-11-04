@@ -14,15 +14,17 @@
 #include "base/functional/concurrent_closures.h"
 #include "base/memory/weak_ptr.h"
 #include "base/values.h"
-#include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/noventra_account_spaces.h"
-#include "content/public/browser/storage_partition.h"
+#include "chrome/browser/profiles/noventra_space_profile_registry.h"
+#include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/web_applications/extensions_manager.h"
 #include "chrome/browser/web_applications/locks/all_apps_lock.h"
 #include "chrome/browser/web_applications/web_app_isolation_delegate.h"
 #include "chrome/browser/web_applications/web_app_registrar.h"
 #include "chrome/common/pref_names.h"
 #include "components/prefs/pref_service.h"
+#include "content/public/browser/storage_partition.h"
+#include "content/public/browser/storage_partition_path.h"
 
 namespace web_app {
 
@@ -76,11 +78,21 @@ void GarbageCollectStoragePartitionsCommand::DoGarbageCollection() {
   // Account spaces remain live even with no currently open tabs. Chromium
   // normalizes allowlisted paths to their partition-domain root, so one
   // registered space protects the domain without loading every space's data.
-  for (const auto [id, name] : profile_->GetPrefs()->GetDict(noventra::kSpacesPref)) {
-    if (base::Uuid::ParseLowercase(id).is_valid()) {
-      allowlist.insert(profile_->GetStoragePartition(
-          noventra::SpaceConfig(profile_, id))->GetPath());
-      break;
+  if (noventra::ProfileSpacesEnabled()) {
+    // Preserve legacy source jars, including hashes whose UUID was lost.
+    allowlist.insert(
+        profile_->GetPath().Append(content::GetStoragePartitionRelativePath(
+                                       noventra::kSpacePartitionDomain, {})
+                                       .DirName()));
+  } else {
+    for (const auto [id, name] :
+         profile_->GetPrefs()->GetDict(noventra::kSpacesPref)) {
+      if (base::Uuid::ParseLowercase(id).is_valid()) {
+        allowlist.insert(
+            profile_->GetStoragePartition(noventra::SpaceConfig(profile_, id))
+                ->GetPath());
+        break;
+      }
     }
   }
 

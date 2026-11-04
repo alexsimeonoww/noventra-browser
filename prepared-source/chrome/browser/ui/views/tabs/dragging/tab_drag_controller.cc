@@ -26,6 +26,7 @@
 #include "base/scoped_observation.h"
 #include "base/trace_event/trace_event.h"
 #include "build/build_config.h"
+#include "chrome/browser/profiles/noventra_space_profile_registry.h"
 #include "chrome/browser/tab_group_sync/tab_group_sync_service_factory.h"
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_element_identifiers.h"
@@ -640,6 +641,15 @@ bool TabDragController::IsAttachedTo(const TabDragContext* context) {
 // static
 bool TabDragController::IsActive() {
   return g_tab_drag_controller && g_tab_drag_controller->active();
+}
+
+// static
+bool TabDragController::IsNewBrowserForDrag(BrowserWindowInterface* browser) {
+  return browser && g_tab_drag_controller &&
+         std::ranges::any_of(g_tab_drag_controller->created_drag_browsers_,
+                             [browser](const auto& created) {
+                               return created.get() == browser;
+                             });
 }
 
 // static
@@ -2931,7 +2941,13 @@ BrowserWindowInterface* TabDragController::CreateBrowserForDrag(
 
   base::TimeTicks now = base::TimeTicks::Now();
   BrowserWindowInterface* browser =
-      CreateBrowserWindow(std::move(create_params));
+      !open_as_web_app &&
+              noventra::IsProfileSpace(from_browser->GetProfile()) &&
+              !from_browser->GetProfile()->IsOffTheRecord()
+          ? noventra::CreateRestoredProfileSpaceBrowser(
+                std::move(create_params), {}, 0)
+          : CreateBrowserWindow(std::move(create_params));
+  created_drag_browsers_.push_back(browser->GetWeakPtr());
   if (auto* manager = InitialWebUIWindowMetricsManager::From(browser)) {
     manager->SetWindowCreationInfo(
         waap::NewWindowCreationSource::kDragToNewWindow, now);
@@ -3004,6 +3020,15 @@ TabDragController::Liveness TabDragController::GetLocalProcessWindow(
   // drag ends via Browser::TabStripEmpty().
   ForEachCurrentBrowserWindowInterfaceOrderedByActivation(
       [&exclude](BrowserWindowInterface* browser) {
+        if (noventra::IsIncognitoSpaceHostClosing(browser)) {
+          // An emptied presentation closes its physical host asynchronously.
+          // Its root placeholder must not intercept the continuing drag.
+          auto* host = noventra::IncognitoSpaceHost(browser);
+          if (host) {
+            exclude.insert(host->GetWindow()->GetNativeWindow());
+          }
+          return true;
+        }
         if (browser->GetTabStripModel()->empty()) {
           auto* selected = noventra::SelectedIncognitoBrowser(browser);
           if (!selected || selected == browser) {

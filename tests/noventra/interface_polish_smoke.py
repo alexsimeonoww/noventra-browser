@@ -22,6 +22,10 @@ DEEP = '''function deep(root, selector) {
 
 def native_key(inp, key, modifiers=()):
     if inp.platform == 'wayland':
+        aliases = {'Control_L': 'ctrl', 'Control_R': 'ctrl', 'Shift_L': 'shift',
+                   'Shift_R': 'shift', 'Alt_L': 'alt', 'Alt_R': 'altgr',
+                   'Super_L': 'logo', 'Super_R': 'logo'}
+        modifiers = tuple(aliases.get(modifier, modifier) for modifier in modifiers)
         subprocess.run(['wtype', *[a for m in modifiers for a in ('-M', m)], '-k', key, *[a for m in reversed(modifiers) for a in ('-m', m)]], check=True)
     else:
         p = inp.pointer

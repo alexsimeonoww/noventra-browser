@@ -715,8 +715,8 @@ bool TabView::OnMousePressed(const ui::MouseEvent& event) {
       for (int candidate : {index - distance, index + distance}) {
         if (!model->ContainsIndex(candidate)) continue;
         auto* tab = model->GetTabAtIndex(candidate);
-        if (tab->IsPinned() == GetTabInterface()->IsPinned() &&
-            noventra::SpaceId(tab->GetContents()) == noventra::SpaceId(GetTabInterface()->GetContents())) {
+        if (noventra::SpaceId(tab->GetContents()) ==
+            noventra::SpaceId(GetTabInterface()->GetContents())) {
           noventra_page_target_ = tab->GetWeakPtr();
           break;
         }
@@ -1326,6 +1326,10 @@ void TabView::SetSelection(bool selected) {
 void TabView::UpdateTabData(const tabs::TabData& data) {
   tabs::TabData old_data = std::move(tab_data_);
   tab_data_ = data;
+  if (old_data.is_tab_discarded != tab_data_.is_tab_discarded ||
+      old_data.should_dim_favicon != tab_data_.should_dim_favicon) {
+    InvalidateLayout();
+  }
 
   tabs::TabInterface* tab = const_cast<tabs::TabInterface*>(GetTabInterface());
 
@@ -1766,11 +1770,19 @@ void TabView::UpdateNoventraDrop(const gfx::Point& point) {
   }
   if (noventra_drop_target_) {
     auto* target = noventra_drop_target_.get();
-    if (noventra::SpaceId(source->GetContents()) != noventra::SpaceId(target->GetContents()) || source->IsPinned() != target->IsPinned()) {
+    if (noventra::SpaceId(source->GetContents()) !=
+        noventra::SpaceId(target->GetContents())) {
       noventra_drop_valid_ = false;
-      label = u"Tabs must be in the same space and pin section";
-    } else if (noventra_drop_combine_ && target->IsSplit() && target->GetSplit() != source->GetSplit() &&
-               model->GetSplitData(target->GetSplit().value())->ListTabs().size() >= 4) {
+      label = u"Tabs must be in the same space";
+    } else if (!noventra_drop_combine_ &&
+               source->IsPinned() != target->IsPinned()) {
+      noventra_drop_valid_ = false;
+      label = u"Hold to combine pinned and regular tabs";
+    } else if (noventra_drop_combine_ && target->IsSplit() &&
+               target->GetSplit() != source->GetSplit() &&
+               model->GetSplitData(target->GetSplit().value())
+                       ->ListTabs()
+                       .size() >= 4) {
       noventra_drop_valid_ = false;
       label = u"This split already has four tabs";
     }
@@ -1865,31 +1877,22 @@ void TabView::FinishNoventraDrag() {
         auto* model = view->browser()->GetTabStripModel();
         if (!model->ContainsIndex(model->GetIndexOfTab(source.get()))) return;
         if (had_target && (!target || !model->ContainsIndex(model->GetIndexOfTab(target.get())))) return;
-        if (target && (noventra::SpaceId(source->GetContents()) != noventra::SpaceId(target->GetContents()) ||
-                       source->IsPinned() != target->IsPinned())) return;
+        if (target &&
+            (noventra::SpaceId(source->GetContents()) !=
+                 noventra::SpaceId(target->GetContents()) ||
+             (!combine && source->IsPinned() != target->IsPinned()))) {
+          return;
+        }
         if (combine) {
           const bool same_split = target && source->IsSplit() && source->GetSplit() == target->GetSplit();
           if (!same_split && !view->GetProfile()->GetPrefs()->GetBoolean(prefs::kSplitViewDragAndDropEnabled)) return;
-          if (target &&
-              model->JoinNoventraSplit(model->GetIndexOfTab(source.get()),
-                                       model->GetIndexOfTab(target.get()))) {
-            if (!view || !source || !target)
-              return;
-            model = view->browser()->GetTabStripModel();
-            const int source_index = model->GetIndexOfTab(source.get());
-            if (!model->ContainsIndex(source_index) ||
-                !model->ContainsIndex(model->GetIndexOfTab(target.get())))
-              return;
-            int destination =
-                model->GetIndexOfTab(target.get()) + (after ? 1 : 0);
-            if (source_index < destination)
-              --destination;
-            if (model->ContainsIndex(destination) &&
-                destination != source_index)
-              model->MoveWebContentsAt(source_index, destination, true);
-            if (view && source && stacked && source->GetSplit())
-              view->browser()->GetTabStripModel()->UpdateSplitLayout(
-                  *source->GetSplit(), split_tabs::SplitTabLayout::kStacked);
+          if (target) {
+            using Placement = TabStripModel::SplitJoinPlacement;
+            model->JoinNoventraSplit(
+                model->GetIndexOfTab(source.get()),
+                model->GetIndexOfTab(target.get()),
+                stacked ? (after ? Placement::kBelow : Placement::kAbove)
+                        : (after ? Placement::kAfter : Placement::kBefore));
           }
         } else {
           model->DetachNoventraSplitTab(model->GetIndexOfTab(source.get()));

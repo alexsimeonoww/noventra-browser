@@ -90,6 +90,11 @@ source_set("browser_live_tab_context") {
 }
 
 if (!is_android) {
+  source_set("noventra_space_host_headers") {
+    public = [ "noventra/incognito_space_host.h" ]
+    public_deps = [ "//base" ]
+  }
+
   # Session helpers use this contract without depending on the full UI.
   source_set("noventra_window_mirror_headers") {
     public = [ "noventra/window_mirror_service.h" ]
@@ -500,8 +505,9 @@ if (!is_android) {
       "//chrome/browser:browser_public_dependencies",
     ]
     deps = [
-      ":noventra_window_mirror_headers",
       ":browser_window_header",
+      ":noventra_space_host_headers",
+      ":noventra_window_mirror_headers",
       ":tab_ui_helper",
       "//base",
       "//chrome/browser/apps/app_service",
@@ -562,12 +568,13 @@ if (!is_android) {
       "//chrome/browser:browser_public_dependencies",
     ]
     deps = [
-      ":noventra_window_mirror_headers",
       ":browser_commands",
       ":browser_init_state",
       ":browser_tab_strip",
       ":browser_tabrestore",
       ":browser_window_header",
+      ":noventra_space_host_headers",
+      ":noventra_window_mirror_headers",
       ":ui_features",
       "//base",
       "//chrome/browser/apps/app_service",
@@ -2332,6 +2339,7 @@ static_library("ui") {
     public_deps += [ "//chrome/browser/ui/browser_shortcuts:service_headers" ]
     deps += [
       ":noventra_pinned_tab_state",
+      ":noventra_space_host_headers",
       ":noventra_window_mirror_headers",
       "//base:i18n",
       "//chrome/browser/affiliations",
@@ -2363,16 +2371,15 @@ static_library("ui") {
       "browser_tabstrip.cc",
       "browser_tabstrip.h",
       "noventra/incognito_space_host.cc",
-      "noventra/incognito_space_host.h",
       "noventra/layout_model.cc",
       "noventra/layout_model.h",
-      "noventra/window_mirror_service.cc",
       "noventra/portable_data.cc",
       "noventra/portable_data.h",
       "noventra/portable_passwords.cc",
       "noventra/portable_passwords.h",
       "noventra/portable_transfer_codec.cc",
       "noventra/portable_transfer_codec.h",
+      "noventra/window_mirror_service.cc",
       "noventra/workspace_routes.cc",
       "noventra/workspace_routes.h",
       "noventra/workspace_sync_document.cc",
@@ -2384,12 +2391,12 @@ static_library("ui") {
       "noventra_commands.h",
       "views/frame/noventra_bookmarks_view.cc",
       "views/frame/noventra_bookmarks_view.h",
-      "views/frame/noventra_window_mirror_view.cc",
-      "views/frame/noventra_window_mirror_view.h",
       "views/frame/noventra_dock_controller.cc",
       "views/frame/noventra_dock_controller.h",
       "views/frame/noventra_dock_view.cc",
       "views/frame/noventra_dock_view.h",
+      "views/frame/noventra_window_mirror_view.cc",
+      "views/frame/noventra_window_mirror_view.h",
       "views/noventra_link_preview.cc",
       "views/noventra_link_preview.h",
     ]

@@ -40,6 +40,9 @@ class LiveTab;
 class SESSIONS_EXPORT LiveTabContext {
  public:
   // TODO(blundell): Rename.
+  // Reject a saved tab before any group/window/split replay.
+  // Embedders without additional ownership constraints accept every tab.
+  virtual bool CanRestoreTab(const tab_restore::Tab& tab) const { return true; }
   virtual void ShowBrowserWindow() = 0;
   virtual SessionID GetSessionID() const = 0;
   virtual SessionWindow::WindowType GetWindowType() const = 0;

@@ -65,6 +65,7 @@ class BrowserLiveTabContext : public sessions::LiveTabContext {
   ~BrowserLiveTabContext() override;
 
   // Overridden from LiveTabContext:
+  bool CanRestoreTab(const sessions::tab_restore::Tab& tab) const override;
   void ShowBrowserWindow() override;
   SessionID GetSessionID() const override;
   sessions::SessionWindow::WindowType GetWindowType() const override;

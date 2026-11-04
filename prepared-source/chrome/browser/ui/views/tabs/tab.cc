@@ -605,7 +605,7 @@ void Tab::Layout(PassKey) {
         {gfx::Point(visible_left - non_visible_left_padding, top),
          close_button_actual_size});
     if (data().pinned) {
-      constexpr int kPinCloseSize = 18;
+      constexpr int kPinCloseSize = 16;
       close_button_->SetBounds(width() - kPinCloseSize, 0, kPinCloseSize,
                                kPinCloseSize);
     }
@@ -832,9 +832,8 @@ bool Tab::OnMousePressed(const ui::MouseEvent& event) {
             if (!model->ContainsIndex(candidate))
               continue;
             auto* tab = model->GetTabAtIndex(candidate);
-            if (tab->IsPinned() == source->IsPinned() &&
-                noventra::SpaceId(tab->GetContents()) ==
-                    noventra::SpaceId(source->GetContents())) {
+            if (noventra::SpaceId(tab->GetContents()) ==
+                noventra::SpaceId(source->GetContents())) {
               noventra_split_page_target_ = tab->GetWeakPtr();
               break;
             }
@@ -1508,8 +1507,10 @@ void Tab::UpdateIconVisibility() {
     // or keyboard focus. Closing unloads the page without removing the pin.
     showing_alert_indicator_ = has_alert_icon;
     showing_icon_ = has_favicon && !has_alert_icon;
-    showing_close_button_ = data().pinned && (mouse_hovered_ || HasFocus() ||
-                                              close_button_->HasFocus());
+    showing_close_button_ =
+        data().pinned && !data().is_tab_discarded &&
+        !data().should_dim_favicon &&
+        (mouse_hovered_ || HasFocus() || close_button_->HasFocus());
 
     // While animating to or from the pinned state, pinned tabs are rendered as
     // normal tabs. Force the extra padding on so the favicon doesn't jitter
@@ -1891,7 +1892,6 @@ bool Tab::UpdateNoventraSplitDrag(const ui::MouseEvent& event) {
   noventra_split_drop_valid_ =
       page.Contains(point) && target && target != source &&
       model->ContainsIndex(model->GetIndexOfTab(target)) &&
-      source->IsPinned() == target->IsPinned() &&
       noventra::SpaceId(source->GetContents()) ==
           noventra::SpaceId(target->GetContents()) &&
       browser->GetProfile()->GetPrefs()->GetBoolean(
@@ -1993,28 +1993,16 @@ void Tab::FinishNoventraSplitDrag() {
             if (!model->ContainsIndex(model->GetIndexOfTab(source.get())) ||
                 !model->ContainsIndex(model->GetIndexOfTab(target.get())))
               return;
-            if (source->IsPinned() != target->IsPinned() ||
-                noventra::SpaceId(source->GetContents()) !=
-                    noventra::SpaceId(target->GetContents()))
+            if (noventra::SpaceId(source->GetContents()) !=
+                noventra::SpaceId(target->GetContents())) {
               return;
-            if (!model->JoinNoventraSplit(model->GetIndexOfTab(source.get()),
-                                          model->GetIndexOfTab(target.get())))
-              return;
-            if (!view || !source || !target)
-              return;
-            model = view->browser()->GetTabStripModel();
-            if (!model->ContainsIndex(model->GetIndexOfTab(source.get())) ||
-                !model->ContainsIndex(model->GetIndexOfTab(target.get())))
-              return;
-            const int from = model->GetIndexOfTab(source.get());
-            int to = model->GetIndexOfTab(target.get()) + (after ? 1 : 0);
-            if (from < to)
-              --to;
-            if (model->ContainsIndex(to) && from != to)
-              model->MoveWebContentsAt(from, to, true);
-            if (view && source && stacked && source->GetSplit())
-              view->browser()->GetTabStripModel()->UpdateSplitLayout(
-                  *source->GetSplit(), split_tabs::SplitTabLayout::kStacked);
+            }
+            using Placement = TabStripModel::SplitJoinPlacement;
+            model->JoinNoventraSplit(
+                model->GetIndexOfTab(source.get()),
+                model->GetIndexOfTab(target.get()),
+                stacked ? (after ? Placement::kBelow : Placement::kAbove)
+                        : (after ? Placement::kAfter : Placement::kBefore));
           },
           browser->GetAsWeakPtr(), weak_source, target, valid, after, stacked));
 }

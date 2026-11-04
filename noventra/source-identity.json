@@ -38,14 +38,19 @@
       "sha256": "5abdb64ae061ab709bd025aa4c44c2558eac0659e8a7ef17b80b97adf8adbee4"
     },
     "build-inputs/docs/noventra/github-releases.md": {
-      "bytes": 7985,
+      "bytes": 8340,
       "mode": 420,
-      "sha256": "5e5cefb11ca46307183f6b3eb586d4583b9cf1de22704d9a0fe30a520ecd272e"
+      "sha256": "4e97d3bcb247ed57612664663eb1b8dabf84e4b313651173e3438dac6f8e2c83"
     },
     "build-inputs/docs/noventra/pin-close-incognito-spaces-2026-11-04.md": {
       "bytes": 2283,
       "mode": 420,
       "sha256": "a0ec85d89903a2ac9e2e008ca25d3514339b319bbf9a159076ee509e82476d60"
+    },
+    "build-inputs/docs/noventra/profile-spaces.md": {
+      "bytes": 5333,
+      "mode": 420,
+      "sha256": "ef31a1c038d74521497999535a1df02a3c7e8dc301ac3b43015976890c3afd26"
     },
     "build-inputs/docs/noventra/sidebar-space-capacity-animation-2026-11-04.md": {
       "bytes": 1797,
@@ -148,9 +153,9 @@
       "sha256": "8149d7388c3354310a36fa41bc22c3c5b5f236ca020a8c4ad86bb520bee6de14"
     },
     "build-inputs/noventra/patches/chromium-156/manifest.json": {
-      "bytes": 180873,
+      "bytes": 186267,
       "mode": 420,
-      "sha256": "20d65567e57a6485871012759e182f99798fad679be5f06158cb722f612075e8"
+      "sha256": "8c6cc0bc21c7c341fe8f386cede7f78a0dcedebd54594e829fecb2923ab85058"
     },
     "build-inputs/noventra/patches/chromium-156/noventra-about-licenses.patch": {
       "bytes": 783,
@@ -222,6 +227,11 @@
       "mode": 420,
       "sha256": "7b77f0ae5b0721c58bbae911a6c8f5b5d09a465c181522d544cabeff86fa657c"
     },
+    "build-inputs/noventra/patches/chromium-156/noventra-profile-spaces-compact-pins.patch": {
+      "bytes": 343880,
+      "mode": 420,
+      "sha256": "bcbce3e8d63da8e7004ab011ee052220da46d3e40b590034bcfff789096e70c7"
+    },
     "build-inputs/noventra/patches/chromium-156/noventra-sidebar-space-capacity-animation.patch": {
       "bytes": 9311,
       "mode": 420,
@@ -263,9 +273,9 @@
       "sha256": "d0f4d7550871a03512e8e880f2071522393a9db0489e97a4e88daf9bab0afbd8"
     },
     "build-inputs/noventra/patches/chromium-156/series": {
-      "bytes": 798,
+      "bytes": 841,
       "mode": 420,
-      "sha256": "075840d59c84f1d3f8df6210984517e65f0989dedc9f6328133c4d798d8ab631"
+      "sha256": "daa940dbf138af2dd79798776e3f7ca2eb5c381888ea0c89c7c48195763fcb05"
     },
     "build-inputs/noventra/qualified-args.gn": {
       "bytes": 894,
@@ -743,9 +753,9 @@
       "sha256": "5d2071febb07661880dfecb822e47da52592769fe2c45317307e275f7bd4669f"
     },
     "build-inputs/tests/noventra/interface_polish_smoke.py": {
-      "bytes": 13014,
+      "bytes": 13310,
       "mode": 420,
-      "sha256": "888ff92c8ebf413696d2b2a1499a8dda6db19dbe33d361ddef696bedfa9c5779"
+      "sha256": "96262aaf550f3cd496aed93a28ca330cb96928cc4ef372a13d98d738ac3c23d8"
     },
     "build-inputs/tests/noventra/javascript_modal_wayland_smoke.py": {
       "bytes": 21295,
@@ -817,6 +827,16 @@
       "mode": 420,
       "sha256": "419d17a5e208a81dff02ea93c2be1c816310d040b7569fb46aa0f936e7b8e673"
     },
+    "build-inputs/tests/noventra/pin_split_smoke.py": {
+      "bytes": 28091,
+      "mode": 420,
+      "sha256": "34dc82b0231a1c09a06e1d931fdbc738554672be8e44f62a006e596d1374c379"
+    },
+    "build-inputs/tests/noventra/pin_visual_state_smoke.py": {
+      "bytes": 7713,
+      "mode": 420,
+      "sha256": "46ede65cd8f22bb124cf3ab7fc37e7705973aef913e44a1eb7e13bd5c1ea5155"
+    },
     "build-inputs/tests/noventra/pinned_tabs_smoke.py": {
       "bytes": 29500,
       "mode": 420,
@@ -826,6 +846,21 @@
       "bytes": 71971,
       "mode": 420,
       "sha256": "32d69ca77058a020b7b38129ca444ac8bb1cc9ead31fe978b45b9ffb2d876f92"
+    },
+    "build-inputs/tests/noventra/profile_space_migration_smoke.py": {
+      "bytes": 19389,
+      "mode": 420,
+      "sha256": "0e8261b32097f74040f641ef1ed5d8121f3e6acbc89aa7a3339e044ad2dda9ca"
+    },
+    "build-inputs/tests/noventra/profile_spaces_smoke.py": {
+      "bytes": 19725,
+      "mode": 420,
+      "sha256": "7dd165e0cb9238876510a798d6f49f49a0ec86987dd81fbfa2b1070ff954c453"
+    },
+    "build-inputs/tests/noventra/profile_workspace_sync_smoke.py": {
+      "bytes": 12240,
+      "mode": 420,
+      "sha256": "c0458a837a6edb859a98250500e330d5ea2dbe84f998c6778567860ace89dbb1"
     },
     "build-inputs/tests/noventra/protocols/virtual-keyboard-unstable-v1.xml": {
       "bytes": 4886,
@@ -987,6 +1022,11 @@
       "mode": 420,
       "sha256": "f38e3c4fc5466b63cf18b7bc5b5754ea9ef5815e2816a1401e38a390a58e22ee"
     },
+    "build-inputs/tests/noventra/workspace_sync_smoke.py": {
+      "bytes": 75912,
+      "mode": 420,
+      "sha256": "36f2b34f0fae8bf4e74ba02cad88fa3b076d1ee6638af88b2b0b1c9530fd31f3"
+    },
     "build-inputs/tests/noventra/workspace_tools_smoke.py": {
       "bytes": 57190,
       "mode": 420,
@@ -1008,9 +1048,9 @@
       "sha256": "c3ef58793df5e7c67d106c8d653c3adf73148bbe959cedfa6fae657bb384a35e"
     },
     "build-inputs/tools/noventra/github_release.py": {
-      "bytes": 23966,
+      "bytes": 23950,
       "mode": 420,
-      "sha256": "8d6b25aa5b751d4bcd9cd6ecdde66de774301e0224caa1e4c8a2fe8171154ff2"
+      "sha256": "22e390daf898b51a0f41bd70e9dc5444dfe515936eb0a61ead836a63c58e2746"
     },
     "build-inputs/tools/noventra/local_delivery_server.py": {
       "bytes": 3464,
@@ -1363,9 +1403,9 @@
       "sha256": "d38081cca780f3f666be1951a968a60ac4b6dda20f00f660c957a95433e22102"
     },
     "prepared-source/chrome/browser/BUILD.gn": {
-      "bytes": 165010,
+      "bytes": 165193,
       "mode": 420,
-      "sha256": "8959eb66ce957e509df9cd851d43cd987e0f6b3f1ccd9e68c0978f59246a2c7d"
+      "sha256": "6d3d11d9f2a8e55302faf3d5a21729c02d56d727310ec4a3db6c97601f83a05a"
     },
     "prepared-source/chrome/browser/autocomplete/chrome_autocomplete_provider_client.cc": {
       "bytes": 35093,
@@ -1398,9 +1438,9 @@
       "sha256": "1899feb5cd6e7fffe53240753dadef4c29cf34ad6cf7fe0323f211695de08e01"
     },
     "prepared-source/chrome/browser/chrome_browser_main.cc": {
-      "bytes": 94326,
+      "bytes": 94805,
       "mode": 420,
-      "sha256": "ef5bc8e1b24465d68370a44e43de3626102c3c473399e8c97a511735c60c9bf1"
+      "sha256": "4d09115ed297d9e7b74139ebce8c17ba39e211d3af7d31e3711c58f9b86f9ba7"
     },
     "prepared-source/chrome/browser/chrome_content_browser_client.cc": {
       "bytes": 402288,
@@ -1572,6 +1612,16 @@
       "mode": 420,
       "sha256": "184fa578022b445d985e673ea531a200ef67663f2d70276aac06fd8e826079fa"
     },
+    "prepared-source/chrome/browser/net/BUILD.gn": {
+      "bytes": 19757,
+      "mode": 420,
+      "sha256": "c3feb023a7e46be7b88cd49560419cc77382ade62700f5cdbf7e58e7a700114e"
+    },
+    "prepared-source/chrome/browser/net/profile_network_context_service.cc": {
+      "bytes": 70029,
+      "mode": 420,
+      "sha256": "086cedc9da709f98a0cb6973e58a235b2a63ca48027429fae7ac593c17723daa"
+    },
     "prepared-source/chrome/browser/notifications/persistent_notification_handler.cc": {
       "bytes": 21814,
       "mode": 420,
@@ -1587,15 +1637,20 @@
       "mode": 420,
       "sha256": "8a9fb636ec703659b0904d88e0a6ab643f3130f34f1292971f9ae69657f88eed"
     },
+    "prepared-source/chrome/browser/prefs/browser_prefs.cc": {
+      "bytes": 139277,
+      "mode": 420,
+      "sha256": "97480e27e91419b6360b7f99560504b313f61990c0440fbf13c78cee78cd0018"
+    },
     "prepared-source/chrome/browser/prefs/session_startup_pref.cc": {
       "bytes": 6125,
       "mode": 420,
       "sha256": "c133ea4094622d96b78276179d713c5e852fcab7bdb50a66d462238901d7def2"
     },
     "prepared-source/chrome/browser/profiles/BUILD.gn": {
-      "bytes": 41250,
+      "bytes": 42224,
       "mode": 420,
-      "sha256": "b8273cee8a185a09f471eac7d16451514a1d3150c1847cd7999334e9c0f908bd"
+      "sha256": "936957f5d1dc2c14ad65c545b02e87bd65745b1ea2d9b7b5d4e906f1d2044668"
     },
     "prepared-source/chrome/browser/profiles/chrome_browser_main_extra_parts_profiles.cc": {
       "bytes": 82357,
@@ -1603,14 +1658,54 @@
       "sha256": "8e78cbd5c3e30f812c4b8012f9b674d52422a089f350576edd1436c2c4c602a2"
     },
     "prepared-source/chrome/browser/profiles/noventra_account_spaces.h": {
-      "bytes": 3368,
+      "bytes": 4259,
       "mode": 420,
-      "sha256": "bb5ddc2433825f0ef6f11d223368246b9708a56dc30c9c8af4457f97e5d2224b"
+      "sha256": "ad0b831dea820897c466a174c3dd3bb5336f4ce9530548c8259c6c169b91013a"
+    },
+    "prepared-source/chrome/browser/profiles/noventra_space_migration.cc": {
+      "bytes": 23246,
+      "mode": 420,
+      "sha256": "c6faf31960077f68e32e6bd558168f1e944f1c6395c234566875049847dae1d9"
+    },
+    "prepared-source/chrome/browser/profiles/noventra_space_migration.h": {
+      "bytes": 4241,
+      "mode": 420,
+      "sha256": "b16b086fdfc15cd66b9763ebb904d422c68808fedec2acd59423a7569e62c8b4"
+    },
+    "prepared-source/chrome/browser/profiles/noventra_space_migration_unittest.cc": {
+      "bytes": 14358,
+      "mode": 420,
+      "sha256": "6a6e60453ad5ddad4391f47aa8719574ea6cded3100555e7e5b3cbaeaf9116ad"
+    },
+    "prepared-source/chrome/browser/profiles/noventra_space_profile_registry.cc": {
+      "bytes": 30873,
+      "mode": 420,
+      "sha256": "02bd33a8b468ac3a24d8eede74a6a3dffbb91ebbdd5ccdbeac0fcdd0c7fa6f39"
+    },
+    "prepared-source/chrome/browser/profiles/noventra_space_profile_registry.h": {
+      "bytes": 3357,
+      "mode": 420,
+      "sha256": "a90e7e1242714a00fffa17b25b96823e1f36e4ba5d208f127f621d34c63922cf"
+    },
+    "prepared-source/chrome/browser/profiles/noventra_space_startup.cc": {
+      "bytes": 27517,
+      "mode": 420,
+      "sha256": "16a10f5c045e4aad4d5ca9a0bb1252d04e001a55f770ee34fcdbf8cd1d42d67d"
+    },
+    "prepared-source/chrome/browser/profiles/noventra_space_startup.h": {
+      "bytes": 856,
+      "mode": 420,
+      "sha256": "9f086271eca894f38e18cc18798fc2ee39300a101ecac0a7f650df08d95bd18f"
+    },
+    "prepared-source/chrome/browser/profiles/profile_impl.cc": {
+      "bytes": 72965,
+      "mode": 420,
+      "sha256": "f2e5daa0700256d35e422b844306c0eee29641159b273531eb0a797b17055236"
     },
     "prepared-source/chrome/browser/profiles/profile_manager.cc": {
-      "bytes": 93625,
+      "bytes": 96289,
       "mode": 420,
-      "sha256": "57b2893154f36fdcc3f087d3f4fce59bfa86964f4b5e811744213279c6874235"
+      "sha256": "b6aeffdbbd5a7367e8fef79527011bf6e3a45ccd1d37ae1065141cc2830c8100"
     },
     "prepared-source/chrome/browser/renderer_context_menu/render_view_context_menu.cc": {
       "bytes": 238429,
@@ -1688,14 +1783,14 @@
       "sha256": "13b15144bf337ce7a90a94e675bceab0d07ed30de79dda54d7b4ec378aaf6c4c"
     },
     "prepared-source/chrome/browser/resources/settings/appearance_page/appearance_page.html.ts": {
-      "bytes": 51425,
+      "bytes": 51902,
       "mode": 420,
-      "sha256": "423d0a1f51af5461763edd61e9c33b3a105e605edccc7bb8680b5c883f62653b"
+      "sha256": "2f571f1bc81a23abebc7bd72ac269da76826823e6b8da84b82abf1d629af899d"
     },
     "prepared-source/chrome/browser/resources/settings/appearance_page/appearance_page.ts": {
-      "bytes": 87800,
+      "bytes": 87829,
       "mode": 420,
-      "sha256": "f71cb23ae3cac93f35b5ab6cfde7eac5aa9db7b6f7898265c2305102b4ac5864"
+      "sha256": "46bc5d3f24ff444506574fe7cf19e0ab300882f7a28496a0586458f3af8173aa"
     },
     "prepared-source/chrome/browser/resources/settings/appearance_page/appearance_page_index.css": {
       "bytes": 740,
@@ -1928,24 +2023,44 @@
       "sha256": "7d4afd319a282054795b071493817e81329f5525faace28ca8860857f9abdacc"
     },
     "prepared-source/chrome/browser/sessions/BUILD.gn": {
-      "bytes": 11640,
+      "bytes": 11757,
       "mode": 420,
-      "sha256": "4e4b1bca2022fa369520bee57b6f90beab49b65ac3d803a1feb006b43f207cc8"
+      "sha256": "0032d88d23f288a3cecaf21ea5df3da44aca954d3babcee07a7a8047bb753080"
+    },
+    "prepared-source/chrome/browser/sessions/chrome_tab_restore_service_client.cc": {
+      "bytes": 5352,
+      "mode": 420,
+      "sha256": "5d56a8992719b4a9423a5f421afaf5ae4b75976b5387cca105bf9e23ea3bc30d"
+    },
+    "prepared-source/chrome/browser/sessions/chrome_tab_restore_service_client.h": {
+      "bytes": 2232,
+      "mode": 420,
+      "sha256": "46ae97161c1a9a02c8f435290e316983cff368c8edb6d39bfdb1af971dc1f2db"
     },
     "prepared-source/chrome/browser/sessions/session_restore.cc": {
-      "bytes": 72353,
+      "bytes": 82669,
       "mode": 420,
-      "sha256": "e01c9c18f4884c072f9ba2ca96f552399df3a15907813c5158c26179083c65a7"
+      "sha256": "c72dd97dc9216594335b9961a37665eb115632f2c23724775c11a0a0a704f094"
+    },
+    "prepared-source/chrome/browser/sessions/session_restore.h": {
+      "bytes": 8269,
+      "mode": 420,
+      "sha256": "c8975287d819fefc6f214c32d881c198e35af59938e5525143cb3ac2757b39b9"
     },
     "prepared-source/chrome/browser/sessions/session_service.cc": {
-      "bytes": 30172,
+      "bytes": 30806,
       "mode": 420,
-      "sha256": "11a1e531da5b1416375416ae6f69f0de345501f3f03702db8c96617b29bdbbc0"
+      "sha256": "03c38861f036c987170db75d6e33d23a617745adcd55b49e0c070904b9a7292d"
+    },
+    "prepared-source/chrome/browser/sessions/session_service.h": {
+      "bytes": 13669,
+      "mode": 420,
+      "sha256": "772b47fdd387260677d8aa8ea2bf99194c7b962c7d7a14b28b6de5c24f86b75b"
     },
     "prepared-source/chrome/browser/sessions/session_service_base.cc": {
-      "bytes": 40163,
+      "bytes": 40644,
       "mode": 420,
-      "sha256": "f8be751f72b18a61841588b9cdd57337b0de1b153f70b9104097735f5fecb480"
+      "sha256": "b23eaa43839fa63591979e859520572cf6a7832e4961003414d93b7ebb3a7c90"
     },
     "prepared-source/chrome/browser/shell_integration_linux.cc": {
       "bytes": 32851,
@@ -1963,9 +2078,9 @@
       "sha256": "d7a627d681ecf64c5ed44f10ccdc6a72b5e36ce270a8f739e3c03e76271fef16"
     },
     "prepared-source/chrome/browser/ui/BUILD.gn": {
-      "bytes": 231053,
+      "bytes": 231259,
       "mode": 420,
-      "sha256": "1fb17144763a804d04b2287cfd974a6bbef46c164c42f76084a32030ce67fa0e"
+      "sha256": "0a2a8392fccc5236c671efa3bd5fbb79c5237c76d5941270661e56f513bb654b"
     },
     "prepared-source/chrome/browser/ui/accelerator_table.cc": {
       "bytes": 20070,
@@ -1998,19 +2113,19 @@
       "sha256": "2e919dfe88b285270c0d822dcd4613ac13e484704bfdf7866609c5eda704810b"
     },
     "prepared-source/chrome/browser/ui/browser_commands.cc": {
-      "bytes": 141622,
+      "bytes": 142548,
       "mode": 420,
-      "sha256": "db1b5115cd145c3ed0e398ccdf6cfc31fb6779bd7c32e2e25be5624b5c8e750f"
+      "sha256": "d6eb96d50e058273a668d19d25dba3024c43442fe4c0cbf2bcdcc8f70d966b52"
     },
     "prepared-source/chrome/browser/ui/browser_live_tab_context.cc": {
-      "bytes": 26200,
+      "bytes": 27451,
       "mode": 420,
-      "sha256": "460ff252b4f647d996ffbef25809b12e1f0a04df45310045356e0808b79cbaea"
+      "sha256": "e655af7e41efc93d903182600b1586ffc5c9a7249089084e6e55c22d0364b38d"
     },
     "prepared-source/chrome/browser/ui/browser_live_tab_context.h": {
-      "bytes": 6327,
+      "bytes": 6403,
       "mode": 420,
-      "sha256": "3b414724e2f3b2fac07e7a5e02bf736f4d7fc6b62d316db823667dc5e0fef623"
+      "sha256": "2b8408dad609d6f98d519f2109b5f7c1ef47bd960e586803ffbcfa1a4663e33c"
     },
     "prepared-source/chrome/browser/ui/browser_shortcuts/BUILD.gn": {
       "bytes": 555,
@@ -2027,10 +2142,15 @@
       "mode": 420,
       "sha256": "c23651bb6f4f6e8a91d4e3d2b9d68fc1ffe7f56d4c0202c0976de56460a8f441"
     },
-    "prepared-source/chrome/browser/ui/browser_tabrestore.cc": {
-      "bytes": 16033,
+    "prepared-source/chrome/browser/ui/browser_tab_strip_model_delegate.cc": {
+      "bytes": 22230,
       "mode": 420,
-      "sha256": "b7f1f0509ab062c2d4f577662e1f6f6fe9eef75c574d3b999080564d3f510d21"
+      "sha256": "17a0ee2b03705302026c4eabe71c2c5ecba6ede7eb081a5951a12fa14278a546"
+    },
+    "prepared-source/chrome/browser/ui/browser_tabrestore.cc": {
+      "bytes": 16309,
+      "mode": 420,
+      "sha256": "e7b376718b0200c0f72d70fb10675d10d636b143c03b178555e58df2e68d196a"
     },
     "prepared-source/chrome/browser/ui/browser_ui_prefs.cc": {
       "bytes": 15991,
@@ -2070,7 +2190,7 @@
     "prepared-source/chrome/browser/ui/layout_constants.cc": {
       "bytes": 9566,
       "mode": 420,
-      "sha256": "7d9b76413eb7899f06053214e87db356267e09db28b97e66461151882982bbb7"
+      "sha256": "c41ccfda7ea45724a331953790ee94021f9d17c2345c9845d97e4c8f15b410ab"
     },
     "prepared-source/chrome/browser/ui/location_bar/location_bar.h": {
       "bytes": 10403,
@@ -2078,9 +2198,9 @@
       "sha256": "1d901689bab20c0813cc37dcb1658c5397830f7609817f4957f8d696afb605e5"
     },
     "prepared-source/chrome/browser/ui/navigator/browser_navigator.cc": {
-      "bytes": 57417,
+      "bytes": 61181,
       "mode": 420,
-      "sha256": "f8bd4e87894b719702ddcfd442ae23484357fe2e89fbf42fae7284f83627b491"
+      "sha256": "2b969928fc340fff4f420a5681f524a43d03673baaf6475bcece0f488f80abbc"
     },
     "prepared-source/chrome/browser/ui/noventra/BUILD.gn": {
       "bytes": 891,
@@ -2088,14 +2208,14 @@
       "sha256": "83f66a30210a020b370699151e01e8dd57d1bf9a484f1ef129fd203aec201bea"
     },
     "prepared-source/chrome/browser/ui/noventra/incognito_space_host.cc": {
-      "bytes": 30753,
+      "bytes": 57560,
       "mode": 420,
-      "sha256": "c21ed8969ebdea4ead4c9076831d64a40b23f0d8a7f0cd4a6ae9fa88b9c5c4fd"
+      "sha256": "98322f41f966d3a9e3ac2c2c6b5f51b1ce0eddf93781efadfb8c6e2d34db2203"
     },
     "prepared-source/chrome/browser/ui/noventra/incognito_space_host.h": {
-      "bytes": 3252,
+      "bytes": 5383,
       "mode": 420,
-      "sha256": "655201228dc0a4d1fb1f18b3dbcaaac8a5ce5567fced919d65f8a56aa4c6efcb"
+      "sha256": "e9d62ca64c507e8c22777489712065dc7a80da670f4ecfb0943df9fea623191b"
     },
     "prepared-source/chrome/browser/ui/noventra/internal_urls_probe.cc": {
       "bytes": 5073,
@@ -2128,14 +2248,14 @@
       "sha256": "9b14e787ceac89dbefdc70332494c85fdf6bc2631faa91e7e3a698ff15de4fe9"
     },
     "prepared-source/chrome/browser/ui/noventra/portable_data.cc": {
-      "bytes": 46519,
+      "bytes": 52886,
       "mode": 420,
-      "sha256": "f74a3a1eb6e4c3c0575eb853d67eb0e3cd4c633874855e551e6e032065db3f1f"
+      "sha256": "d633da9c4a82b78f9ede48fe8a137406a4fb056ec1c4f3f7e41e7af8a72e3551"
     },
     "prepared-source/chrome/browser/ui/noventra/portable_data.h": {
-      "bytes": 2526,
+      "bytes": 2818,
       "mode": 420,
-      "sha256": "03bdebc4fdb4d5fdc8e06ef2447b8f7e3a3bf47c3223d3cd41b1cf64875b5411"
+      "sha256": "d36812736f5f6c3ae6aa80b2b23445c6064a65179814a5b43c52dc863ddb0c52"
     },
     "prepared-source/chrome/browser/ui/noventra/portable_data_unittest.cc": {
       "bytes": 11939,
@@ -2178,9 +2298,9 @@
       "sha256": "ea11b369f78d07b542612f80fd0cbf9fb53602002b6b95fdb1122ca517b435f6"
     },
     "prepared-source/chrome/browser/ui/noventra/workspace_routes.cc": {
-      "bytes": 7196,
+      "bytes": 7545,
       "mode": 420,
-      "sha256": "3dc8c172795ac9bae9cbfa06899c3415ad1065c681ce4695f7820743d6a778da"
+      "sha256": "eba555e4e1552f1e962ebef88800b7c3a850996376a582d790bc051ff9318aa2"
     },
     "prepared-source/chrome/browser/ui/noventra/workspace_routes.h": {
       "bytes": 1964,
@@ -2203,14 +2323,14 @@
       "sha256": "768f3b1985797f22728a7c2c5014945de71756831496ae9362b73afe98b4c70e"
     },
     "prepared-source/chrome/browser/ui/noventra/workspace_sync_service.cc": {
-      "bytes": 62913,
+      "bytes": 65216,
       "mode": 420,
-      "sha256": "93b3a8e45a448e03b8f645ef7be817bbe9de7950520914fdf291e63a48d1881a"
+      "sha256": "987ea4ea0c0423f4f67dba494de3924191822287560866ea1d9cdb3f1f87c4bb"
     },
     "prepared-source/chrome/browser/ui/noventra/workspace_sync_service.h": {
-      "bytes": 3697,
+      "bytes": 3878,
       "mode": 420,
-      "sha256": "6e9c220e20cd1a739640ba189d21c5113e288f56f2a80b46900154b046857f31"
+      "sha256": "1d1b454cd9e5c3568bd437d05226b3658bfb5032867a44c436a4f29bc06eec28"
     },
     "prepared-source/chrome/browser/ui/noventra/workspace_sync_transport.cc": {
       "bytes": 16570,
@@ -2273,9 +2393,9 @@
       "sha256": "cffc0ee648660c574a3fd142d8bd680ef22c06cc7e5882b436d438ea09b7a8d8"
     },
     "prepared-source/chrome/browser/ui/tabs/pinned_tab_codec.cc": {
-      "bytes": 4999,
+      "bytes": 5180,
       "mode": 420,
-      "sha256": "fb11e1e9438e068e5f3d44e2cb0f9c7a25ca06076b08f32769c0b34efe4cfa5b"
+      "sha256": "90d43300f351e256fbe32f3e3272b70a9abc64391bd4bc18b6d9676220620a27"
     },
     "prepared-source/chrome/browser/ui/tabs/split_tab_menu_model.cc": {
       "bytes": 15282,
@@ -2318,9 +2438,9 @@
       "sha256": "f070dc12c9d5b99fe3094b09d58649c544445f6cc3cfb69e45f8355b69915a90"
     },
     "prepared-source/chrome/browser/ui/tabs/tab_menu_model.cc": {
-      "bytes": 41343,
+      "bytes": 41782,
       "mode": 420,
-      "sha256": "5a850c42f4c5f5abbcfe8571fff09d4d711310c3557263048c5915cc6125756d"
+      "sha256": "4c98f2d48d64235bba92206f647d25374bb15c4d4c6662677283c9a600ae9f08"
     },
     "prepared-source/chrome/browser/ui/tabs/tab_model.cc": {
       "bytes": 16037,
@@ -2328,14 +2448,14 @@
       "sha256": "85ccbb4635c240d01d22581f89f4504bc4464929e19bb782c46a8831ba304571"
     },
     "prepared-source/chrome/browser/ui/tabs/tab_strip_model.cc": {
-      "bytes": 247107,
+      "bytes": 251581,
       "mode": 420,
-      "sha256": "72e4ca37796a8fd0b7f4362d826ae79bcbff35e598c880ff62d3fd5ec4e24439"
+      "sha256": "11dbfc0a71845a0a9942c2c5b76914459d1b6d3f02f222f835f2fceceb076bb8"
     },
     "prepared-source/chrome/browser/ui/tabs/tab_strip_model.h": {
-      "bytes": 72131,
+      "bytes": 72290,
       "mode": 420,
-      "sha256": "a987c553d571a1fcfd80b27c8e5f980256f9bd2325376711af9c1f4c8d915c6b"
+      "sha256": "feaf2e47491392e72b748ad170d9acd5e74b414a855d3f08808f757c8990a9ce"
     },
     "prepared-source/chrome/browser/ui/tabs/tab_strip_prefs.cc": {
       "bytes": 2632,
@@ -2468,9 +2588,9 @@
       "sha256": "df1f2200a297ffdf084fb43162f4c4b403d303acfb2afd1fc4adb4a7d227bc0e"
     },
     "prepared-source/chrome/browser/ui/views/frame/browser_frame_view_factory_views.cc": {
-      "bytes": 5404,
+      "bytes": 5457,
       "mode": 420,
-      "sha256": "f6caf7bc98f340f443b7084b134b0ae9198d65b47cbee3a78c2eef74f115c4af"
+      "sha256": "5b5dbf01b6e125a05a3d5a6ee1ec17af1e23aa296562ba9174ed49a6978f5caf"
     },
     "prepared-source/chrome/browser/ui/views/frame/browser_frame_view_win.cc": {
       "bytes": 34172,
@@ -2573,9 +2693,9 @@
       "sha256": "758d21409696e4eab78bf9e006858218aa81a7f27aeda5c4fdc9bb264a3db0b1"
     },
     "prepared-source/chrome/browser/ui/views/frame/multi_contents_view_delegate.cc": {
-      "bytes": 8816,
+      "bytes": 9132,
       "mode": 420,
-      "sha256": "f6e89049147a83d20b951e5d3a55d01a2fe1084801cb723d484dbe3d46e7e22c"
+      "sha256": "d3c58266a6c6a071a6dece523662a7a0c343d3721d08f7ba5bea5c29f296df07"
     },
     "prepared-source/chrome/browser/ui/views/frame/multi_contents_view_delegate.h": {
       "bytes": 2649,
@@ -2648,9 +2768,9 @@
       "sha256": "a3696ccb570342bb45dc452a033dbb04f86fda5f7978519b32f5b0919037ff7a"
     },
     "prepared-source/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc": {
-      "bytes": 85038,
+      "bytes": 85443,
       "mode": 420,
-      "sha256": "f59ec08b32730221ebe40b60da6fc0ec52dce32eab7ca11a8dead52f6c45b96d"
+      "sha256": "fdebbe540f98642884f23e4a0d5aaeb3dfbe4b0ecee0a506ffdca7ede65b9f7e"
     },
     "prepared-source/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h": {
       "bytes": 14362,
@@ -2748,9 +2868,9 @@
       "sha256": "92f75e494034c004cf8efe3baaeedb90d74f38433fe4011ed4d913d988e19fca"
     },
     "prepared-source/chrome/browser/ui/views/tabs/common/pinned_tab_container_view.cc": {
-      "bytes": 19313,
+      "bytes": 19319,
       "mode": 420,
-      "sha256": "1c1ce77e504d0dcbec857df155261c2d55b605625fd0b5ff3429864b556ad489"
+      "sha256": "e8d83b8d4329fe791f4f4ce42289e1db5de3ca53d9e69aa09c2b574c10cbaf83"
     },
     "prepared-source/chrome/browser/ui/views/tabs/common/split_tab_view.cc": {
       "bytes": 12738,
@@ -2758,9 +2878,9 @@
       "sha256": "63875c0cdbcf44099db29fafdb71edd6959af70abaf26a7352c3edac8300da3b"
     },
     "prepared-source/chrome/browser/ui/views/tabs/common/tab_strip_layout_utils.cc": {
-      "bytes": 8861,
+      "bytes": 8876,
       "mode": 420,
-      "sha256": "3cee189112965b62e533fc74eba54b385ea1c50ce5254f0501e99e20d52c44f8"
+      "sha256": "753f55ab0968792ab1704abb6f9c01b7cfe87c9f67da8c93265fd9aa28035e45"
     },
     "prepared-source/chrome/browser/ui/views/tabs/common/tab_strip_layout_utils.h": {
       "bytes": 3430,
@@ -2783,9 +2903,9 @@
       "sha256": "6dd40c7f4df27045f5d5f90c030148ea0bb4fa5f3fe6bf323a2dd7352d173187"
     },
     "prepared-source/chrome/browser/ui/views/tabs/common/tab_view.cc": {
-      "bytes": 73456,
+      "bytes": 73126,
       "mode": 420,
-      "sha256": "2c2666c4dc1b5c35762099d8a3813be8d8e2eff3f1f4df53ab4c917ef4c56603"
+      "sha256": "2630794ad583697826b5ee9db016f3b76bcd4110ea59db93d73a72abc225384c"
     },
     "prepared-source/chrome/browser/ui/views/tabs/common/tab_view.h": {
       "bytes": 11294,
@@ -2793,9 +2913,9 @@
       "sha256": "5a4f60444d32d886784aaa9fd2955bf9c8034ae7a731259f4fceb814e10dfcb7"
     },
     "prepared-source/chrome/browser/ui/views/tabs/common/tab_view_vertical_layout.cc": {
-      "bytes": 8647,
+      "bytes": 8754,
       "mode": 420,
-      "sha256": "8d2e758fdd2ae42841e398861c8cf45310fc658bec3d5bdc05966b4abbb16e2b"
+      "sha256": "4723d7c086e416116e77e651a7fb0d12e22700382b9371b12b6ef54055bde8b8"
     },
     "prepared-source/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view_layout.cc": {
       "bytes": 16648,
@@ -2808,19 +2928,19 @@
       "sha256": "ccaf57084beaf1dc21a04b321ef4cd8cf70e7509a85f690e020b4a78e57bf99b"
     },
     "prepared-source/chrome/browser/ui/views/tabs/dragging/tab_drag_controller.cc": {
-      "bytes": 132134,
+      "bytes": 133311,
       "mode": 420,
-      "sha256": "24c5a6cfafd5b4af81ed4037b9b1b455f283152fd0b1f6707209f5f11db79b78"
+      "sha256": "a01bb0a7081a141d22075f1aa8a65f68c0970898cc859d74bc93d4c5fcbc3c5a"
     },
     "prepared-source/chrome/browser/ui/views/tabs/dragging/tab_drag_controller.h": {
-      "bytes": 32447,
+      "bytes": 32752,
       "mode": 420,
-      "sha256": "adf878ccbdb580d6e9f34b14b018c2c90ccd3ef476677b19d64dcf6efe827d8e"
+      "sha256": "70538a7f9e4b6304b099646be844cd00c99605ff909668b96962e1fe33d6cec4"
     },
     "prepared-source/chrome/browser/ui/views/tabs/tab.cc": {
-      "bytes": 76046,
+      "bytes": 75292,
       "mode": 420,
-      "sha256": "cebd44a9a2717e61a31ca459573ff829178d91c61ed96ff2ee413d51a2a46b11"
+      "sha256": "643f3e05112df0bc5bcaa11e46cb31259f418c2b2f7a43df2f341f250a6905e2"
     },
     "prepared-source/chrome/browser/ui/views/tabs/tab.h": {
       "bytes": 15093,
@@ -2833,9 +2953,9 @@
       "sha256": "abab718fc6802349c102d11f1dbd7569ffd82a0e63cc7bf3291eee3cadb6789d"
     },
     "prepared-source/chrome/browser/ui/views/tabs/tab/tab_icon.cc": {
-      "bytes": 24232,
+      "bytes": 24205,
       "mode": 420,
-      "sha256": "b3ab0974440985b949ac82f71b8f935f5e486dab5207867b349f096009a7309d"
+      "sha256": "fa8a8f22a97ecf0612a2f55d8baf29722a258038971c716178d7d0cd5488c2ab"
     },
     "prepared-source/chrome/browser/ui/views/tabs/tab/tab_icon.h": {
       "bytes": 9352,
@@ -2988,14 +3108,14 @@
       "sha256": "bf29c23ac61c74ac8d5fc396d0e433342443dfa4ec49a775702fb3332bed5080"
     },
     "prepared-source/chrome/browser/ui/webui/settings/appearance_handler.cc": {
-      "bytes": 29839,
+      "bytes": 30174,
       "mode": 420,
-      "sha256": "4a2c327dc13b532cb56e4a1a54a6f4b59f803b2c16c832fb9492525e19c1cd1b"
+      "sha256": "cfb66a7c77698383161d51987063216bd2f7f2274e7421b0b9d57282d763972e"
     },
     "prepared-source/chrome/browser/ui/webui/settings/appearance_handler.h": {
-      "bytes": 3234,
+      "bytes": 3275,
       "mode": 420,
-      "sha256": "ac2191ff0f7f8982e5c9f88bb00093fc21e72c39f6377c67103cc95c5d61ae48"
+      "sha256": "af6f230cf5b7c3f76bc5c2a3d82650f9b439168bb214407d034354d500759354"
     },
     "prepared-source/chrome/browser/ui/webui/settings/brave_full_disk_access_confirm_dialog_delegate_mac.mm": {
       "bytes": 2674,
@@ -3038,19 +3158,19 @@
       "sha256": "ebffd41ccd1e1ce98252118fbaf5217cf7ab46a3918d9b0ab791ed07e949ddf8"
     },
     "prepared-source/chrome/browser/ui/webui/settings/portable_transfer_handler.cc": {
-      "bytes": 16064,
+      "bytes": 16749,
       "mode": 420,
-      "sha256": "5c816609b1fe367dcfa92433dd74d125500834e45144edf225710d89a0de707f"
+      "sha256": "99c353b4f2fb20e28505df426bac8f187e212ef038d5d849276951a3f32cd5c9"
     },
     "prepared-source/chrome/browser/ui/webui/settings/portable_transfer_handler.h": {
-      "bytes": 2174,
+      "bytes": 2255,
       "mode": 420,
-      "sha256": "5d770fc2a1c4f66c00dd0185e1023550948bb06335a2820283d66197f78cd166"
+      "sha256": "30f2d54db10ac8e1dcd3c4b45b876a0d8cfc8ee3f6c84f8120dc05bb534254e8"
     },
     "prepared-source/chrome/browser/ui/webui/settings/settings_clear_browsing_data_handler.cc": {
-      "bytes": 20699,
+      "bytes": 21043,
       "mode": 420,
-      "sha256": "7c4247949c8f8ae29a79d23bcbc22e40fe2372262cd2b9d5184ce88b4a5604d7"
+      "sha256": "1096eb78664669c3e88e99df9a89eb7b648e29b4e1bc3e32f2ea1eeadba87b40"
     },
     "prepared-source/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc": {
       "bytes": 252469,
@@ -3108,9 +3228,9 @@
       "sha256": "9408ce00c2bafb7edee322c4c4237054deab9741653fe2a4032a283f5820bf5a"
     },
     "prepared-source/chrome/browser/web_applications/commands/garbage_collect_storage_partitions_command.cc": {
-      "bytes": 3978,
+      "bytes": 4505,
       "mode": 420,
-      "sha256": "6fe9995cd83f32a472425a21681426f8a8968735a32607ca814998defd592b13"
+      "sha256": "cd7b3e5de69ff4c2cba409d6d981baa8d0b5849eac5108b5faa5c6528399b5af"
     },
     "prepared-source/chrome/common/channel_info_posix.cc": {
       "bytes": 5120,
@@ -3858,9 +3978,9 @@
       "sha256": "1dc6adcb0ba41306e118382bec01bd11c5b821e357e41039c7fb73d667882722"
     },
     "prepared-source/components/sessions/core/live_tab_context.h": {
-      "bytes": 5750,
+      "bytes": 5967,
       "mode": 420,
-      "sha256": "730492e11fd86b9f3299edac32854afebdb3e2dce766d47d6d2b20d20d573305"
+      "sha256": "376601482f24bba5af1eb38294f6dadd81eb20007e4bbb35d996da24f379d7d4"
     },
     "prepared-source/components/sessions/core/session_service_commands.cc": {
       "bytes": 55587,
@@ -3872,10 +3992,25 @@
       "mode": 420,
       "sha256": "e9a582ecc446e19fc37baa98de204d8ef1131d7880163d67a171731ea2d961b4"
     },
-    "prepared-source/components/sessions/core/tab_restore_service_helper.cc": {
-      "bytes": 64413,
+    "prepared-source/components/sessions/core/tab_restore_service_client.h": {
+      "bytes": 3820,
       "mode": 420,
-      "sha256": "03de74066ff1bef78b28b8610b86261c3fe3334cbcc5ba22c60917aefa4763d2"
+      "sha256": "99c01e8b0217db2234e98dce01ee33a774358cfd95b5d84c711b0b14d02d4e97"
+    },
+    "prepared-source/components/sessions/core/tab_restore_service_helper.cc": {
+      "bytes": 66298,
+      "mode": 420,
+      "sha256": "947541750232b87b89787de0d61b71d759e1cd697bf10a3d926cf27fb54cf0d1"
+    },
+    "prepared-source/components/sessions/core/tab_restore_service_helper.h": {
+      "bytes": 13631,
+      "mode": 420,
+      "sha256": "d815cc4c9dfe6bde4bcaad35366d9127cf811a01b7129f78bab4f51e4a1820cd"
+    },
+    "prepared-source/components/sessions/core/tab_restore_service_helper_unittest.cc": {
+      "bytes": 6314,
+      "mode": 420,
+      "sha256": "de9a028cbc2355dba7354ecbcbcd6b075f20633d55990797190c851860f3197b"
     },
     "prepared-source/components/sessions/core/tab_restore_service_impl.cc": {
       "bytes": 74478,
@@ -4067,6 +4202,16 @@
       "mode": 420,
       "sha256": "94ae2011a493059f9b735dfec0682b8ca67e7769cc1a90d2382dd8094263697f"
     },
+    "prepared-source/content/browser/storage_partition_impl_map.cc": {
+      "bytes": 19318,
+      "mode": 420,
+      "sha256": "279b54cc3599b4427f7b283063cdfb0802d0a2dad6b5e62aecd4e1435612955a"
+    },
+    "prepared-source/content/browser/storage_partition_impl_map.h": {
+      "bytes": 3885,
+      "mode": 420,
+      "sha256": "b1fd4ecbad6e07c9b3de23edba1567352f02d0d41c25c083fe88406b92e558cb"
+    },
     "prepared-source/content/browser/web_contents/web_contents_impl.cc": {
       "bytes": 523552,
       "mode": 420,
@@ -4087,10 +4232,20 @@
       "mode": 420,
       "sha256": "b19ef7e8c2317e8011197265327ffecaf7c6b02a18ad73785b0262e4eb848d78"
     },
+    "prepared-source/content/public/browser/BUILD.gn": {
+      "bytes": 25794,
+      "mode": 420,
+      "sha256": "4200f849e39d42b49ff189b354c66da0ca54153f7df81dbf9044a1c36f1638d8"
+    },
     "prepared-source/content/public/browser/notification_event_dispatcher.h": {
       "bytes": 3357,
       "mode": 420,
       "sha256": "9719e326e61db8fc8871cb929656ba514ad06e9e0f6c5b20b6ef01a3ea4066a4"
+    },
+    "prepared-source/content/public/browser/storage_partition_path.h": {
+      "bytes": 680,
+      "mode": 420,
+      "sha256": "86e7348352fc1cf66eaaffb7c0d16e045496b36b414fc644cdc8ffc3550e41d1"
     },
     "prepared-source/content/renderer/render_frame_impl.cc": {
       "bytes": 315910,
@@ -4464,9 +4619,9 @@
     }
   },
   "format": 1,
-  "layer_manifest_sha256": "20d65567e57a6485871012759e182f99798fad679be5f06158cb722f612075e8",
+  "layer_manifest_sha256": "8c6cc0bc21c7c341fe8f386cede7f78a0dcedebd54594e829fecb2923ab85058",
   "product": "local.noventra.browser",
-  "snapshot_sha256": "02864cdbbf859c9152151862af6450534339cd94c00efc99212dec63e8ed9f90",
-  "source_freeze_sha256": "9bbdc90368c56baf54d053392a78ff22d372778361b8f7de2fb77da0915f4719",
-  "version_label": "156.0.8078.79-preview.6"
+  "snapshot_sha256": "af59116d87f55ca931fc99e6792e833f01a642a9586b51f2308fa56f3ba5ab41",
+  "source_freeze_sha256": "2656107a2d8aeb28bc9927145b3f7d44032f1ef5de4d7fc0d5e01c0ffc98d817",
+  "version_label": "0.1.7"
 }

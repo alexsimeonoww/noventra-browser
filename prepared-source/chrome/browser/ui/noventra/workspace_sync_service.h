@@ -3,9 +3,11 @@
 #define CHROME_BROWSER_UI_NOVENTRA_WORKSPACE_SYNC_SERVICE_H_
 
 #include <cstdint>
+#include <map>
 #include <memory>
 #include <string>
 
+#include "base/files/file_path.h"
 #include "base/functional/callback.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/scoped_refptr.h"
@@ -27,6 +29,8 @@ class CancelationSignal;
 }
 
 namespace noventra {
+using WorkspaceSyncPrefWrites = std::map<base::FilePath, base::DictValue>;
+
 class WorkspaceSyncWorker;
 struct WorkspaceSyncReply;
 class WorkspaceSyncServiceFactory;
@@ -69,7 +73,7 @@ class WorkspaceSyncService final : public KeyedService {
              const base::DictValue& payload,
              Callback callback);
   void OnReply(uint64_t operation, WorkspaceSyncReply reply);
-  void OnPrefsWritten(uint64_t operation, base::DictValue expected);
+  void OnPrefsWritten(uint64_t operation, WorkspaceSyncPrefWrites expected);
   void OnDisconnected(uint64_t operation, WorkspaceSyncReply reply);
   void Finish(WorkspaceSyncReply reply);
   void OnLocalChange();
@@ -80,6 +84,7 @@ class WorkspaceSyncService final : public KeyedService {
   base::SequenceBound<WorkspaceSyncWorker> worker_;
   std::shared_ptr<syncer::CancelationSignal> cancelation_;
   PrefChangeRegistrar prefs_registrar_;
+  PrefChangeRegistrar catalog_prefs_registrar_;
   base::RepeatingTimer poll_timer_;
   base::OneShotTimer debounce_timer_;
   base::OneShotTimer initialization_timer_;

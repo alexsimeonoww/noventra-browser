@@ -164,7 +164,6 @@ bool MultiContentsViewDelegateImpl::CanAcceptTabDrop(
   const auto* source =
       contents ? tabs::TabInterface::MaybeGetFromContents(contents) : nullptr;
   return source && source != target &&
-         source->IsPinned() == target->IsPinned() &&
          contents->GetBrowserContext() ==
              target->GetContents()->GetBrowserContext() &&
          noventra::SpaceId(contents) ==
@@ -180,11 +179,11 @@ void MultiContentsViewDelegateImpl::HandleTabDrop(
     return;
   }
 
-  const split_tabs::SplitTabVisualData split_data(
-      side == MultiContentsDropTargetView::DropSide::BOTTOM
-          ? split_tabs::SplitTabLayout::kStacked
-          : split_tabs::SplitTabLayout::kSideBySide);
-
+  // Native strip reordering may already have changed the live pin state.
+  // Keep the drag's original pin when its final destination is a split.
+  const auto& session = drag_controller.GetSessionData();
+  const bool started_pinned =
+      session.tab_drag_data_[session.source_view_index_].pinned;
   std::unique_ptr<tabs::TabModel> detached_tab =
       drag_controller.DetachTabAtForInsertion(
           drag_controller.GetSessionData().source_view_index_);
@@ -198,17 +197,22 @@ void MultiContentsViewDelegateImpl::HandleTabDrop(
   tabs::TabInterface* active_tab = tab_strip_model_->GetActiveTab();
   const bool same_space = noventra::SpaceId(active_tab->GetContents()) ==
                           noventra::SpaceId(detached_tab->GetContents());
+  const bool pin_split =
+      started_pinned || active_tab->IsPinned() || detached_tab->IsPinned();
   const int inserted_tab_idx = tab_strip_model_->InsertDetachedTabAt(
       new_tab_idx, std::move(detached_tab),
-      active_tab->IsPinned() ? AddTabTypes::ADD_PINNED : AddTabTypes::ADD_NONE,
-      same_space ? active_tab->GetGroup() : std::nullopt);
+      pin_split ? AddTabTypes::ADD_PINNED : AddTabTypes::ADD_NONE,
+      same_space && !pin_split ? active_tab->GetGroup() : std::nullopt);
   if (!same_space) {
     // Keep the dragged tab and its account intact, without a mixed-space split.
     tab_strip_model_->ActivateTabAt(inserted_tab_idx);
     return;
   }
-  tab_strip_model_->AddToNewSplit(
-      {inserted_tab_idx}, split_data,
-      split_tabs::SplitTabCreatedSource::kDragAndDropTab);
-  tab_strip_model_->ActivateTabAt(inserted_tab_idx);
+  using Placement = TabStripModel::SplitJoinPlacement;
+  tab_strip_model_->JoinNoventraSplit(
+      inserted_tab_idx, tab_strip_model_->GetIndexOfTab(active_tab),
+      side == MultiContentsDropTargetView::DropSide::START ? Placement::kBefore
+      : side == MultiContentsDropTargetView::DropSide::BOTTOM
+          ? Placement::kBelow
+          : Placement::kAfter);
 }

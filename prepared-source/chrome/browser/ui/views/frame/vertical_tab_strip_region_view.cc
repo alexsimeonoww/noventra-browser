@@ -10,22 +10,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "base/strings/utf_string_conversions.h"
-#include "base/task/single_thread_task_runner.h"
-#include "chrome/browser/profiles/noventra_account_spaces.h"
-#include "chrome/browser/ui/browser_commands.h"
-#include "chrome/browser/ui/navigator/browser_navigator.h"
-#include "chrome/browser/ui/navigator/browser_navigator_params.h"
-#include "chrome/browser/ui/tabs/tab_strip_model_observer.h"
-#include "components/prefs/scoped_user_pref_update.h"
-#include "ui/menus/simple_menu_model.h"
-#include "ui/base/models/dialog_model.h"
-#include "components/constrained_window/constrained_window_views.h"
-#include "ui/views/controls/menu/menu_runner.h"
-#include "chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h"
-#include "chrome/browser/ui/views/frame/noventra_dock_view.h"
-#include "chrome/browser/ui/views/frame/noventra_dock_controller.h"
-
 #include <algorithm>
 #include <optional>
 #include <utility>
@@ -39,37 +23,47 @@
 #include "base/metrics/user_metrics.h"
 #include "base/metrics/user_metrics_action.h"
 #include "base/numerics/safe_conversions.h"
+#include "base/strings/utf_string_conversions.h"
+#include "base/task/single_thread_task_runner.h"
 #include "base/time/time.h"
 #include "cc/paint/paint_flags.h"
 #include "chrome/app/vector_icons/vector_icons.h"
+#include "chrome/browser/profiles/noventra_account_spaces.h"
+#include "chrome/browser/profiles/noventra_space_profile_registry.h"
 #include "chrome/browser/profiles/profile.h"
-#include "components/prefs/pref_service.h"
 #include "chrome/browser/ui/actions/chrome_action_id.h"
 #include "chrome/browser/ui/animation/browser_animation_controller.h"
 #include "chrome/browser/ui/animation/browser_animation_types.h"
 #include "chrome/browser/ui/browser_actions.h"
+#include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_element_identifiers.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_features.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/color/chrome_color_id.h"
 #include "chrome/browser/ui/layout_constants.h"
+#include "chrome/browser/ui/navigator/browser_navigator.h"
+#include "chrome/browser/ui/navigator/browser_navigator_params.h"
 #include "chrome/browser/ui/omnibox/omnibox_tab_helper.h"
 #include "chrome/browser/ui/tabs/features.h"
 #include "chrome/browser/ui/tabs/hover_tab_selector.h"
 #include "chrome/browser/ui/tabs/tab_group_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "chrome/browser/ui/tabs/tab_strip_model_observer.h"
 #include "chrome/browser/ui/tabs/vertical_tab_strip_state.h"
 #include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
 #include "chrome/browser/ui/ui_features.h"
+#include "chrome/browser/ui/view_ids.h"
 #include "chrome/browser/ui/views/animations/tab_strip_animations.h"
 #include "chrome/browser/ui/views/frame/base_tab_strip_region_view.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
-#include "chrome/browser/ui/view_ids.h"
 #include "chrome/browser/ui/views/frame/custom_corners_background.h"
 #include "chrome/browser/ui/views/frame/frame_separator.h"
+#include "chrome/browser/ui/views/frame/noventra_dock_controller.h"
+#include "chrome/browser/ui/views/frame/noventra_dock_view.h"
 #include "chrome/browser/ui/views/frame/safe_invoke/safe_invoke.h"
 #include "chrome/browser/ui/views/frame/shadow_frame_view.h"
 #include "chrome/browser/ui/views/frame/tab_strip_region_view.h"
+#include "chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h"
 #include "chrome/browser/ui/views/tabs/common/pinned_tab_container_view.h"
 #include "chrome/browser/ui/views/tabs/common/root_tab_collection_node.h"
 #include "chrome/browser/ui/views/tabs/common/tab_collection_node.h"
@@ -84,31 +78,37 @@
 #include "chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_focus_swipe_controller.h"
 #include "chrome/browser/ui/web_applications/app_browser_controller.h"
 #include "chrome/grit/generated_resources.h"
+#include "components/constrained_window/constrained_window_views.h"
+#include "components/prefs/pref_service.h"
+#include "components/prefs/scoped_user_pref_update.h"
 #include "components/tabs/public/tab_group.h"
 #include "components/tabs/public/tab_interface.h"
 #include "components/vector_icons/vector_icons.h"
 #include "ui/base/dragdrop/os_exchange_data.h"
 #include "ui/base/interaction/element_tracker.h"
 #include "ui/base/l10n/l10n_util.h"
-#include "ui/base/models/image_model.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
-#include "ui/compositor/layer.h"
+#include "ui/base/models/dialog_model.h"
+#include "ui/base/models/image_model.h"
 #include "ui/color/color_provider.h"
+#include "ui/compositor/layer.h"
 #include "ui/display/screen.h"
 #include "ui/events/event.h"
 #include "ui/events/keycodes/keyboard_codes.h"
-#include "ui/gfx/geometry/point.h"
-#include "ui/gfx/geometry/vector2d.h"
 #include "ui/gfx/canvas.h"
 #include "ui/gfx/color_palette.h"
 #include "ui/gfx/color_utils.h"
+#include "ui/gfx/geometry/point.h"
+#include "ui/gfx/geometry/vector2d.h"
 #include "ui/gfx/paint_vector_icon.h"
+#include "ui/menus/simple_menu_model.h"
 #include "ui/native_theme/native_theme.h"
 #include "ui/views/background.h"
 #include "ui/views/controls/button/label_button.h"
 #include "ui/views/controls/button/md_text_button.h"
 #include "ui/views/controls/focus_ring.h"
 #include "ui/views/controls/highlight_path_generator.h"
+#include "ui/views/controls/menu/menu_runner.h"
 #include "ui/views/controls/resize_area.h"
 #include "ui/views/focus/focus_manager.h"
 #include "ui/views/interaction/element_tracker_views.h"
@@ -388,7 +388,8 @@ class AccountSpacesButton : public views::View, public TabStripModelObserver {
     more_ = AddChildView(std::make_unique<AccountSpaceDotButton>(
         base::BindRepeating(&AccountSpacesButton::ShowMenu, base::Unretained(this)),
         true));
-    registrar_.Init(browser_->GetProfile()->GetPrefs());
+    registrar_.Init(
+        noventra::SpaceCatalogProfile(browser_->GetProfile())->GetPrefs());
     registrar_.Add(noventra::kSpacesPref, base::BindRepeating(&AccountSpacesButton::ScheduleRefresh, base::Unretained(this)));
     registrar_.Add(noventra::kSpaceOrderPref, base::BindRepeating(&AccountSpacesButton::ScheduleRefresh, base::Unretained(this)));
     registrar_.Add(noventra::kArchivedSpacesPref, base::BindRepeating(&AccountSpacesButton::ScheduleRefresh, base::Unretained(this)));
@@ -823,22 +824,30 @@ class AccountSpacesButton : public views::View, public TabStripModelObserver {
   void EditName(bool create, std::string id) {
     auto delegate = std::make_unique<NameDelegate>(weak_factory_.GetWeakPtr(), create, id);
     auto* ptr = delegate.get();
-    auto model = ui::DialogModel::Builder(std::move(delegate))
-        .SetTitle(create ? u"New account space" : u"Rename account space")
-        .AddParagraph(ui::DialogModelLabel(u"Each space has its own cookies, website logins and site storage. History, saved passwords, bookmarks, extensions and browser settings are shared."))
-        .AddTextfield(kSpaceNameField, u"Name", create ? u"Work" : Name(id))
-        .AddOkButton(base::BindRepeating(&NameDelegate::Save, base::Unretained(ptr)))
-        .AddCancelButton(base::DoNothing())
-        .SetInitiallyFocusedField(kSpaceNameField).Build();
+    auto model =
+        ui::DialogModel::Builder(std::move(delegate))
+            .SetTitle(create ? u"New account space" : u"Rename account space")
+            .AddParagraph(ui::DialogModelLabel(
+                noventra::ProfileSpacesEnabled()
+                    ? u"Each space has its own browser profile, including "
+                      u"history, bookmarks, passwords, extensions and website "
+                      u"data."
+                    : u"Each space has its own cookies, website logins and "
+                      u"site storage. History, saved passwords, bookmarks, "
+                      u"extensions and browser settings are shared."))
+            .AddTextfield(kSpaceNameField, u"Name", create ? u"Work" : Name(id))
+            .AddOkButton(
+                base::BindRepeating(&NameDelegate::Save, base::Unretained(ptr)))
+            .AddCancelButton(base::DoNothing())
+            .SetInitiallyFocusedField(kSpaceNameField)
+            .Build();
     // A naming form must keep focus while Wayland tears down the space menu.
     // Use the standard browser-modal host rather than a transient popup.
     constrained_window::ShowBrowserModal(
         std::move(model), browser_->GetWidget()->GetNativeWindow());
   }
   void Switch(const std::string& id) {
-    if (!noventra::SelectIncognitoSpace(browser_->browser(), id)) {
-      noventra::SwitchSpace(browser_->browser(), id);
-    }
+    noventra::SwitchSpace(browser_->browser(), id);
     ScheduleRefresh();
   }
   bool refresh_pending_ = false;

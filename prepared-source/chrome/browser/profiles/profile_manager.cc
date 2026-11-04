@@ -54,6 +54,7 @@
 #include "chrome/browser/prefs/incognito_mode_prefs.h"
 #include "chrome/browser/profiles/delete_profile_helper.h"
 #include "chrome/browser/profiles/keep_alive/profile_keep_alive_types.h"
+#include "chrome/browser/profiles/noventra_space_profile_registry.h"
 #include "chrome/browser/profiles/profile_attributes_entry.h"
 #include "chrome/browser/profiles/profile_attributes_init_params.h"
 #include "chrome/browser/profiles/profile_attributes_storage.h"
@@ -474,6 +475,18 @@ ProfileManager::~ProfileManager() {
     observer.OnProfileManagerDestroying();
   }
 
+  if (noventra::ProfileSpacesEnabled()) {
+    if (auto bindings = noventra::SpaceProfileBindingsForStartup()) {
+      // Child services observe catalog prefs. Tear them down before roots.
+      for (const auto& binding : *bindings) {
+        const auto path = user_data_dir_.Append(binding.profile_basename);
+        profiles_pending_destruction_.erase(path);
+        profiles_info_.erase(path);
+      }
+      ProfileDestroyer::DestroyPendingProfilesForShutdown();
+    }
+  }
+
   base::UmaHistogramBoolean("Profile.DidDestroyProfileBeforeShutdown",
                             could_have_destroyed_profile_);
   if (base::FeatureList::IsEnabled(features::kDestroyProfileOnBrowserClose)) {
@@ -859,48 +872,77 @@ void ProfileManager::CreateProfileAsync(
     return;
   }
 
-  if (!CanCreateProfileAtPath(profile_path)) {
-    if (!initialized_callback.is_null()) {
-      std::move(initialized_callback).Run(nullptr);
-    }
-    return;
-  }
+  noventra::PrepareSpaceProfileLoadAsync(
+      weak_factory_.GetWeakPtr(), profile_path,
+      base::BindOnce(
+          [](base::WeakPtr<ProfileManager> manager, base::FilePath profile_path,
+             base::OnceCallback<void(Profile*)> initialized_callback,
+             base::OnceCallback<void(Profile*)> created_callback, bool allowed,
+             std::unique_ptr<ScopedProfileKeepAlive> catalog_keep_alive) {
+            if (!manager || !allowed ||
+                (catalog_keep_alive &&
+                 (!catalog_keep_alive->profile() ||
+                  catalog_keep_alive->profile()->ShutdownStarted()))) {
+              if (initialized_callback) {
+                std::move(initialized_callback).Run(nullptr);
+              }
+              return;
+            }
+            if (!manager->CanCreateProfileAtPath(profile_path)) {
+              if (!initialized_callback.is_null()) {
+                std::move(initialized_callback).Run(nullptr);
+              }
+              return;
+            }
 
-  // Create the profile if needed and collect its ProfileInfo.
-  auto iter = profiles_info_.find(profile_path);
-  ProfileInfo* info = nullptr;
+            // Create the profile if needed and collect its ProfileInfo.
+            auto iter = manager->profiles_info_.find(profile_path);
+            ProfileInfo* info = nullptr;
 
-  if (iter != profiles_info_.end()) {
-    info = iter->second.get();
-  } else {
-    // Initiate asynchronous creation process.
-    info = RegisterOwnedProfile(CreateProfileAsyncHelper(profile_path));
-  }
+            if (iter != manager->profiles_info_.end()) {
+              info = iter->second.get();
+            } else {
+              // Initiate asynchronous creation process.
+              info = manager->RegisterOwnedProfile(
+                  manager->CreateProfileAsyncHelper(profile_path));
+            }
 
-  // Call or enqueue the callback.
-  if (!initialized_callback.is_null() || !created_callback.is_null()) {
-    if (iter != profiles_info_.end() && info->GetCreatedProfile()) {
-      Profile* profile = info->GetCreatedProfile();
-      // If this was the Guest profile, apply settings and go OffTheRecord.
-      // The system profile also needs characteristics of being off the record,
-      // such as having no extensions, not writing to disk, etc.
-      if (profile->IsGuestSession() || profile->IsSystemProfile()) {
-        SetNonPersonalProfilePrefs(profile);
-        profile = profile->GetPrimaryOTRProfile(/*create_if_needed=*/true);
-      }
+            // Call or enqueue the callback.
+            if (!initialized_callback.is_null() ||
+                !created_callback.is_null()) {
+              if (iter != manager->profiles_info_.end() &&
+                  info->GetCreatedProfile()) {
+                Profile* profile = info->GetCreatedProfile();
+                // If this was the Guest profile, apply settings and go
+                // OffTheRecord. The system profile also needs characteristics
+                // of being off the record, such as having no extensions, not
+                // writing to disk, etc.
+                if (profile->IsGuestSession() || profile->IsSystemProfile()) {
+                  manager->SetNonPersonalProfilePrefs(profile);
+                  profile =
+                      profile->GetPrimaryOTRProfile(/*create_if_needed=*/true);
+                }
 
-      // Profile has already been created. Run callback immediately.
-      if (!initialized_callback.is_null())
-        std::move(initialized_callback).Run(profile);
-    } else {
-      // Profile is either already in the process of being created, or new.
-      // Add callback to the list.
-      if (!initialized_callback.is_null())
-        info->init_callbacks.push_back(std::move(initialized_callback));
-      if (!created_callback.is_null())
-        info->created_callbacks.push_back(std::move(created_callback));
-    }
-  }
+                // Profile has already been created. Run callback immediately.
+                if (!initialized_callback.is_null()) {
+                  std::move(initialized_callback).Run(profile);
+                }
+              } else {
+                // Profile is either already in the process of being created, or
+                // new. Add callback to the list.
+                if (!initialized_callback.is_null()) {
+                  info->init_callbacks.push_back(
+                      std::move(initialized_callback));
+                }
+                if (!created_callback.is_null()) {
+                  info->created_callbacks.push_back(
+                      std::move(created_callback));
+                }
+              }
+            }
+          },
+          weak_factory_.GetWeakPtr(), profile_path,
+          std::move(initialized_callback), std::move(created_callback)));
 }
 
 bool ProfileManager::IsValidProfile(const void* profile) {
@@ -1308,8 +1350,9 @@ void ProfileManager::InitProfileUserPrefs(Profile* profile) {
   }
   if (!profile->GetPrefs()->HasPrefPath(prefs::kProfileName) ||
       inherited_default_name) {
-    profile->GetPrefs()->SetString(
-        prefs::kProfileName, inherited_default_name ? placeholder : profile_name);
+    profile->GetPrefs()->SetString(prefs::kProfileName, inherited_default_name
+                                                            ? placeholder
+                                                            : profile_name);
   }
 
   if (!profile->GetPrefs()->HasPrefPath(prefs::kSupervisedUserId)) {
@@ -1820,6 +1863,16 @@ Profile* ProfileManager::CreateAndInitializeProfile(
         factory) {
   TRACE_EVENT0("browser", "ProfileManager::CreateAndInitializeProfile");
 
+  std::unique_ptr<ScopedProfileKeepAlive> catalog_keep_alive;
+  if (!noventra::PrepareSpaceProfileLoad(weak_factory_.GetWeakPtr(),
+                                         profile_dir, &catalog_keep_alive)) {
+    return nullptr;
+  }
+  // Another native request can finish while the cold verification pumps tasks.
+  if (auto* existing = GetProfileByPath(profile_dir)) {
+    return existing;
+  }
+
   if (!CanCreateProfileAtPath(profile_dir)) {
     LOG(ERROR) << "Cannot create profile at path "
                << profile_dir.AsUTF8Unsafe();
@@ -1930,6 +1983,7 @@ void ProfileManager::OnProfileCreationFinished(Profile* profile,
 
 void ProfileManager::OnProfileCreationStarted(Profile* profile,
                                               Profile::CreateMode create_mode) {
+  CHECK(noventra::AttachSpaceCatalogProfileLease(profile));
   for (auto& observer : observers_) {
     observer.OnProfileCreationStarted(profile);
   }
@@ -2116,8 +2170,7 @@ void ProfileManager::AddProfileToStorage(Profile* profile) {
   init_params.is_consented_primary_account = is_consented_primary_account;
 
   init_params.is_ephemeral = IsForceEphemeralProfilesEnabled(profile);
-  init_params.is_signed_in_with_credential_provider =
-      false;
+  init_params.is_signed_in_with_credential_provider = false;
 
   storage.AddProfile(std::move(init_params));
 }

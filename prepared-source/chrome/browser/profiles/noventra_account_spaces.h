@@ -4,7 +4,9 @@
 
 #include <map>
 #include <string>
+
 #include "base/uuid.h"
+#include "chrome/browser/profiles/noventra_space_profile_registry.h"
 #include "chrome/browser/profiles/profile.h"
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/security_principal.h"
@@ -24,10 +26,17 @@ inline constexpr char kSpaceAppearancePref[] =
 inline constexpr char kSpaceExtraData[] = "noventra.account_space";
 inline constexpr char kSpacePartitionDomain[] = "noventra-account-spaces";
 
-// The partition itself is authoritative. A label never changes an open tab's
-// account identity, even when it is dragged, duplicated or navigates cross-site.
+// A regular child Profile owns its Space identity. Private Spaces and legacy
+// regular tabs keep their partition identity; labels never change ownership.
 inline std::string SpaceId(content::WebContents* contents) {
   if (!contents) return {};
+  auto* profile = Profile::FromBrowserContext(contents->GetBrowserContext());
+  if (!profile->IsOffTheRecord()) {
+    const auto id = ProfileSpaceId(profile);
+    if (!id.empty()) {
+      return id;
+    }
+  }
   const auto& config = contents->GetSiteInstance()->GetSecurityPrincipal()
                            .GetStoragePartitionConfig();
   return config.partition_domain() == kSpacePartitionDomain
@@ -36,6 +45,16 @@ inline std::string SpaceId(content::WebContents* contents) {
 
 inline content::StoragePartitionConfig SpaceConfig(
     Profile* profile, const std::string& id) {
+  if (ProfileSpacesEnabled() && !profile->IsOffTheRecord()) {
+    const auto own_id = ProfileSpaceId(profile);
+    CHECK(id == own_id);
+    const auto storage = ProfileSpaceStorage(profile);
+    if (storage == SpaceProfileStorage::kLegacyPartition) {
+      return content::StoragePartitionConfig::Create(
+          profile, kSpacePartitionDomain, own_id, false);
+    }
+    return content::StoragePartitionConfig::CreateDefault(profile);
+  }
   if (id.empty())
     return content::StoragePartitionConfig::CreateDefault(profile);
   // IDs are generated locally and persisted independently of display names.
@@ -49,7 +68,10 @@ inline content::StoragePartitionConfig SpaceConfig(
 inline scoped_refptr<content::SiteInstance> SpaceSiteInstance(
     Profile* profile, const GURL& url, const std::string& id) {
   const auto config = SpaceConfig(profile, id);
-  auto instance = content::SiteInstance::CreateForFixedStoragePartition(profile, url, config);
+  auto instance = config.is_default()
+                      ? content::SiteInstance::CreateForURL(profile, url)
+                      : content::SiteInstance::CreateForFixedStoragePartition(
+                            profile, url, config);
   CHECK(instance->GetSecurityPrincipal().GetStoragePartitionConfig() == config);
   return instance;
 }
@@ -62,10 +84,12 @@ inline std::string RestoredSpaceId(
 
 inline content::SessionStorageNamespaceHandle* SpaceSessionStorage(
     content::WebContents* contents) {
-  if (SpaceId(contents).empty())
-    return contents->GetController().GetDefaultSessionStorageNamespace();
-  const auto& config = contents->GetSiteInstance()->GetSecurityPrincipal()
+  const auto& config = contents->GetSiteInstance()
+                           ->GetSecurityPrincipal()
                            .GetStoragePartitionConfig();
+  if (config.is_default()) {
+    return contents->GetController().GetDefaultSessionStorageNamespace();
+  }
   const auto& namespaces = contents->GetController().GetSessionStorageNamespaceMap();
   auto it = namespaces.find(config);
   return it == namespaces.end() ? nullptr : it->second.get();
