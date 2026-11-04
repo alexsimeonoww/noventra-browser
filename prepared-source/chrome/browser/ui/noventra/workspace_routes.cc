@@ -9,6 +9,7 @@
 #include "base/strings/string_util.h"
 #include "base/uuid.h"
 #include "base/values.h"
+#include "chrome/browser/profiles/noventra_space_profile_registry.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/noventra_commands.h"
@@ -19,8 +20,11 @@ namespace noventra {
 namespace {
 
 bool HasWorkspaceRoutes(Profile* profile) {
-  return profile && !profile->IsOffTheRecord() &&
-         profile->GetPrefs()->FindPreference(kWorkspaceRoutesPref);
+  if (!profile || profile->IsOffTheRecord()) {
+    return false;
+  }
+  auto* catalog = SpaceCatalogProfile(profile);
+  return catalog && catalog->GetPrefs()->FindPreference(kWorkspaceRoutesPref);
 }
 
 void SaveWorkspaceRoutes(Profile* profile,
@@ -32,7 +36,8 @@ void SaveWorkspaceRoutes(Profile* profile,
     entry.Set("space_id", route.space_id);
     value.Append(std::move(entry));
   }
-  profile->GetPrefs()->SetList(kWorkspaceRoutesPref, std::move(value));
+  SpaceCatalogProfile(profile)->GetPrefs()->SetList(kWorkspaceRoutesPref,
+                                                    std::move(value));
 }
 
 }  // namespace
@@ -93,7 +98,9 @@ base::expected<std::string, std::string> CanonicalWorkspaceRouteHost(
 
 bool CanManageWorkspaceRoutes(Profile* profile) {
   return HasWorkspaceRoutes(profile) && !profile->ShutdownStarted() &&
-         profile->GetPrefs()
+         !SpaceCatalogProfile(profile)->ShutdownStarted() &&
+         SpaceCatalogProfile(profile)
+             ->GetPrefs()
              ->FindPreference(kWorkspaceRoutesPref)
              ->IsUserModifiable();
 }
@@ -103,7 +110,8 @@ std::vector<WorkspaceRoute> GetWorkspaceRoutes(Profile* profile) {
   if (!HasWorkspaceRoutes(profile)) {
     return routes;
   }
-  for (const auto& value : profile->GetPrefs()->GetList(kWorkspaceRoutesPref)) {
+  for (const auto& value : SpaceCatalogProfile(profile)->GetPrefs()->GetList(
+           kWorkspaceRoutesPref)) {
     const auto* entry = value.GetIfDict();
     const auto* host = entry ? entry->FindString("host") : nullptr;
     const auto* id = entry ? entry->FindString("space_id") : nullptr;

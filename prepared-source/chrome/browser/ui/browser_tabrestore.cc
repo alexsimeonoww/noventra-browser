@@ -73,6 +73,11 @@ std::unique_ptr<WebContents> CreateRestoredTab(
   // session_storage_namespace_handle.h include since we only need that to assign
   // into the map.
   const std::string space = noventra::RestoredSpaceId(extra_data);
+  if (noventra::ProfileSpacesEnabled() &&
+      !browser->GetProfile()->IsOffTheRecord() &&
+      space != noventra::ProfileSpaceId(browser->GetProfile())) {
+    return nullptr;
+  }
   const auto config = noventra::SpaceConfig(browser->GetProfile(), space);
   content::SessionStorageNamespaceHandleMap session_storage_namespace_map;
   if (session_storage_namespace)
@@ -315,6 +320,9 @@ WebContents* AddRestoredTab(
       user_agent_override, extra_data, initially_hidden, from_session_restore,
       pin);
 
+  if (!web_contents) {
+    return nullptr;
+  }
   return AddRestoredTabImpl(
       std::move(web_contents), browser, tab_index, group, select, pin,
       from_session_restore, is_active_browser, load_policy);
@@ -333,6 +341,9 @@ WebContents* ReplaceRestoredTab(
       browser, navigations, selected_navigation, extension_app_id,
       base::TimeTicks(), base::Time(), session_storage_namespace,
       user_agent_override, extra_data, false, from_session_restore, false);
+  if (!web_contents) {
+    return nullptr;
+  }
   WebContents* raw_web_contents = web_contents.get();
 
   // ReplaceWebContentsAt won't animate in the restoration, so manually do the

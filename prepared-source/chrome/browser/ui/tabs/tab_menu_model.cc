@@ -243,8 +243,14 @@ class SplitWithTabMenuModel : public ui::SimpleMenuModel,
     auto target = command_id == kSplitWithNewTabCommand
                       ? source
                       : candidates_[command_id - kFirstSplitCandidateCommand];
-    if (source->IsSplit()) {
-      model->JoinNoventraSplit(model->GetIndexOfTab(target.get()), model->GetIndexOfTab(source.get()));
+    if (command_id != kSplitWithNewTabCommand) {
+      if (source->IsSplit()) {
+        model->JoinNoventraSplit(model->GetIndexOfTab(target.get()),
+                                 model->GetIndexOfTab(source.get()));
+      } else {
+        model->JoinNoventraSplit(model->GetIndexOfTab(source.get()),
+                                 model->GetIndexOfTab(target.get()));
+      }
       return;
     }
     model->ActivateTab(source.get());
@@ -884,7 +890,13 @@ bool TabMenuModel::IsEnabledAt(size_t index) const {
                               tab_strip_->GetIndexOfTab(tab_interface_.get()))) {
       return false;
     }
-    return tab_interface_->IsSplit() == (command_id == kSeparateTabsCommand);
+    if (command_id == kSeparateTabsCommand) {
+      return tab_interface_->IsSplit();
+    }
+    return !tab_interface_->IsSplit() ||
+           tab_strip_->GetSplitData(tab_interface_->GetSplit().value())
+                   ->ListTabs()
+                   .size() < 4;
   }
 #if BUILDFLAG(ENABLE_EXTENSIONS)
   if (auto* matcher = GetMatcherIfExtension(index)) {

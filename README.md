@@ -9,6 +9,21 @@ vertical tabs, Spaces, split views and configurable browser controls.
 The first public target is **Linux x86_64 preview**. Windows and macOS downloads
 are not available yet. Preview builds need testing before everyday use.
 
+## Unreleased: separate Space profiles and compact pins
+
+Regular Linux Spaces use independent profiles for history, bookmarks, saved
+passwords, download lists, extensions and settings. Switching Spaces retains
+their loaded pages in one window. Existing shared library data stays in
+Personal; each other Space keeps its website partition through a cold migration
+with a retained recovery copy. Incognito belongs to the Space that opened it.
+Ordinary private visits are not saved, while suggestions and explicit bookmark
+saves use that parent Space.
+
+Pins use smaller tiles, keep their favicon colors while closed, and show Close
+only while loaded. Pinned and ordinary tabs can join a split in the same Space;
+the resulting split stays pinned. See [profile and migration details](docs/noventra/profile-spaces.md).
+These changes are unreleased. The signed download remains preview 6.
+
 ## Visible leave confirmations
 
 Linux preview 6 fixes an invisible leave confirmation on Wayland. A misplaced

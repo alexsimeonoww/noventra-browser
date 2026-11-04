@@ -124,7 +124,7 @@ gfx::Size PinnedTabContainerView::GetMinimumSize() const {
                                                                         : 1.0f),
       static_cast<float>(num_children));
   const int min_height =
-      base::ClampCeil(GetNoventraVerticalTabHeight(collection_node_) *
+      base::ClampCeil(GetNoventraVerticalTabHeight(collection_node_, true) *
                       min_rows) +
       (num_children > 1 ? kTabPadding : 0);
   return gfx::Size(GetLayoutConstant(LayoutConstant::kVerticalTabMinWidth),

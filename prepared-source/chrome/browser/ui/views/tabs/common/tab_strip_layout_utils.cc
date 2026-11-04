@@ -34,7 +34,7 @@ int GetNoventraVerticalTabHeight(const TabCollectionNode* node, bool pinned) {
                            prefs->GetInteger(kDensityPref) == 1;
   return GetLayoutConstant(pinned ? LayoutConstant::kVerticalTabPinnedHeight
                                   : LayoutConstant::kVerticalTabHeight) +
-         (comfortable ? 8 : 0);
+         (comfortable ? (pinned ? 4 : 8) : 0);
 }
 
 std::vector<int> CalculateProportionalChildWidths(

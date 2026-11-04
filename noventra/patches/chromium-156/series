@@ -21,3 +21,4 @@ noventra-about-licenses.patch
 noventra-pin-close-private-spaces.patch
 noventra-sidebar-space-capacity-animation.patch
 noventra-wayland-modal-position.patch
+noventra-profile-spaces-compact-pins.patch

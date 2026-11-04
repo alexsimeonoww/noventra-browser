@@ -152,7 +152,10 @@ StartupTabs PinnedTabCodec::ReadPinnedTabs(Profile* profile) {
       continue;
     }
     std::optional<StartupTab> tab = DecodeTab(serialized_tab.GetDict());
-    if (tab.has_value()) {
+    if (tab.has_value() &&
+        (!noventra::ProfileSpacesEnabled() || profile->IsOffTheRecord() ||
+         noventra::RestoredSpaceId(tab->extra_data) ==
+             noventra::ProfileSpaceId(profile))) {
       results.push_back(tab.value());
     }
   }

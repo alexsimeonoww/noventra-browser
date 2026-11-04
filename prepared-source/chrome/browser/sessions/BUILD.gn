@@ -101,8 +101,10 @@ source_set("impl") {
     sources += [ "restore_on_startup_policy_handler.cc" ]
     deps += [
       "//chrome/browser/prefs:util",
+      "//chrome/browser/profiles:noventra_space_migration",
       "//chrome/browser/ui:browser_window_header",
       "//chrome/browser/ui:noventra_pinned_tab_state",
+      "//chrome/browser/ui:noventra_space_host_headers",
       "//chrome/browser/ui:noventra_window_mirror_headers",
     ]
   }

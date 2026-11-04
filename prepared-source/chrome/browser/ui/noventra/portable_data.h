@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <string>
 
+#include "base/functional/callback.h"
 #include "base/types/expected.h"
 #include "base/values.h"
 class BrowserWindowInterface;
@@ -41,10 +42,14 @@ PortableResult ValidatePortableData(const base::DictValue& snapshot);
 // is no cross-database crash-atomic transaction; successful categories are
 // recorded separately. Extension items are returned for reviewed reinstall;
 // this function never installs code or grants extension permissions.
-PortableResult ApplyPortableData(BrowserWindowInterface* browser,
-                                 const base::DictValue& snapshot,
-                                 const base::DictValue& categories,
-                                 int expected_layout_revision);
+// Tabs are inserted asynchronously in their owning Profiles. Cancellation
+// preserves completed categories and the exact inserted-tab progress.
+void ApplyPortableData(BrowserWindowInterface* browser,
+                       const base::DictValue& snapshot,
+                       const base::DictValue& categories,
+                       int expected_layout_revision,
+                       base::OnceCallback<void(PortableResult)> callback,
+                       base::RepeatingCallback<bool()> can_continue = {});
 
 }  // namespace noventra
 

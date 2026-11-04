@@ -3,8 +3,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "chrome/browser/ui/navigator/browser_navigator.h"
-
 #include <algorithm>
 #include <memory>
 #include <optional>
@@ -13,6 +11,7 @@
 #include <utility>
 
 #include "base/feature_list.h"
+#include "base/functional/bind.h"
 #include "base/memory/raw_ptr.h"
 #include "base/notimplemented.h"
 #include "base/notreached.h"
@@ -27,6 +26,7 @@
 #include "chrome/browser/platform_util.h"
 #include "chrome/browser/prefs/incognito_mode_prefs.h"
 #include "chrome/browser/profiles/noventra_account_spaces.h"
+#include "chrome/browser/profiles/noventra_space_profile_registry.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/renderer_host/chrome_navigation_ui_data.h"
 #include "chrome/browser/tab_contents/tab_util.h"
@@ -38,6 +38,7 @@
 #include "chrome/browser/ui/browser_window/public/profile_browser_collection.h"
 #include "chrome/browser/ui/incognito_allowed_url.h"
 #include "chrome/browser/ui/location_bar/location_bar.h"
+#include "chrome/browser/ui/navigator/browser_navigator.h"
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"
 #include "chrome/browser/ui/navigator/browser_navigator_params_utils.h"
 #include "chrome/browser/ui/noventra/workspace_routes.h"
@@ -143,6 +144,16 @@ bool WindowCanOpenTabs(const NavigateParams& params) {
          params.browser->tab_strip_model()->empty();
 }
 
+BrowserWindowInterface* CreateNormalBrowserWindow(
+    BrowserWindowCreateParams params) {
+  auto* profile = &params.profile.get();
+  return noventra::ProfileSpacesEnabled() && !profile->IsOffTheRecord() &&
+                 noventra::IsProfileSpace(profile)
+             ? noventra::CreateRestoredProfileSpaceBrowser(std::move(params),
+                                                           {}, /*restore_id=*/0)
+             : CreateBrowserWindow(std::move(params));
+}
+
 // Finds an existing Browser compatible with |profile|, making a new one if no
 // such Browser is located.
 BrowserWindowInterface* GetOrCreateBrowser(
@@ -156,7 +167,7 @@ BrowserWindowInterface* GetOrCreateBrowser(
                       BrowserWindowInterface::CreationStatus::kOk) {
     BrowserWindowCreateParams params(profile, user_gesture);
     params.should_trigger_session_restore = should_trigger_session_restore;
-    browser = CreateBrowserWindow(std::move(params));
+    browser = CreateNormalBrowserWindow(std::move(params));
   }
   return browser;
 }
@@ -399,7 +410,7 @@ std::tuple<BrowserWindowInterface*, int> GetBrowserAndTabForDisposition(
         BrowserWindowCreateParams browser_params(profile, params.user_gesture);
         browser_params.should_trigger_session_restore =
             should_trigger_session_restore;
-        browser = CreateBrowserWindow(std::move(browser_params));
+        browser = CreateNormalBrowserWindow(std::move(browser_params));
       }
       return {browser, -1};
     }
@@ -541,6 +552,68 @@ bool CanRouteWorkspaceNavigation(const NavigateParams& params) {
   }
 }
 
+// Profile-backed routing finishes native profile/browser acquisition before
+// allocating contents. No source page or Profile pointer survives the wait.
+bool RouteToProfileSpace(NavigateParams* params, const std::string& id) {
+  if (!noventra::ProfileSpacesEnabled()) {
+    return false;
+  }
+  const bool cross_profile =
+      noventra::ProfileSpaceId(params->browser->GetProfile()) != id;
+  const auto source = params->browser->GetWeakPtr();
+  const bool select =
+      params->disposition != WindowOpenDisposition::NEW_BACKGROUND_TAB;
+  auto pending = std::make_unique<NavigateParams>(std::move(*params));
+  pending->browser = nullptr;
+  pending->initiating_profile = nullptr;
+  pending->source_contents = nullptr;
+  pending->source_site_instance = nullptr;
+  pending->opener = nullptr;
+  pending->navigated_or_inserted_contents = nullptr;
+  pending->switch_to_singleton_tab = nullptr;
+  if (cross_profile) {
+    pending->referrer = content::Referrer();
+    pending->extra_headers.clear();
+    pending->blob_url_loader_factory = nullptr;
+  }
+  pending->group.reset();
+  pending->tabstrip_index = -1;
+  pending->tabstrip_add_types &= ~AddTabTypes::ADD_INHERIT_OPENER;
+  pending->disposition = select ? WindowOpenDisposition::NEW_FOREGROUND_TAB
+                                : WindowOpenDisposition::NEW_BACKGROUND_TAB;
+  pending->window_action = NavigateParams::WindowAction::kNoAction;
+  params->browser = nullptr;
+  params->initiating_profile = nullptr;
+  params->source_contents = nullptr;
+  params->navigated_or_inserted_contents = nullptr;
+  noventra::AcquireProfileSpaceBrowser(
+      source.get(), id,
+      base::BindOnce(
+          [](base::WeakPtr<BrowserWindowInterface> source, std::string id,
+             std::unique_ptr<NavigateParams> pending,
+             BrowserWindowInterface* target) {
+            if (!source || source->IsDeleteScheduled() || !target ||
+                target->IsDeleteScheduled() ||
+                target->GetProfile()->IsOffTheRecord() ||
+                target->GetProfile()->ShutdownStarted() ||
+                noventra::ProfileSpaceId(target->GetProfile()) != id ||
+                noventra::SpaceCatalogProfile(target->GetProfile()) !=
+                    noventra::SpaceCatalogProfile(source->GetProfile())) {
+              return;
+            }
+            pending->browser = target;
+            pending->initiating_profile = target->GetProfile();
+            // The resolved destination is now explicit. A second routing pass
+            // cannot move this request back through its former Profile.
+            pending->source_site_instance = noventra::SpaceSiteInstance(
+                target->GetProfile(), pending->url, id);
+            Navigate(pending.get());
+          },
+          source, id, std::move(pending)),
+      select);
+  return true;
+}
+
 std::unique_ptr<content::WebContents> CreateTargetContents(
     const NavigateParams& params,
     const GURL& url,
@@ -564,6 +637,11 @@ std::unique_ptr<content::WebContents> CreateTargetContents(
   if (!incognito_space.empty() && !params.opener) {
     initial_site_instance_for_new_contents = noventra::SpaceSiteInstance(
         params.browser->GetProfile(), url, incognito_space);
+  } else if (!params.opener &&
+             noventra::IsProfileSpace(params.browser->GetProfile())) {
+    auto* profile = params.browser->GetProfile();
+    initial_site_instance_for_new_contents = noventra::SpaceSiteInstance(
+        profile, url, noventra::ProfileSpaceId(profile));
   } else if (routed_space.has_value()) {
     // An engaged empty ID deliberately selects Personal, even when the
     // current tab belongs to another account. Never repartition an old tab.
@@ -917,6 +995,9 @@ base::WeakPtr<content::NavigationHandle> NavigateImpl(
         noventra::ResolveWorkspaceRoute(params->browser, params->url);
   }
   if (routed_space.has_value()) {
+    if (RouteToProfileSpace(params, *routed_space)) {
+      return nullptr;
+    }
     if (params->disposition == WindowOpenDisposition::CURRENT_TAB) {
       params->disposition = WindowOpenDisposition::NEW_FOREGROUND_TAB;
     }

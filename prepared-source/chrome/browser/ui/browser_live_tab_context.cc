@@ -34,6 +34,7 @@
 #include "chrome/browser/ui/browser_window/public/create_browser_window.h"
 #include "chrome/browser/ui/browser_window/public/global_browser_collection.h"
 #include "chrome/browser/ui/browser_window/public/profile_browser_collection.h"
+#include "chrome/browser/ui/noventra/incognito_space_host.h"
 #include "chrome/browser/ui/noventra/pinned_tab_state.h"
 #include "chrome/browser/ui/noventra/window_mirror_service.h"
 #include "chrome/browser/ui/tabs/saved_tab_groups/saved_tab_group_utils.h"
@@ -157,6 +158,13 @@ BrowserLiveTabContext::~BrowserLiveTabContext() {
   }
 }
 
+bool BrowserLiveTabContext::CanRestoreTab(
+    const sessions::tab_restore::Tab& tab) const {
+  return !noventra::ProfileSpacesEnabled() || profile_->IsOffTheRecord() ||
+         noventra::RestoredSpaceId(tab.extra_data) ==
+             noventra::ProfileSpaceId(&profile_.get());
+}
+
 void BrowserLiveTabContext::ShowBrowserWindow() {
   base_window_->Show();
 }
@@ -223,6 +231,7 @@ std::map<std::string, std::string> BrowserLiveTabContext::GetExtraDataForTab(
 std::map<std::string, std::string>
 BrowserLiveTabContext::GetExtraDataForWindow() const {
   std::map<std::string, std::string> data;
+  noventra::PopulateProfileSpaceWindowExtraData(&browser_.get(), &data);
   if (auto* mirrors = noventra::WindowMirrorService::GetForProfileIfExisting(
           browser_->GetProfile())) {
     mirrors->PopulateWindowExtraData(&browser_.get(), &data);
@@ -368,6 +377,9 @@ sessions::LiveTab* BrowserLiveTabContext::AddRestoredTab(
     bool select,
     bool is_restoring_group_or_window,
     sessions::tab_restore::Type original_session_type) {
+  if (!CanRestoreTab(tab)) {
+    return nullptr;
+  }
   tab_groups::TabGroupSyncService* tab_group_service =
       tab_groups::TabGroupSyncServiceFactory::GetForProfile(&profile_.get());
   CHECK(tab_group_service);
@@ -470,7 +482,9 @@ sessions::LiveTab* BrowserLiveTabContext::AddRestoredTab(
         /*from_session_restore=*/false, /*is_active_browser=*/std::nullopt);
   }
 
-  CHECK(web_contents);
+  if (!web_contents) {
+    return nullptr;
+  }
 
   if (load_policy == chrome::RestoredTabLoadPolicy::kDeferUntilActivation) {
     return sessions::ContentLiveTab::GetOrCreateForWebContents(web_contents);
@@ -487,6 +501,9 @@ sessions::LiveTab* BrowserLiveTabContext::AddRestoredTab(
 
 sessions::LiveTab* BrowserLiveTabContext::ReplaceRestoredTab(
     const sessions::tab_restore::Tab& tab) {
+  if (!CanRestoreTab(tab)) {
+    return nullptr;
+  }
   const sessions::tab_restore::PlatformSpecificTabData* tab_platform_data =
       tab.platform_data.get();
   SessionStorageNamespaceHandle* storage_namespace =
@@ -500,7 +517,9 @@ sessions::LiveTab* BrowserLiveTabContext::ReplaceRestoredTab(
       &*browser_, tab.navigations, tab.normalized_navigation_index(),
       tab.extension_app_id, storage_namespace, tab.user_agent_override,
       tab.extra_data, false /* from_session_restore */);
-  return sessions::ContentLiveTab::GetOrCreateForWebContents(web_contents);
+  return web_contents
+             ? sessions::ContentLiveTab::GetOrCreateForWebContents(web_contents)
+             : nullptr;
 }
 
 void BrowserLiveTabContext::ReconstructSplit(
@@ -576,7 +595,20 @@ sessions::LiveTabContext* BrowserLiveTabContext::Create(
   }
 
   BrowserWindowInterface* browser =
-      CreateBrowserWindow(std::move(*create_params));
+      noventra::ProfileSpacesEnabled() && noventra::IsProfileSpace(profile) &&
+              create_params->type == BrowserWindowInterface::TYPE_NORMAL
+          ? noventra::CreateRestoredProfileSpaceBrowser(
+                std::move(*create_params), extra_data, /*restore_id=*/0)
+          : CreateBrowserWindow(std::move(*create_params));
+  if (!browser) {
+    return nullptr;
+  }
+  if (noventra::ProfileSpacesEnabled() && !profile->IsOffTheRecord() &&
+      !noventra::IsProfileSpace(profile) &&
+      browser->GetType() == BrowserWindowInterface::TYPE_NORMAL) {
+    noventra::RestoreProfileSpaceWindowIdentity(browser, extra_data,
+                                                /*restore_id=*/0);
+  }
 
   if (noventra::WindowMirrorService::IsEnabled(profile)) {
     // Closed-window restore inserts its real owner tabs synchronously after

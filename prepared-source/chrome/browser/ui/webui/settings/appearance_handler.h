@@ -46,6 +46,7 @@ class AppearanceHandler : public SettingsPageUIHandler, public extensions::Exten
   void OnExtensionUnloaded(content::BrowserContext*, const extensions::Extension*, extensions::UnloadedExtensionReason) override;
   void OnShutdown(extensions::ExtensionRegistry*) override;
   PrefChangeRegistrar layout_registrar_;
+  PrefChangeRegistrar spaces_registrar_;
   base::ScopedObservation<extensions::ExtensionRegistry, extensions::ExtensionRegistryObserver> extension_observation_{this};
   void HandleNoventraGetLayout(const base::ListValue& args);
   void HandleNoventraApplyLayout(const base::ListValue& args);

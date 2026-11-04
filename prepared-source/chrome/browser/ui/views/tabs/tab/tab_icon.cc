@@ -166,7 +166,7 @@ void TabIcon::SetData(const tabs::TabData& data) {
   SetIcon(data.favicon, data.should_themify_favicon);
   SetNetworkState(data.network_state);
   SetCrashed(data.is_crashed);
-  SetDiscarded(data.should_dim_favicon && (!data.pinned || data.is_tab_discarded));
+  SetDiscarded(data.should_dim_favicon && !data.pinned);
   has_tab_data_ = true;
 
   UpdateThrobber();

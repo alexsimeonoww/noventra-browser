@@ -2,23 +2,32 @@
 #include "chrome/browser/ui/noventra/incognito_space_host.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <map>
+#include <set>
 #include <utility>
 
 #include "base/auto_reset.h"
 #include "base/check.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/no_destructor.h"
 #include "base/strings/string_number_conversions.h"
+#include "base/strings/string_split.h"
+#include "base/strings/string_util.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/uuid.h"
 #include "build/build_config.h"
 #include "chrome/browser/lifetime/browser_shutdown.h"
 #include "chrome/browser/prefs/incognito_mode_prefs.h"
 #include "chrome/browser/profiles/noventra_account_spaces.h"
+#include "chrome/browser/profiles/noventra_space_profile_registry.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/sessions/session_restore.h"
+#include "chrome/browser/sessions/session_service.h"
+#include "chrome/browser/sessions/session_service_factory.h"
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_window.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
@@ -31,6 +40,7 @@
 #include "chrome/browser/ui/views/frame/browser_native_widget.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/frame/browser_widget.h"
+#include "chrome/browser/ui/views/tabs/dragging/tab_drag_controller.h"
 #include "chrome/common/webui_url_constants.h"
 #include "components/javascript_dialogs/app_modal_dialog_queue.h"
 #include "components/policy/core/common/policy_pref_names.h"
@@ -57,25 +67,80 @@
 namespace noventra {
 namespace {
 
-struct PrivateSpace {
+enum class PresentationKind { kRegular, kPrivate };
+
+struct Presentation {
   base::WeakPtr<BrowserWindowInterface> browser;
   std::string id;
   std::u16string name;
+  PresentationKind kind;
+  base::WeakPtr<BrowserWindowInterface> regular_parent;
 };
 
 struct Host {
   base::WeakPtr<BrowserWindowInterface> browser;
-  std::vector<PrivateSpace> spaces;
+  std::vector<Presentation> spaces;
   base::WeakPtr<BrowserWindowInterface> selected;
   bool close_requested = false;
   int next_number = 1;
+  uint64_t selection_generation = 0;
+  std::string group;
+  std::set<std::string> open_regular_spaces;
+  std::string selected_regular_space;
 };
 
 struct Creation {
   base::WeakPtr<BrowserWindowInterface> host;
   std::string id;
+  raw_ptr<Profile> profile;
+  PresentationKind kind;
+  base::WeakPtr<BrowserWindowInterface> regular_parent;
   bool consumed = false;
 };
+
+std::string RestoredHostGroup(const std::map<std::string, std::string>& data,
+                              int32_t restore_id) {
+  const auto found = data.find(kProfileSpaceHostKey);
+  if (found != data.end()) {
+    int legacy_id = 0;
+    if (base::Uuid::ParseLowercase(found->second).is_valid() ||
+        (base::StartsWith(found->second, "legacy:") &&
+         base::StringToInt(found->second.substr(7), &legacy_id) &&
+         legacy_id > 0)) {
+      return found->second;
+    }
+  }
+  // A legacy mixed-Profile window has the same saved native SessionID in all
+  // UUID-filtered seeds. The owning root Profile scopes this temporary key.
+  return "legacy:" + base::NumberToString(restore_id);
+}
+
+void PersistHostMetadata(Host& host) {
+  if (!ProfileSpacesEnabled() || !host.browser || host.close_requested ||
+      host.browser->IsDeleteScheduled()) {
+    return;
+  }
+  std::map<std::string, std::string> data;
+  PopulateProfileSpaceWindowExtraData(host.browser.get(), &data);
+  auto save = [&data](BrowserWindowInterface* browser) {
+    if (!browser || browser->GetProfile()->IsOffTheRecord()) {
+      return;
+    }
+    if (auto* session =
+            SessionServiceFactory::GetForProfile(browser->GetProfile())) {
+      for (const auto& [key, value] : data) {
+        session->AddWindowExtraData(browser->GetSessionID(), key.c_str(),
+                                    value);
+      }
+    }
+  };
+  save(host.browser.get());
+  for (const auto& space : host.spaces) {
+    if (space.kind == PresentationKind::kRegular && space.browser) {
+      save(space.browser.get());
+    }
+  }
+}
 
 // Retain no raw profile/partition pointer across asynchronous worker stop.
 // If the last OTR Browser closes, context destruction itself drops every
@@ -127,10 +192,10 @@ void ClearClosedPrivatePartition(Profile* profile, const std::string& id) {
       static_cast<content::BrowserContext*>(profile)->GetWeakPtr(), config));
 }
 
-class IncognitoHosts {
+class SpaceWindowHosts {
  public:
-  static IncognitoHosts& Get() {
-    static base::NoDestructor<IncognitoHosts> instance;
+  static SpaceWindowHosts& Get() {
+    static base::NoDestructor<SpaceWindowHosts> instance;
     return *instance;
   }
 
@@ -152,25 +217,46 @@ class IncognitoHosts {
   Host& Enroll(BrowserWindowInterface* browser) {
     auto& host = hosts_[browser->GetSessionID().id()];
     host.browser = browser->GetWeakPtr();
+    if (host.group.empty()) {
+      host.group = base::Uuid::GenerateRandomV4().AsLowercaseString();
+    }
     return host;
+  }
+
+  Host* FindGroup(Profile* root, const std::string& group) {
+    for (auto& [id, host] : hosts_) {
+      if (host.browser && !host.browser->IsDeleteScheduled() &&
+          host.browser->GetProfile() == root && host.group == group) {
+        return &host;
+      }
+    }
+    return nullptr;
   }
 
   void Select(Host& host,
               BrowserWindowInterface* selected,
-              bool cancel_close = true) {
+              bool cancel_close = true,
+              bool activate = true) {
     if (selecting_ || !host.browser || host.browser->IsDeleteScheduled() ||
         (selected && selected->IsDeleteScheduled())) {
       return;
     }
     base::AutoReset<bool> selecting(&selecting_, true);
+    ++host.selection_generation;
     const auto regular = host.browser;
     const auto selected_browser = selected ? selected->GetWeakPtr() : nullptr;
     const auto spaces = host.spaces;
     host.selected = selected_browser;
+    if (ProfileSpacesEnabled() && !host.close_requested &&
+        (!selected || !selected->GetProfile()->IsOffTheRecord())) {
+      host.selected_regular_space =
+          selected ? ProfileSpaceId(selected->GetProfile()) : std::string();
+      PersistHostMetadata(host);
+    }
     if (cancel_close) {
       host.close_requested = false;
     }
-    // Every private BrowserView stays attached to its own widget/profile.
+    // Every hosted BrowserView stays attached to its own widget/profile.
     // Widget visibility changes never transfer a page between tab models.
     auto* regular_view = BrowserView::GetBrowserViewForBrowser(regular.get());
     if (!regular_view || !regular_view->browser_widget()) {
@@ -186,17 +272,22 @@ class IncognitoHosts {
         auto* child =
             BrowserView::GetBrowserViewForBrowser(space.browser.get());
         if (child && child->browser_widget()) {
-          const bool selected = space.browser.get() == selected_browser.get();
+          const bool is_selected =
+              space.browser.get() == selected_browser.get();
 #if defined(USE_AURA) && !BUILDFLAG(IS_CHROMEOS)
           // Only the selected presentation follows the host through a native
           // hide/minimize/restore. Other Spaces must remain hidden.
           if (auto* native = child->browser_widget()->GetNativeView()) {
             wm::TransientWindowManager::GetOrCreate(native)
-                ->set_parent_controls_visibility(selected);
+                ->set_parent_controls_visibility(is_selected);
           }
 #endif
-          if (selected) {
-            child->Show();
+          if (is_selected) {
+            if (activate) {
+              child->Show();
+            } else {
+              child->ShowInactive();
+            }
           } else {
             child->browser_widget()->Hide();
           }
@@ -210,7 +301,15 @@ class IncognitoHosts {
     // Raise the physical OS window, then activate the selected logical widget.
     // Each complete BrowserView owns a separate focus/accelerator tree.
     if (!view->browser_widget()->IsVisible()) {
-      view->browser_widget()->Show();
+      if (activate) {
+        view->browser_widget()->Show();
+      } else {
+        view->browser_widget()->ShowInactive();
+      }
+    }
+    if (!activate) {
+      changed_.Notify();
+      return;
     }
     if (!view || !regular || !view->browser_widget()) {
       return;
@@ -243,7 +342,7 @@ class IncognitoHosts {
     }
     if (host->browser.get() == browser) {
       // Native parent destruction owns the child-widget destruction. Normal
-      // close requests first run every private Browser's unload checks below.
+      // close requests first run every hosted Browser's unload checks below.
       hosts_.erase(browser->GetSessionID().id());
       changed_.Notify();
       return;
@@ -255,7 +354,11 @@ class IncognitoHosts {
         std::ranges::find_if(host->spaces, [browser](const auto& space) {
           return space.browser.get() == browser;
         });
-    if (closed != host->spaces.end()) {
+    const auto parent = closed != host->spaces.end()
+                            ? closed->regular_parent
+                            : base::WeakPtr<BrowserWindowInterface>();
+    if (closed != host->spaces.end() &&
+        closed->kind == PresentationKind::kPrivate) {
       ClearClosedPrivatePartition(browser->GetProfile(), closed->id);
     }
     std::erase_if(host->spaces, [browser](const auto& space) {
@@ -270,7 +373,8 @@ class IncognitoHosts {
         FROM_HERE,
         base::BindOnce(
             [](base::WeakPtr<BrowserWindowInterface> regular, bool selected,
-               bool finish_close) {
+               bool finish_close,
+               base::WeakPtr<BrowserWindowInterface> parent) {
               if (!regular || regular->IsDeleteScheduled()) {
                 return;
               }
@@ -287,14 +391,21 @@ class IncognitoHosts {
                   regular->GetWindow()->Close();
                 }
               } else if (selected) {
-                self.Select(*host, nullptr);
-                if (regular->GetTabStripModel()->empty()) {
-                  chrome::NewTab(regular.get(), NewTabTypes::kNoUserAction);
+                const auto target = parent && !parent->IsDeleteScheduled() &&
+                                            self.Find(parent.get()) == host
+                                        ? parent
+                                        : regular;
+                self.Select(*host, target.get() == regular.get()
+                                       ? nullptr
+                                       : target.get());
+                if (target && !target->IsDeleteScheduled() &&
+                    target->GetTabStripModel()->empty()) {
+                  chrome::NewTab(target.get(), NewTabTypes::kNoUserAction);
                 }
               }
               self.changed_.Notify();
             },
-            regular, selected, finish_close));
+            regular, selected, finish_close, parent));
     changed_.Notify();
   }
 
@@ -312,12 +423,12 @@ class IncognitoHosts {
 // transient ownership relation to the regular widget. It is a logical top-level
 // Widget so that its complete BrowserView owns focus/IME state through
 // teardown. No DesktopNativeWidgetAura or additional OS window is created.
-class PrivateNativeWidget : public views::NativeWidgetAura,
-                            public BrowserNativeWidget {
+class HostedNativeWidget : public views::NativeWidgetAura,
+                           public BrowserNativeWidget {
  public:
-  PrivateNativeWidget(BrowserWidget* widget,
-                      BrowserView* host,
-                      base::WeakPtr<BrowserWindowInterface> owner)
+  HostedNativeWidget(BrowserWidget* widget,
+                     BrowserView* host,
+                     base::WeakPtr<BrowserWindowInterface> owner)
       : views::NativeWidgetAura(widget),
         host_(host->GetAsWeakPtr()),
         owner_(std::move(owner)) {}
@@ -334,12 +445,12 @@ class PrivateNativeWidget : public views::NativeWidgetAura,
   }
 
   void Activate() override {
-    if (CanActivatePrivatePresentation()) {
+    if (CanActivatePresentation()) {
       views::NativeWidgetAura::Activate();
     }
   }
   bool ShouldActivate() const override {
-    return CanActivatePrivatePresentation() &&
+    return CanActivatePresentation() &&
            views::NativeWidgetAura::ShouldActivate();
   }
 
@@ -394,7 +505,7 @@ class PrivateNativeWidget : public views::NativeWidgetAura,
   }
 
  private:
-  bool CanActivatePrivatePresentation() const {
+  bool CanActivatePresentation() const {
     if (!owner_ || !host_ || owner_->IsDeleteScheduled()) {
       return false;
     }
@@ -420,15 +531,177 @@ class PrivateNativeWidget : public views::NativeWidgetAura,
 
 }  // namespace
 
+void PopulateProfileSpaceWindowExtraData(
+    BrowserWindowInterface* browser,
+    std::map<std::string, std::string>* extra_data) {
+  if (!ProfileSpacesEnabled() || !browser ||
+      browser->GetProfile()->IsOffTheRecord()) {
+    return;
+  }
+  auto* host = SpaceWindowHosts::Get().Find(browser);
+  if (!host) {
+    return;
+  }
+  (*extra_data)[kProfileSpaceHostKey] = host->group;
+  const std::vector<std::string> ids(host->open_regular_spaces.begin(),
+                                     host->open_regular_spaces.end());
+  (*extra_data)[kProfileSpaceOpenKey] = base::JoinString(ids, ",");
+  (*extra_data)[kProfileSpaceSelectedKey] = host->selected_regular_space;
+}
+
+void RestoreProfileSpaceWindowIdentity(
+    BrowserWindowInterface* browser,
+    const std::map<std::string, std::string>& extra_data,
+    int32_t restore_id) {
+  if (!ProfileSpacesEnabled() || !browser ||
+      browser->GetProfile()->IsOffTheRecord() ||
+      IsProfileSpace(browser->GetProfile())) {
+    return;
+  }
+  auto& self = SpaceWindowHosts::Get();
+  auto& host = self.Enroll(browser);
+  host.group = RestoredHostGroup(extra_data, restore_id);
+  auto selected = extra_data.find(kProfileSpaceSelectedKey);
+  host.selected_regular_space =
+      selected != extra_data.end() &&
+              base::Uuid::ParseLowercase(selected->second).is_valid()
+          ? selected->second
+          : std::string();
+  if (auto requested = SessionRestore::TakeProfileSpaceStartupSelection(
+          browser->GetProfile())) {
+    host.selected_regular_space = *requested;
+  }
+  const auto visible = SpaceIds(browser);
+  if (!host.selected_regular_space.empty() &&
+      std::ranges::find(visible, host.selected_regular_space) ==
+          visible.end()) {
+    host.selected_regular_space.clear();
+  }
+  if (auto open = extra_data.find(kProfileSpaceOpenKey);
+      open != extra_data.end()) {
+    for (auto id : base::SplitString(open->second, ",", base::TRIM_WHITESPACE,
+                                     base::SPLIT_WANT_NONEMPTY)) {
+      if (base::Uuid::ParseLowercase(id).is_valid()) {
+        host.open_regular_spaces.insert(std::move(id));
+      }
+    }
+  }
+  if (!host.selected_regular_space.empty()) {
+    host.open_regular_spaces.insert(host.selected_regular_space);
+  }
+  const std::vector<std::string> open(host.open_regular_spaces.begin(),
+                                      host.open_regular_spaces.end());
+  const auto selected_id = host.selected_regular_space;
+  const auto generation = host.selection_generation;
+  PersistHostMetadata(host);
+  // The root's native restore finishes its window/tab transaction first.
+  // Children can then restore without competing with that transaction's Show.
+  base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+      FROM_HERE,
+      base::BindOnce(
+          [](base::WeakPtr<BrowserWindowInterface> physical,
+             std::vector<std::string> open, std::string selected_id,
+             uint64_t generation) {
+            if (!physical || physical->IsDeleteScheduled()) {
+              return;
+            }
+            for (const auto& id : open) {
+              const auto visible = SpaceIds(physical.get());
+              if (std::ranges::find(visible, id) == visible.end()) {
+                continue;
+              }
+              AcquireProfileSpaceBrowser(
+                  physical.get(), id,
+                  base::BindOnce(
+                      [](base::WeakPtr<BrowserWindowInterface> physical,
+                         std::string id, std::string selected_id,
+                         uint64_t generation, BrowserWindowInterface* child) {
+                        if (!physical || physical->IsDeleteScheduled() ||
+                            !child || browser_shutdown::IsTryingToQuit()) {
+                          return;
+                        }
+                        const auto retained = child->GetWeakPtr();
+                        if (child->GetTabStripModel()->empty()) {
+                          chrome::NewTab(child, NewTabTypes::kNoUserAction);
+                        }
+                        auto& self = SpaceWindowHosts::Get();
+                        auto* host = self.Find(physical.get());
+                        if (host && !host->close_requested && retained &&
+                            !retained->IsDeleteScheduled() &&
+                            id == selected_id &&
+                            host->selection_generation == generation) {
+                          self.Select(*host, retained.get(),
+                                      /*cancel_close=*/true,
+                                      physical->GetWindow()->IsActive());
+                        }
+                      },
+                      physical, id, selected_id, generation));
+            }
+          },
+          browser->GetWeakPtr(), open, selected_id, generation));
+}
+
+BrowserWindowInterface* CreateRestoredProfileSpaceBrowser(
+    BrowserWindowCreateParams params,
+    const std::map<std::string, std::string>& extra_data,
+    int32_t restore_id,
+    BrowserWindowInterface* preferred_host) {
+  auto* profile = &params.profile.get();
+  auto* root = SpaceCatalogProfile(profile);
+  CHECK(ProfileSpacesEnabled() && IsProfileSpace(profile) && root);
+  auto& self = SpaceWindowHosts::Get();
+  auto effective_data = extra_data;
+  if (restore_id <= 0 && !effective_data.contains(kProfileSpaceHostKey)) {
+    auto* preferred = self.Find(preferred_host);
+    effective_data[kProfileSpaceHostKey] =
+        preferred && preferred->browser &&
+                preferred->browser->GetProfile() == root
+            ? preferred->group
+            : base::Uuid::GenerateRandomV4().AsLowercaseString();
+  }
+  const auto group = RestoredHostGroup(effective_data, restore_id);
+  auto* host = self.FindGroup(root, group);
+  if (!host) {
+    BrowserWindowCreateParams physical(BrowserWindowInterface::TYPE_NORMAL,
+                                       root, false);
+    physical.should_trigger_session_restore = false;
+    physical.initial_bounds = params.initial_bounds;
+    physical.initial_workspace = params.initial_workspace;
+    physical.initial_visible_on_all_workspaces_state =
+        params.initial_visible_on_all_workspaces_state;
+    physical.initial_show_state = params.initial_show_state;
+    auto* browser = CreateBrowserWindow(std::move(physical));
+    CHECK(browser);
+    RestoreProfileSpaceWindowIdentity(browser, effective_data, restore_id);
+    host = self.Find(browser);
+    CHECK(host);
+    if (browser->GetTabStripModel()->empty()) {
+      chrome::NewTab(browser, NewTabTypes::kNoUserAction);
+    }
+    base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+        FROM_HERE, base::BindOnce(
+                       [](base::WeakPtr<BrowserWindowInterface> physical) {
+                         if (physical && !physical->IsDeleteScheduled() &&
+                             !physical->GetWindow()->IsVisible()) {
+                           physical->GetWindow()->ShowInactive();
+                         }
+                       },
+                       browser->GetWeakPtr()));
+  }
+  CHECK(host->browser && !host->close_requested);
+  return CreateProfileSpaceBrowser(host->browser.get(), std::move(params));
+}
+
 BrowserWindowInterface* IncognitoSpaceHost(BrowserWindowInterface* browser) {
-  auto* host = IncognitoHosts::Get().Find(browser);
+  auto* host = SpaceWindowHosts::Get().Find(browser);
   return host ? host->browser.get() : nullptr;
 }
 
 std::string IncognitoSpaceId(BrowserWindowInterface* browser) {
-  if (auto* host = IncognitoHosts::Get().Find(browser)) {
+  if (auto* host = SpaceWindowHosts::Get().Find(browser)) {
     for (const auto& space : host->spaces) {
-      if (space.browser.get() == browser) {
+      if (space.browser.get() == browser &&
+          space.kind == PresentationKind::kPrivate) {
         return space.id;
       }
     }
@@ -439,9 +712,10 @@ std::string IncognitoSpaceId(BrowserWindowInterface* browser) {
 std::vector<IncognitoSpaceEntry> IncognitoSpaces(
     BrowserWindowInterface* browser) {
   std::vector<IncognitoSpaceEntry> entries;
-  if (auto* host = IncognitoHosts::Get().Find(browser)) {
+  if (auto* host = SpaceWindowHosts::Get().Find(browser)) {
     for (const auto& space : host->spaces) {
-      if (space.browser && !space.browser->IsDeleteScheduled()) {
+      if (space.kind == PresentationKind::kPrivate && space.browser &&
+          !space.browser->IsDeleteScheduled()) {
         entries.push_back({space.id, space.name});
       }
     }
@@ -449,9 +723,14 @@ std::vector<IncognitoSpaceEntry> IncognitoSpaces(
   return entries;
 }
 
+bool IsIncognitoSpaceHostClosing(BrowserWindowInterface* browser) {
+  auto* host = SpaceWindowHosts::Get().Find(browser);
+  return host && host->close_requested;
+}
+
 BrowserWindowInterface* SelectedIncognitoBrowser(
     BrowserWindowInterface* browser) {
-  if (auto* host = IncognitoHosts::Get().Find(browser)) {
+  if (auto* host = SpaceWindowHosts::Get().Find(browser)) {
     return host->selected ? host->selected.get() : host->browser.get();
   }
   return nullptr;
@@ -464,7 +743,7 @@ bool IncognitoPresentationIsSelected(BrowserWindowInterface* browser) {
 
 BrowserWindowInterface* IncognitoSpaceTarget(BrowserWindowInterface* browser,
                                              const std::string& id) {
-  auto* host = IncognitoHosts::Get().Find(browser);
+  auto* host = SpaceWindowHosts::Get().Find(browser);
   if (!host || !host->browser) {
     return nullptr;
   }
@@ -479,7 +758,26 @@ BrowserWindowInterface* IncognitoSpaceTarget(BrowserWindowInterface* browser,
 }
 
 void ShowIncognitoPresentation(BrowserWindowInterface* browser) {
-  auto& self = IncognitoHosts::Get();
+  auto& self = SpaceWindowHosts::Get();
+  if (ProfileSpacesEnabled() && browser && !self.Find(browser) &&
+      !browser->GetProfile()->IsOffTheRecord() &&
+      !IsProfileSpace(browser->GetProfile())) {
+    if (auto requested = SessionRestore::TakeProfileSpaceStartupSelection(
+            browser->GetProfile())) {
+      std::map<std::string, std::string> data;
+      data[kProfileSpaceHostKey] =
+          base::Uuid::GenerateRandomV4().AsLowercaseString();
+      data[kProfileSpaceSelectedKey] = *requested;
+      data[kProfileSpaceOpenKey] = *requested;
+      RestoreProfileSpaceWindowIdentity(browser, data,
+                                        browser->GetSessionID().id());
+      return;
+    }
+  }
+  if (ProfileSpacesEnabled() && browser &&
+      SessionRestore::IsRestoring(browser->GetProfile())) {
+    return;
+  }
   if (auto* host = self.Find(browser)) {
     self.Select(*host, host->browser.get() == browser ? nullptr : browser,
                 /*cancel_close=*/false);
@@ -488,7 +786,7 @@ void ShowIncognitoPresentation(BrowserWindowInterface* browser) {
 
 bool DispatchIncognitoHostActivation(BrowserWindowInterface* browser,
                                      bool active) {
-  auto* host = IncognitoHosts::Get().Find(browser);
+  auto* host = SpaceWindowHosts::Get().Find(browser);
   if (!host || host->browser.get() != browser) {
     return false;
   }
@@ -514,9 +812,8 @@ void RestoreIncognitoFocusAfterModal(content::WebContents* contents) {
   }
   auto* browser =
       GlobalBrowserCollection::GetInstance()->FindBrowserWithTab(contents);
-  auto* host = IncognitoHosts::Get().Find(browser);
-  if (!browser || !host || host->selected.get() != browser ||
-      IncognitoSpaceId(browser).empty()) {
+  auto* host = SpaceWindowHosts::Get().Find(browser);
+  if (!browser || !host || host->selected.get() != browser) {
     return;
   }
   // WindowClosing runs while the modal/widget and event blocker are still
@@ -530,7 +827,7 @@ void RestoreIncognitoFocusAfterModal(content::WebContents* contents) {
                 selected->IsDeleteScheduled()) {
               return;
             }
-            auto* host = IncognitoHosts::Get().Find(regular.get());
+            auto* host = SpaceWindowHosts::Get().Find(regular.get());
             if (!host || host->browser.get() != regular.get() ||
                 host->selected.get() != selected.get() ||
                 host->close_requested ||
@@ -640,34 +937,301 @@ bool SelectIncognitoSpace(BrowserWindowInterface* browser,
   return true;
 }
 
+BrowserWindowInterface* CreateProfileSpaceBrowser(
+    BrowserWindowInterface* physical_host,
+    BrowserWindowCreateParams params) {
+#if defined(USE_AURA) && !BUILDFLAG(IS_CHROMEOS)
+  auto* profile = &params.profile.get();
+  if (!ProfileSpacesEnabled() || !physical_host ||
+      physical_host->IsDeleteScheduled() ||
+      physical_host->GetProfile()->IsOffTheRecord() ||
+      physical_host->GetProfile()->ShutdownStarted() ||
+      physical_host->GetType() != BrowserWindowInterface::TYPE_NORMAL ||
+      params.type != BrowserWindowInterface::TYPE_NORMAL ||
+      !IsProfileSpace(profile) || profile->IsOffTheRecord() ||
+      profile->ShutdownStarted() ||
+      SpaceCatalogProfile(profile) != physical_host->GetProfile()) {
+    return nullptr;
+  }
+  auto& self = SpaceWindowHosts::Get();
+  if (auto* host = self.Find(physical_host)) {
+    if (host->browser.get() != physical_host || host->close_requested) {
+      return nullptr;
+    }
+    for (const auto& space : host->spaces) {
+      if (space.kind == PresentationKind::kRegular && space.browser &&
+          !space.browser->IsDeleteScheduled() &&
+          space.browser->GetProfile() == profile) {
+        return space.browser.get();
+      }
+    }
+  }
+  auto* view = BrowserView::GetBrowserViewForBrowser(physical_host);
+  if (!view || !view->GetWidget() || view->GetWidget()->IsClosed()) {
+    return nullptr;
+  }
+  Creation creation{physical_host->GetWeakPtr(),
+                    ProfileSpaceId(profile),
+                    profile,
+                    PresentationKind::kRegular,
+                    {}};
+  const bool session_restore_creation =
+      params.creation_source ==
+      BrowserWindowCreateParams::CreationSource::kSessionRestore;
+  base::AutoReset<Creation*> scoped_creation(&self.creating_, &creation);
+  auto* browser = CreateBrowserWindow(std::move(params));
+  if (!browser) {
+    return nullptr;
+  }
+  CHECK(creation.consumed);
+  CHECK_EQ(IncognitoSpaceHost(browser), physical_host);
+  auto* host = self.Find(physical_host);
+  CHECK(host);
+  host->open_regular_spaces.insert(ProfileSpaceId(profile));
+  PersistHostMetadata(*host);
+  const auto child = browser->GetWeakPtr();
+  if (!session_restore_creation && !SessionRestore::IsRestoring(profile) &&
+      SessionRestore::HasPendingProfileSpaceSession(profile) &&
+      SessionRestore::RestoreProfileSpaceSession(profile, browser) ==
+          SessionRestore::ProfileSpaceSessionResult::kUnavailable) {
+    return nullptr;
+  }
+  return child && !child->IsDeleteScheduled() ? child.get() : nullptr;
+#else
+  return nullptr;
+#endif
+}
+
+void AcquireProfileSpaceBrowser(
+    BrowserWindowInterface* source,
+    const std::string& id,
+    base::OnceCallback<void(BrowserWindowInterface*)> callback,
+    bool select) {
+  if (!ProfileSpacesEnabled() || !source || source->IsDeleteScheduled() ||
+      browser_shutdown::IsTryingToQuit()) {
+    std::move(callback).Run(nullptr);
+    return;
+  }
+  auto& self = SpaceWindowHosts::Get();
+  auto* physical = IncognitoSpaceHost(source);
+  if (!physical) {
+    physical = source;
+  }
+  if (physical->GetProfile()->IsOffTheRecord() ||
+      physical->GetProfile()->ShutdownStarted() ||
+      SpaceCatalogProfile(physical->GetProfile()) != physical->GetProfile() ||
+      physical->GetType() != BrowserWindowInterface::TYPE_NORMAL) {
+    std::move(callback).Run(nullptr);
+    return;
+  }
+  auto& host = self.Enroll(physical);
+  const auto visible = SpaceIds(physical, /*include_archived=*/!select);
+  if (host.close_requested || std::ranges::find(visible, id) == visible.end()) {
+    std::move(callback).Run(nullptr);
+    return;
+  }
+  callback = base::BindOnce(
+      [](base::WeakPtr<BrowserWindowInterface> source,
+         base::WeakPtr<BrowserWindowInterface> physical, uint64_t generation,
+         bool select,
+         base::OnceCallback<void(BrowserWindowInterface*)> callback,
+         BrowserWindowInterface* browser) {
+        auto& self = SpaceWindowHosts::Get();
+        auto* host = self.Find(physical.get());
+        if (!source || source->IsDeleteScheduled() || !physical || !host ||
+            host->close_requested || !browser || browser->IsDeleteScheduled()) {
+          std::move(callback).Run(nullptr);
+          return;
+        }
+        const auto target = browser->GetWeakPtr();
+        std::move(callback).Run(browser);
+        host = self.Find(physical.get());
+        if (select && source && !source->IsDeleteScheduled() && target &&
+            !target->IsDeleteScheduled() && host && !host->close_requested &&
+            host->selection_generation == generation &&
+            !IsSpaceArchived(physical->GetProfile(),
+                             ProfileSpaceId(target->GetProfile())) &&
+            !target->GetTabStripModel()->empty()) {
+          self.Select(*host,
+                      target.get() == physical.get() ? nullptr : target.get());
+        }
+      },
+      source->GetWeakPtr(), physical->GetWeakPtr(), host.selection_generation,
+      select, std::move(callback));
+  if (id.empty()) {
+    std::move(callback).Run(physical);
+    return;
+  }
+  for (const auto& space : host.spaces) {
+    if (space.kind == PresentationKind::kRegular && space.id == id &&
+        space.browser && !space.browser->IsDeleteScheduled()) {
+      std::move(callback).Run(space.browser.get());
+      return;
+    }
+  }
+  AcquireSpaceProfile(
+      physical->GetProfile(), id,
+      base::BindOnce(
+          [](base::WeakPtr<BrowserWindowInterface> source,
+             base::WeakPtr<BrowserWindowInterface> physical, std::string id,
+             bool select,
+             base::OnceCallback<void(BrowserWindowInterface*)> callback,
+             Profile* profile) {
+            auto& self = SpaceWindowHosts::Get();
+            auto* host = self.Find(physical.get());
+            if (!source || source->IsDeleteScheduled() || !physical ||
+                !profile || physical->IsDeleteScheduled() || !host ||
+                host->close_requested || browser_shutdown::IsTryingToQuit() ||
+                ProfileSpaceId(profile) != id ||
+                SpaceCatalogProfile(profile) != physical->GetProfile()) {
+              std::move(callback).Run(nullptr);
+              return;
+            }
+            const auto visible =
+                SpaceIds(physical.get(), /*include_archived=*/!select);
+            if (std::ranges::find(visible, id) == visible.end()) {
+              std::move(callback).Run(nullptr);
+              return;
+            }
+            BrowserWindowCreateParams params(
+                BrowserWindowInterface::TYPE_NORMAL, profile, false);
+            params.should_trigger_session_restore = false;
+            auto* browser =
+                CreateProfileSpaceBrowser(physical.get(), std::move(params));
+            if (!browser) {
+              std::move(callback).Run(nullptr);
+              return;
+            }
+            const auto child = browser->GetWeakPtr();
+            const auto restored =
+                SessionRestore::RestoreProfileSpaceSession(profile, browser);
+            host = self.Find(physical.get());
+            std::move(callback).Run(
+                restored != SessionRestore::ProfileSpaceSessionResult::
+                                kUnavailable &&
+                        child && !child->IsDeleteScheduled() && host &&
+                        !host->close_requested && source &&
+                        !source->IsDeleteScheduled()
+                    ? child.get()
+                    : nullptr);
+          },
+          source->GetWeakPtr(), physical->GetWeakPtr(), id, select,
+          std::move(callback)));
+}
+
+bool SelectProfileSpace(BrowserWindowInterface* source, const std::string& id) {
+  if (!ProfileSpacesEnabled()) {
+    return false;
+  }
+#if defined(USE_AURA) && !BUILDFLAG(IS_CHROMEOS)
+  if (!source || source->IsDeleteScheduled() ||
+      browser_shutdown::IsTryingToQuit()) {
+    return true;
+  }
+  auto& self = SpaceWindowHosts::Get();
+  auto* physical = IncognitoSpaceHost(source);
+  if (!physical) {
+    physical = source;
+  }
+  if (physical->GetProfile()->IsOffTheRecord() ||
+      physical->GetProfile()->IsGuestSession() ||
+      physical->GetProfile()->ShutdownStarted() ||
+      SpaceCatalogProfile(physical->GetProfile()) != physical->GetProfile() ||
+      physical->GetType() != BrowserWindowInterface::TYPE_NORMAL) {
+    return true;
+  }
+  auto& host = self.Enroll(physical);
+  if (host.close_requested) {
+    return true;
+  }
+  const auto ids = SpaceIds(physical);
+  if (std::ranges::find(ids, id) == ids.end()) {
+    return true;
+  }
+  for (const auto& space : host.spaces) {
+    if (space.id == id && space.browser &&
+        !space.browser->IsDeleteScheduled()) {
+      self.Select(host, space.browser.get());
+      return true;
+    }
+  }
+  if (id.empty()) {
+    const auto personal = physical->GetWeakPtr();
+    self.Select(host, nullptr);
+    if (personal && !personal->IsDeleteScheduled() &&
+        personal->GetTabStripModel()->empty()) {
+      chrome::NewTab(personal.get(), NewTabTypes::kNoUserAction);
+    }
+    return true;
+  }
+  const auto generation = ++host.selection_generation;
+  AcquireProfileSpaceBrowser(
+      source, id,
+      base::BindOnce(
+          [](base::WeakPtr<BrowserWindowInterface> physical,
+             uint64_t generation, BrowserWindowInterface* browser) {
+            if (!physical || physical->IsDeleteScheduled() || !browser ||
+                browser_shutdown::IsTryingToQuit()) {
+              return;
+            }
+            auto& self = SpaceWindowHosts::Get();
+            auto* host = self.Find(physical.get());
+            const auto child = browser->GetWeakPtr();
+            if (!host || host->close_requested ||
+                host->selection_generation != generation ||
+                child->IsDeleteScheduled()) {
+              return;
+            }
+            if (child->GetTabStripModel()->empty()) {
+              chrome::NewTab(child.get(), NewTabTypes::kNoUserAction);
+            }
+            host = self.Find(physical.get());
+            if (!host || host->close_requested || !child ||
+                host->selection_generation != generation ||
+                child->IsDeleteScheduled()) {
+              return;
+            }
+            self.Select(*host, child.get());
+            if (child && !child->IsDeleteScheduled()) {
+              chrome::FocusLocationBar(child.get());
+            }
+          },
+          physical->GetWeakPtr(), generation));
+#endif
+  return true;
+}
+
 base::CallbackListSubscription ObserveIncognitoSpaces(
     base::RepeatingClosure callback) {
-  return IncognitoHosts::Get().changed_.Add(std::move(callback));
+  return SpaceWindowHosts::Get().changed_.Add(std::move(callback));
 }
 
 BrowserNativeWidget* MaybeCreateIncognitoNativeWidget(BrowserWidget* widget,
                                                       BrowserView* view) {
 #if defined(USE_AURA) && !BUILDFLAG(IS_CHROMEOS)
-  auto& self = IncognitoHosts::Get();
+  auto& self = SpaceWindowHosts::Get();
   auto* creation = self.creating_;
   if (!creation || creation->consumed || !creation->host ||
       view->browser()->GetType() != BrowserWindowInterface::TYPE_NORMAL ||
-      !view->GetProfile()->IsIncognitoProfile() ||
-      view->GetProfile()->GetOriginalProfile() !=
-          creation->host->GetProfile()->GetOriginalProfile()) {
+      view->GetProfile() != creation->profile ||
+      creation->host->IsDeleteScheduled()) {
     return nullptr;
   }
   auto* host_view = BrowserView::GetBrowserViewForBrowser(creation->host.get());
   CHECK(host_view && host_view->GetWidget());
   creation->consumed = true;
   auto& host = self.Enroll(creation->host.get());
-  const auto name = host.next_number++;
+  std::u16string name;
+  if (creation->kind == PresentationKind::kPrivate) {
+    const auto number = host.next_number++;
+    name = number == 1 ? u"Incognito"
+                       : u"Incognito " + base::NumberToString16(number);
+  }
   host.spaces.push_back({view->browser()->GetWeakPtr(), creation->id,
-                         name == 1
-                             ? u"Incognito"
-                             : u"Incognito " + base::NumberToString16(name)});
-  return new PrivateNativeWidget(widget, host_view,
-                                 view->browser()->GetWeakPtr());
+                         std::move(name), creation->kind,
+                         creation->regular_parent});
+  return new HostedNativeWidget(widget, host_view,
+                                view->browser()->GetWeakPtr());
 #else
   return nullptr;
 #endif
@@ -679,34 +1243,55 @@ BrowserWindowInterface* CreateIncognitoSpace(BrowserWindowInterface* source,
   if (!source) {
     return nullptr;
   }
-  auto* regular = IncognitoSpaceHost(source);
-  if (!regular) {
-    regular = source;
+  auto& self = SpaceWindowHosts::Get();
+  auto* physical = IncognitoSpaceHost(source);
+  if (!physical) {
+    physical = source;
+  }
+  auto* regular = source;
+  if (source == physical) {
+    if (auto* selected = SelectedIncognitoBrowser(source)) {
+      regular = selected;
+    }
+  }
+  if (regular->GetProfile()->IsOffTheRecord()) {
+    if (auto* host = self.Find(regular)) {
+      for (const auto& space : host->spaces) {
+        if (space.browser.get() == regular && space.regular_parent) {
+          regular = space.regular_parent.get();
+          break;
+        }
+      }
+    }
   }
   if (regular->GetProfile()->IsOffTheRecord() ||
       regular->GetProfile()->IsGuestSession() ||
       regular->GetProfile()->ShutdownStarted() ||
-      regular->IsDeleteScheduled() ||
+      regular->IsDeleteScheduled() || physical->IsDeleteScheduled() ||
       regular->GetType() != BrowserWindowInterface::TYPE_NORMAL ||
+      physical->GetProfile()->IsOffTheRecord() ||
       IncognitoModePrefs::GetAvailability(regular->GetProfile()) ==
           policy::IncognitoModeAvailability::kDisabled) {
     return nullptr;
   }
-  auto* view = BrowserView::GetBrowserViewForBrowser(regular);
+  auto* view = BrowserView::GetBrowserViewForBrowser(physical);
   if (!view || !view->GetWidget() || view->GetWidget()->IsClosed()) {
     return nullptr;
   }
-  auto& self = IncognitoHosts::Get();
-  Creation creation{regular->GetWeakPtr(),
-                    base::Uuid::GenerateRandomV4().AsLowercaseString()};
-  base::AutoReset<Creation*> scoped_creation(&self.creating_, &creation);
   auto* profile = regular->GetProfile()->GetPrimaryOTRProfile(true);
+  Creation creation{physical->GetWeakPtr(),
+                    base::Uuid::GenerateRandomV4().AsLowercaseString(), profile,
+                    PresentationKind::kPrivate, regular->GetWeakPtr()};
+  base::AutoReset<Creation*> scoped_creation(&self.creating_, &creation);
   BrowserWindowCreateParams params(BrowserWindowInterface::TYPE_NORMAL, profile,
                                    true);
   params.should_trigger_session_restore = false;
   params.omit_from_session_restore = true;
   auto* browser = CreateBrowserWindow(std::move(params));
-  CHECK_EQ(IncognitoSpaceHost(browser), regular);
+  if (!browser) {
+    return nullptr;
+  }
+  CHECK_EQ(IncognitoSpaceHost(browser), physical);
   if (add_initial_tab) {
     const GURL url(chrome::kChromeUINewTabURL);
     NavigateParams navigate(browser, url, ui::PAGE_TRANSITION_AUTO_TOPLEVEL);
@@ -748,7 +1333,7 @@ BrowserWindowInterface* CreateIncognitoSpaceForProfile(Profile* profile,
 }
 
 void LayoutIncognitoSpaces(BrowserView* host_view) {
-  auto* host = IncognitoHosts::Get().Find(host_view->browser());
+  auto* host = SpaceWindowHosts::Get().Find(host_view->browser());
   if (!host || host->browser.get() != host_view->browser() ||
       !host_view->GetWidget()) {
     return;
@@ -766,36 +1351,111 @@ void LayoutIncognitoSpaces(BrowserView* host_view) {
 }
 
 bool PrepareIncognitoHostClose(BrowserWindowInterface* browser) {
-  auto* host = IncognitoHosts::Get().Find(browser);
-  if (!host || host->browser.get() != browser || host->spaces.empty()) {
+  auto* host = SpaceWindowHosts::Get().Find(browser);
+  if (!host) {
     return true;
   }
-  // Sequential closing preserves each private page's beforeunload/download
+  if (host->browser.get() != browser) {
+    if (!browser->GetProfile()->IsOffTheRecord() && !host->close_requested &&
+        !browser_shutdown::IsTryingToQuit()) {
+      const auto physical = host->browser;
+      host->close_requested = true;
+      ++host->selection_generation;
+      base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+          FROM_HERE, base::BindOnce(
+                         [](base::WeakPtr<BrowserWindowInterface> physical) {
+                           if (physical && !physical->IsDeleteScheduled()) {
+                             physical->GetWindow()->Close();
+                           }
+                         },
+                         physical));
+      return false;
+    }
+    return true;
+  }
+  if (host->spaces.empty()) {
+    return true;
+  }
+  // Sequential closing preserves each hosted page's beforeunload/download
   // checks. Show the child so that any cancellation prompt has a visible host.
   const auto child =
       host->selected ? host->selected : host->spaces.back().browser;
   if (child) {
-    IncognitoHosts::Get().Select(*host, child.get());
     host->close_requested = true;
+    SpaceWindowHosts::Get().Select(*host, child.get(), /*cancel_close=*/false);
     child->GetWindow()->Close();
   }
   return false;
 }
 
 bool KeepEmptyIncognitoHost(BrowserWindowInterface* browser) {
-  auto* host = IncognitoHosts::Get().Find(browser);
-  return host && host->browser.get() == browser && !host->spaces.empty() &&
-         !host->close_requested && !browser_shutdown::IsTryingToQuit();
+  auto* host = SpaceWindowHosts::Get().Find(browser);
+  if (!host || host->close_requested || browser_shutdown::IsTryingToQuit()) {
+    return false;
+  }
+  if (host->browser.get() == browser) {
+    return !host->spaces.empty();
+  }
+  if (browser->GetProfile()->IsOffTheRecord()) {
+    return false;
+  }
+  if (host->browser && TabDragController::IsNewBrowserForDrag(browser)) {
+    auto* physical_model = host->browser->GetTabStripModel();
+    const bool placeholder_only =
+        physical_model->empty() ||
+        (physical_model->count() == 1 && !physical_model->IsTabPinned(0) &&
+         !physical_model->GetTabAtIndex(0)->GetGroup() &&
+         (physical_model->GetWebContentsAt(0)->GetVisibleURL().is_empty() ||
+          physical_model->GetWebContentsAt(0)->GetVisibleURL() ==
+              GURL(chrome::kChromeUINewTabURL)));
+    const bool other_space_has_tabs =
+        std::ranges::any_of(host->spaces, [browser](const auto& space) {
+          return space.browser && space.browser.get() != browser &&
+                 !space.browser->GetTabStripModel()->empty();
+        });
+    if (placeholder_only && !other_space_has_tabs) {
+      // The native drop consumed this temporary presentation. Its normal
+      // close path also closes the otherwise empty physical host.
+      return false;
+    }
+  }
+  // Tab-strip observers are still unwinding. Keep a regular Space usable
+  // without creating its replacement tab inside those notifications.
+  base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+      FROM_HERE, base::BindOnce(
+                     [](base::WeakPtr<BrowserWindowInterface> browser) {
+                       if (!browser || browser->IsDeleteScheduled() ||
+                           browser_shutdown::IsTryingToQuit()) {
+                         return;
+                       }
+                       auto* host = SpaceWindowHosts::Get().Find(browser.get());
+                       if (host && !host->close_requested &&
+                           browser->GetTabStripModel()->empty()) {
+                         chrome::NewTab(browser.get(),
+                                        NewTabTypes::kNoUserAction);
+                       }
+                     },
+                     browser->GetWeakPtr()));
+  return true;
 }
 
 void IncognitoWindowCloseCancelled(BrowserWindowInterface* browser) {
-  if (auto* host = IncognitoHosts::Get().Find(browser)) {
+  if (auto* host = SpaceWindowHosts::Get().Find(browser)) {
+    const bool was_closing = host->close_requested;
     host->close_requested = false;
+    ++host->selection_generation;
+    if (was_closing && ProfileSpacesEnabled()) {
+      const auto selected = host->selected ? host->selected : host->browser;
+      if (selected && !selected->GetProfile()->IsOffTheRecord()) {
+        host->selected_regular_space = ProfileSpaceId(selected->GetProfile());
+        PersistHostMetadata(*host);
+      }
+    }
   }
 }
 
 void IncognitoBrowserViewDestroying(BrowserWindowInterface* browser) {
-  IncognitoHosts::Get().Destroying(browser);
+  SpaceWindowHosts::Get().Destroying(browser);
 }
 
 }  // namespace noventra

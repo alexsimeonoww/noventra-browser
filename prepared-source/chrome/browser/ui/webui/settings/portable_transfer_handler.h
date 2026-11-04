@@ -44,6 +44,7 @@ class PortableTransferHandler final : public SettingsPageUIHandler {
   void OnOpened(uint64_t operation, Result document);
   void OnPasswordsPrepared(uint64_t operation, Result counts);
   void OnPasswordsImported(uint64_t operation, Result result);
+  void OnDataImported(uint64_t operation, bool import_passwords, Result result);
   void ClearPlan();
   void Cancel();
   void StopPeer(bool notify = false);

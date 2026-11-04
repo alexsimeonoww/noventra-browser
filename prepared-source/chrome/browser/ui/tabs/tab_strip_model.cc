@@ -3611,8 +3611,15 @@ void TabStripModel::ExecuteAddToNewSplitCommand(
 
   // If we are splitting the active tab no group can be deleted.
   if (!indices.empty()) {
+    auto removed_from_groups = indices;
+    if (GetActiveTab()->IsPinned() ||
+        std::ranges::any_of(indices,
+                            [this](int index) { return IsTabPinned(index); })) {
+      removed_from_groups.push_back(active_index());
+      std::ranges::sort(removed_from_groups);
+    }
     std::vector<tab_groups::TabGroupId> groups_to_delete =
-        GetGroupsDestroyedFromRemovingIndices(indices);
+        GetGroupsDestroyedFromRemovingIndices(removed_from_groups);
     if (!groups_to_delete.empty()) {
       MarkTabGroupsForClosing(groups_to_delete);
       return delegate_->OnRemovingAllTabsFromGroups(groups_to_delete,
@@ -5023,10 +5030,15 @@ split_tabs::SplitTabId TabStripModel::AddToSplitImpl(
     tabs.push_back(tab);
   }
 
-  // Add the tabs to a split with the active index.
-  MoveTabsAndSetPropertiesImpl(indices, pivot_index,
-                               GetTabGroupForTab(pivot_index),
-                               IsTabPinned(pivot_index));
+  // Split collections have one pin state. Keep an existing saved pin
+  // regardless of which member initiated the split.
+  const bool pinned = std::ranges::any_of(
+      tabs, [](const tabs::TabInterface* tab) { return tab->IsPinned(); });
+  const int destination =
+      pinned ? std::min(pivot_index, IndexOfFirstNonPinnedTab()) : pivot_index;
+  MoveTabsAndSetPropertiesImpl(
+      indices, destination,
+      pinned ? std::nullopt : GetTabGroupForTab(pivot_index), pinned);
 
   contents_data_->CreateSplit(split_id, tabs, visual_data);
   selection_model_.InvalidateListSelectionModel(base::PassKey<TabStripModel>());
@@ -6698,29 +6710,127 @@ void TabStripModel::DetachNoventraSplitTab(int index) {
     AddToNewSplit(indices, visual, split_tabs::SplitTabCreatedSource::kExtensionsApi);
   }
 }
-bool TabStripModel::JoinNoventraSplit(int source_index, int target_index) {
-  if (!ContainsIndex(source_index) || !ContainsIndex(target_index) || source_index == target_index) return false;
+bool TabStripModel::JoinNoventraSplit(int source_index,
+                                      int target_index,
+                                      SplitJoinPlacement placement) {
+  if (!ContainsIndex(source_index) || !ContainsIndex(target_index) ||
+      source_index == target_index) {
+    return false;
+  }
   auto* source = GetTabAtIndex(source_index);
   auto* target = GetTabAtIndex(target_index);
-  if (noventra::SpaceId(source->GetContents()) != noventra::SpaceId(target->GetContents()) ||
-      source->IsPinned() != target->IsPinned()) return false;
-  if (source->IsSplit() && source->GetSplit() == target->GetSplit()) {
-    MoveWebContentsAt(source_index, target_index, true);
-    return true;
+  if (noventra::SpaceId(source->GetContents()) !=
+      noventra::SpaceId(target->GetContents())) {
+    return false;
   }
-  std::vector<tabs::TabInterface*> members = target->IsSplit()
-      ? GetSplitData(target->GetSplit().value())->ListTabs()
-      : std::vector<tabs::TabInterface*>{target};
-  if (members.size() >= 4) return false;
-  const auto visual = target->IsSplit() ? *GetSplitData(target->GetSplit().value())->visual_data()
-                                      : split_tabs::SplitTabVisualData();
-  DetachNoventraSplitTab(GetIndexOfTab(source));
-  if (target->IsSplit()) RemoveSplit(target->GetSplit().value());
-  members.push_back(source);
-  std::vector<int> indices;
-  for (auto* tab : members) indices.push_back(GetIndexOfTab(tab));
-  ActivateTabAt(GetIndexOfTab(target));
-  AddToNewSplit(indices, visual, split_tabs::SplitTabCreatedSource::kExtensionsApi);
-  ActivateTabAt(GetIndexOfTab(source));
+  auto members = target->IsSplit()
+                     ? GetSplitData(*target->GetSplit())->ListTabs()
+                     : std::vector<tabs::TabInterface*>{target};
+  const bool same_split =
+      source->IsSplit() && source->GetSplit() == target->GetSplit();
+  if (!same_split && members.size() >= 4) {
+    return false;
+  }
+  const auto removed_groups =
+      [](TabStripModel* model, tabs::TabInterface* source,
+         tabs::TabInterface* target,
+         const std::vector<tabs::TabInterface*>& members) {
+        std::vector<tabs::TabInterface*> ungrouped;
+        if (source->IsPinned() ||
+            std::ranges::any_of(
+                members, [](const auto* tab) { return tab->IsPinned(); })) {
+          ungrouped = members;
+          ungrouped.push_back(source);
+        } else if (source->GetGroup() != target->GetGroup()) {
+          ungrouped.push_back(source);
+        }
+        return model->GetGroupsDestroyedFromRemovingTabs(ungrouped);
+      };
+  const auto groups = same_split
+                          ? std::vector<tab_groups::TabGroupId>()
+                          : removed_groups(this, source, target, members);
+  auto join = base::BindOnce(
+      [](decltype(removed_groups) get_removed_groups,
+         base::WeakPtr<BrowserWindowInterface> browser,
+         base::WeakPtr<tabs::TabInterface> source,
+         base::WeakPtr<tabs::TabInterface> target,
+         std::vector<tab_groups::TabGroupId> approved_groups,
+         SplitJoinPlacement placement) {
+        if (!browser || browser->IsDeleteScheduled() || !source || !target) {
+          return;
+        }
+        auto* model = browser->GetTabStripModel();
+        if (!model || model->closing_all() ||
+            !model->ContainsIndex(model->GetIndexOfTab(source.get())) ||
+            !model->ContainsIndex(model->GetIndexOfTab(target.get())) ||
+            noventra::SpaceId(source->GetContents()) !=
+                noventra::SpaceId(target->GetContents())) {
+          return;
+        }
+        const bool same_split =
+            source->IsSplit() && source->GetSplit() == target->GetSplit();
+        if (!same_split) {
+          auto members =
+              target->IsSplit()
+                  ? model->GetSplitData(*target->GetSplit())->ListTabs()
+                  : std::vector<tabs::TabInterface*>{target.get()};
+          if (members.size() >= 4) {
+            return;
+          }
+          const auto changed_groups =
+              get_removed_groups(model, source.get(), target.get(), members);
+          if (std::ranges::any_of(changed_groups, [&](const auto& group) {
+                return !std::ranges::contains(approved_groups, group);
+              })) {
+            return;
+          }
+          const auto visual =
+              target->IsSplit()
+                  ? *model->GetSplitData(*target->GetSplit())->visual_data()
+                  : split_tabs::SplitTabVisualData();
+          model->DetachNoventraSplitTab(model->GetIndexOfTab(source.get()));
+          if (target->IsSplit()) {
+            model->RemoveSplit(*target->GetSplit());
+          }
+          members.push_back(source.get());
+          std::vector<int> indices;
+          for (auto* tab : members) {
+            indices.push_back(model->GetIndexOfTab(tab));
+          }
+          model->ActivateTabAt(model->GetIndexOfTab(target.get()));
+          model->AddToNewSplit(
+              indices, visual,
+              split_tabs::SplitTabCreatedSource::kExtensionsApi);
+        }
+        const int from = model->GetIndexOfTab(source.get());
+        int destination = model->GetIndexOfTab(target.get());
+        if (placement != SplitJoinPlacement::kDefault) {
+          const bool after = placement == SplitJoinPlacement::kAfter ||
+                             placement == SplitJoinPlacement::kBelow;
+          destination += after ? 1 : 0;
+          if (from < destination) {
+            --destination;
+          }
+        } else if (!same_split) {
+          destination = from;
+        }
+        if (model->ContainsIndex(destination) && from != destination) {
+          model->MoveWebContentsAt(from, destination, true);
+        }
+        if (placement == SplitJoinPlacement::kAbove ||
+            placement == SplitJoinPlacement::kBelow) {
+          model->UpdateSplitLayout(*source->GetSplit(),
+                                   split_tabs::SplitTabLayout::kStacked);
+        }
+        model->ActivateTabAt(model->GetIndexOfTab(source.get()));
+      },
+      removed_groups, delegate_->GetBrowserWindowInterface()->GetWeakPtr(),
+      source->GetWeakPtr(), target->GetWeakPtr(), groups, placement);
+  if (!groups.empty()) {
+    MarkTabGroupsForClosing(groups);
+    delegate_->OnRemovingAllTabsFromGroups(groups, std::move(join));
+  } else {
+    std::move(join).Run();
+  }
   return true;
 }

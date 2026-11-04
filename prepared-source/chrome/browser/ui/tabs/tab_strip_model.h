@@ -720,7 +720,11 @@ class TabStripModel {
   // maintain their group and pin properties.
   void RemoveSplit(split_tabs::SplitTabId split_id);
   // Native in-window tab composition, preserving each WebContents and account.
-  bool JoinNoventraSplit(int source_index, int target_index);
+  enum class SplitJoinPlacement { kDefault, kBefore, kAfter, kAbove, kBelow };
+  bool JoinNoventraSplit(
+      int source_index,
+      int target_index,
+      SplitJoinPlacement placement = SplitJoinPlacement::kDefault);
   void DetachNoventraSplitTab(int index);
 
   TabGroupModel* group_model() const { return group_model_.get(); }

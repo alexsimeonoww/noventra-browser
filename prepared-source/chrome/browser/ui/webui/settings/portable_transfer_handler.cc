@@ -269,27 +269,18 @@ void PortableTransferHandler::Handle(const base::ListValue& args) {
     callback_ = args[0].Clone();
     const auto operation = ++operation_;
     expiry_.Stop();
-    auto result = noventra::ApplyPortableData(browser, document_, *categories,
-                                              layout_revision_);
-    if (!result.has_value()) {
-      Reply(operation, base::unexpected(result.error()));
-      return;
-    }
-    apply_result_ = std::move(*result);
-    const auto* ledger = profile_->GetPrefs()
-                             ->GetDict("noventra.browser.portable_imports")
-                             .FindDict(*document_.FindString("transfer_id"));
-    if (categories->FindBool("passwords").value_or(false) &&
-        document_.FindString("passwords_csv") &&
-        (!ledger || !ledger->FindBool("passwords").value_or(false))) {
-      passwords_->CommitImport(
-          base::BindOnce(&PortableTransferHandler::OnPasswordsImported,
-                         weak_factory_.GetWeakPtr(), operation));
-    } else {
-      auto completed = std::move(apply_result_);
-      ClearPlan();
-      Reply(operation, std::move(completed));
-    }
+    noventra::ApplyPortableData(
+        browser, document_, *categories, layout_revision_,
+        base::BindOnce(&PortableTransferHandler::OnDataImported,
+                       weak_factory_.GetWeakPtr(), operation,
+                       categories->FindBool("passwords").value_or(false)),
+        base::BindRepeating(
+            [](base::WeakPtr<PortableTransferHandler> self,
+               uint64_t operation) {
+              return self && self->operation_ == operation && self->callback_ &&
+                     self->IsJavascriptAllowed();
+            },
+            weak_factory_.GetWeakPtr(), operation));
     return;
   }
   if (action != "export" && action != "preview") {
@@ -422,6 +413,32 @@ void PortableTransferHandler::OnPasswordsPrepared(uint64_t operation,
                 base::BindOnce(&PortableTransferHandler::ClearPlan,
                                weak_factory_.GetWeakPtr()));
   Reply(operation, review_.Clone());
+}
+
+void PortableTransferHandler::OnDataImported(uint64_t operation,
+                                             bool import_passwords,
+                                             Result result) {
+  if (operation != operation_ || !callback_ || !IsJavascriptAllowed()) {
+    return;
+  }
+  if (!result.has_value()) {
+    Reply(operation, base::unexpected(result.error()));
+    return;
+  }
+  apply_result_ = std::move(*result);
+  const auto* ledger = profile_->GetPrefs()
+                           ->GetDict("noventra.browser.portable_imports")
+                           .FindDict(*document_.FindString("transfer_id"));
+  if (import_passwords && document_.FindString("passwords_csv") &&
+      (!ledger || !ledger->FindBool("passwords").value_or(false))) {
+    passwords_->CommitImport(
+        base::BindOnce(&PortableTransferHandler::OnPasswordsImported,
+                       weak_factory_.GetWeakPtr(), operation));
+  } else {
+    auto completed = std::move(apply_result_);
+    ClearPlan();
+    Reply(operation, std::move(completed));
+  }
 }
 
 void PortableTransferHandler::OnPasswordsImported(uint64_t operation,

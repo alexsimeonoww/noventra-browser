@@ -65,6 +65,7 @@
 #if BUILDFLAG(ENABLE_DOWNGRADE_PROCESSING)
 #include "chrome/browser/downgrade/downgrade_manager_delegate_impl.h"  // nogncheck
 #endif
+#include "chrome/browser/profiles/noventra_space_startup.h"
 #include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/profiles/profile_manager_observer.h"
 #include "chrome/browser/profiles/profiles_state.h"
@@ -1917,6 +1918,16 @@ int ChromeBrowserMainParts::PreMainMessageLoopRunImpl() {
       ChromeWebUIControllerFactory::GetInstance());
   RegisterChromeWebUIConfigs();
   RegisterChromeUntrustedWebUIConfigs();
+
+#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_CHROMEOS)
+  const auto space_setup = noventra::PrepareProfileSpacesForStartup(
+      user_data_dir_, *base::CommandLine::ForCurrentProcess());
+  if (!space_setup.has_value()) {
+    LOG(ERROR) << "Space profile setup stopped before loading browsing data: "
+               << space_setup.error().path.LossyDisplayName();
+    return CHROME_RESULT_CODE_MISSING_DATA;
+  }
+#endif
 
   // This step is costly and is already measured in Startup.CreateFirstProfile
   // and more directly Profile.CreateAndInitializeProfile.

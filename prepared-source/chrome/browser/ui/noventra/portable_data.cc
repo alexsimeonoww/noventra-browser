@@ -10,14 +10,20 @@
 #include <utility>
 
 #include "base/containers/span.h"
+#include "base/functional/bind.h"
+#include "base/functional/callback.h"
 #include "base/i18n/time_formatting.h"
 #include "base/json/json_writer.h"
+#include "base/memory/ref_counted.h"
+#include "base/no_destructor.h"
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
+#include "base/task/single_thread_task_runner.h"
 #include "base/time/time.h"
 #include "base/uuid.h"
 #include "chrome/browser/bookmarks/bookmark_model_factory.h"
 #include "chrome/browser/profiles/noventra_account_spaces.h"
+#include "chrome/browser/profiles/noventra_space_profile_registry.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/sessions/session_service_base.h"
 #include "chrome/browser/sessions/session_service_lookup.h"
@@ -27,6 +33,7 @@
 #include "chrome/browser/ui/browser_window/public/global_browser_collection.h"
 #include "chrome/browser/ui/navigator/browser_navigator.h"
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"
+#include "chrome/browser/ui/noventra/incognito_space_host.h"
 #include "chrome/browser/ui/noventra/layout_model.h"
 #include "chrome/browser/ui/noventra/pinned_tab_state.h"
 #include "chrome/browser/ui/noventra/workspace_routes.h"
@@ -314,9 +321,13 @@ std::optional<std::string> CheckPolicy(Profile* profile,
     return "Your organization does not allow bookmark changes.";
   }
   if (Selected(categories, "spaces")) {
+    auto* catalog = SpaceCatalogProfile(profile);
+    if (!catalog) {
+      return "Space settings are unavailable.";
+    }
     for (const char* name : {kSpacesPref, kSpaceOrderPref, kArchivedSpacesPref,
                              kSpaceAppearancePref, kWorkspaceRoutesPref}) {
-      if (!UserModifiable(prefs, name)) {
+      if (!UserModifiable(*catalog->GetPrefs(), name)) {
         return "Your organization manages Space settings.";
       }
     }
@@ -370,6 +381,11 @@ PortableResult CollectPortableData(BrowserWindowInterface* browser,
   }
   Profile* profile = browser->GetProfile();
   auto& prefs = *profile->GetPrefs();
+  auto* catalog = SpaceCatalogProfile(profile);
+  if (!catalog) {
+    return base::unexpected("Space settings are unavailable.");
+  }
+  const auto& catalog_prefs = *catalog->GetPrefs();
   base::DictValue preferences;
   if (Selected(*selected, "settings")) {
     for (const auto name : kBooleanPreferences) {
@@ -432,7 +448,7 @@ PortableResult CollectPortableData(BrowserWindowInterface* browser,
     return base::unexpected("A transfer supports at most 1,000 Spaces.");
   }
   for (const auto& id : ids) {
-    const auto* name = prefs.GetDict(kSpacesPref).FindString(id);
+    const auto* name = catalog_prefs.GetDict(kSpacesPref).FindString(id);
     const auto appearance = GetSpaceAppearance(profile, id);
     base::DictValue space;
     space.Set("id", id);
@@ -746,10 +762,44 @@ PortableResult ValidatePortableData(const base::DictValue& snapshot) {
       .Set("password_present", passwords && !passwords->empty());
 }
 
-PortableResult ApplyPortableData(BrowserWindowInterface* browser,
-                                 const base::DictValue& snapshot,
-                                 const base::DictValue& categories,
-                                 int expected_layout_revision) {
+namespace {
+struct PendingPortableTabs {
+  base::ListValue tabs;
+  std::map<std::string, std::string> space_map;
+  base::DictValue entry;
+  std::string transfer_id;
+  size_t next = 0;
+};
+
+// A transfer may be requested from two Settings windows. Its saved progress
+// has one writer while asynchronous profile creation lets other UI work run.
+class PortableImportLease {
+ public:
+  using Key = std::pair<base::FilePath, std::string>;
+  static std::unique_ptr<PortableImportLease> Acquire(Key key) {
+    if (!Active().insert(key).second) {
+      return nullptr;
+    }
+    return std::unique_ptr<PortableImportLease>(
+        new PortableImportLease(std::move(key)));
+  }
+  ~PortableImportLease() { Active().erase(key_); }
+
+ private:
+  explicit PortableImportLease(Key key) : key_(std::move(key)) {}
+  static std::set<Key>& Active() {
+    static base::NoDestructor<std::set<Key>> active;
+    return *active;
+  }
+  Key key_;
+};
+
+PortableResult PreparePortableData(
+    BrowserWindowInterface* browser,
+    const base::DictValue& snapshot,
+    const base::DictValue& categories,
+    int expected_layout_revision,
+    std::unique_ptr<PendingPortableTabs>* pending) {
   if (!IsRegularBrowser(browser)) {
     return base::unexpected("Import data in a regular browser window.");
   }
@@ -770,6 +820,11 @@ PortableResult ApplyPortableData(BrowserWindowInterface* browser,
   }
   Profile* profile = browser->GetProfile();
   auto& prefs = *profile->GetPrefs();
+  auto* catalog = SpaceCatalogProfile(profile);
+  if (!catalog) {
+    return base::unexpected("Space settings are unavailable.");
+  }
+  auto& catalog_prefs = *catalog->GetPrefs();
   if (auto error =
           CheckPolicy(profile, *selected, *snapshot.FindDict("preferences"))) {
     return base::unexpected(*error);
@@ -808,7 +863,9 @@ PortableResult ApplyPortableData(BrowserWindowInterface* browser,
       static_cast<size_t>(restored_tabs) > snapshot.FindList("tabs")->size()) {
     return base::unexpected("The previous transfer record is invalid.");
   }
-  std::map<std::string, std::string> space_map{{"", ""}};
+  const auto current_id =
+      ProfileSpacesEnabled() ? ProfileSpaceId(profile) : std::string();
+  std::map<std::string, std::string> space_map{{"", current_id}};
   if (const auto* saved_map = entry.FindDict("space_map")) {
     if (saved_map->size() > kMaximumSpaces) {
       return base::unexpected("The previous transfer record is invalid.");
@@ -821,7 +878,8 @@ PortableResult ApplyPortableData(BrowserWindowInterface* browser,
     for (const auto [source, local] : *saved_map) {
       if (!local.is_string() || (!source.empty() && !IsUUID(source)) ||
           (!local.GetString().empty() && !IsUUID(local.GetString())) ||
-          source.empty() != local.GetString().empty() ||
+          (source.empty() ? local.GetString() != current_id
+                          : local.GetString().empty()) ||
           !source_ids.contains(source) ||
           !local_ids.insert(local.GetString()).second) {
         return base::unexpected("The previous transfer record is invalid.");
@@ -835,10 +893,11 @@ PortableResult ApplyPortableData(BrowserWindowInterface* browser,
     return base::unexpected("The previous transfer record is invalid.");
   }
   const auto known_spaces = SpaceIds(browser, true);
-  base::DictValue names = prefs.GetDict(kSpacesPref).Clone();
-  base::ListValue order = prefs.GetList(kSpaceOrderPref).Clone();
-  base::ListValue archived = prefs.GetList(kArchivedSpacesPref).Clone();
-  base::DictValue appearance = prefs.GetDict(kSpaceAppearancePref).Clone();
+  base::DictValue names = catalog_prefs.GetDict(kSpacesPref).Clone();
+  base::ListValue order = catalog_prefs.GetList(kSpaceOrderPref).Clone();
+  base::ListValue archived = catalog_prefs.GetList(kArchivedSpacesPref).Clone();
+  base::DictValue appearance =
+      catalog_prefs.GetDict(kSpaceAppearancePref).Clone();
   int added_spaces = 0;
   if (wants("spaces")) {
     for (const auto& value : *snapshot.FindList("spaces")) {
@@ -890,7 +949,7 @@ PortableResult ApplyPortableData(BrowserWindowInterface* browser,
           "Close some tabs before importing more than 2,000.");
     }
   }
-  auto merged_routes = prefs.GetList(kWorkspaceRoutesPref).Clone();
+  auto merged_routes = catalog_prefs.GetList(kWorkspaceRoutesPref).Clone();
   int added_routes = 0;
   if (wants("spaces")) {
     std::set<std::string> existing_hosts;
@@ -980,11 +1039,11 @@ PortableResult ApplyPortableData(BrowserWindowInterface* browser,
     MarkCompleted(prefs, id, entry);
   }
   if (wants("spaces")) {
-    prefs.SetList(kSpaceOrderPref, std::move(order));
-    prefs.SetList(kArchivedSpacesPref, std::move(archived));
-    prefs.SetDict(kSpaceAppearancePref, std::move(appearance));
-    prefs.SetDict(kSpacesPref, std::move(names));
-    prefs.SetList(kWorkspaceRoutesPref, std::move(merged_routes));
+    catalog_prefs.SetList(kSpaceOrderPref, std::move(order));
+    catalog_prefs.SetList(kArchivedSpacesPref, std::move(archived));
+    catalog_prefs.SetDict(kSpaceAppearancePref, std::move(appearance));
+    catalog_prefs.SetDict(kSpacesPref, std::move(names));
+    catalog_prefs.SetList(kWorkspaceRoutesPref, std::move(merged_routes));
     base::DictValue saved_map;
     for (const auto& [source, local] : space_map) {
       saved_map.Set(source, local);
@@ -1006,72 +1065,14 @@ PortableResult ApplyPortableData(BrowserWindowInterface* browser,
     entry.Set("bookmarks", true);
     MarkCompleted(prefs, id, entry);
   }
-  int added_tabs = 0;
+  const int added_tabs = 0;
   if (wants("tabs")) {
-    const auto& incoming_tabs = *snapshot.FindList("tabs");
-    for (size_t tab_index = restored_tabs; tab_index < incoming_tabs.size();
-         ++tab_index) {
-      const auto& tab = incoming_tabs[tab_index].GetDict();
-      const auto& local_space = space_map.at(*tab.FindString("space_id"));
-      const GURL url(*tab.FindString("url"));
-      const auto instance =
-          local_space.empty()
-              ? content::SiteInstance::CreateForURL(profile, url)
-              : SpaceSiteInstance(profile, url, local_space);
-      auto contents_to_insert = content::WebContents::Create(
-          content::WebContents::CreateParams(profile, instance));
-      auto navigation = content::NavigationEntry::Create();
-      navigation->SetURL(url);
-      navigation->SetVirtualURL(url);
-      std::vector<std::unique_ptr<content::NavigationEntry>> history;
-      history.push_back(std::move(navigation));
-      contents_to_insert->GetController().Restore(
-          0, content::RestoreType::kRestored, &history);
-      // URL-only restored entries stay unloaded until selected. Importing many
-      // tabs must not create hundreds of immediate requests or active pages.
-      NavigateParams params(browser, std::move(contents_to_insert));
-      params.disposition = WindowOpenDisposition::NEW_BACKGROUND_TAB;
-      params.tabstrip_index = browser->GetTabStripModel()->count();
-      params.tabstrip_add_types =
-          AddTabTypes::ADD_FORCE_INDEX |
-          (*tab.FindBool("pinned") ? AddTabTypes::ADD_PINNED
-                                   : AddTabTypes::ADD_NONE);
-      params.source_site_instance = instance;
-      Navigate(&params);
-      auto* contents = params.navigated_or_inserted_contents.get();
-      if (!contents || SpaceId(contents) != local_space) {
-        // Metadata/bookmarks already imported remain intact. Report the exact
-        // successful tab count; never relabel or repartition an existing tab.
-        MarkCompleted(prefs, id, entry);
-        return base::DictValue()
-            .Set("partial", true)
-            .Set("message",
-                 "Some tabs could not be opened. Existing work was kept.")
-            .Set("bookmarks", added_bookmarks)
-            .Set("spaces", added_spaces)
-            .Set("routes", added_routes)
-            .Set("tabs", added_tabs)
-            .Set("settings", layout.has_value())
-            .Set("extension_items", snapshot.FindList("extensions")->Clone());
-      }
-      if (*tab.FindBool("pinned")) {
-        const auto& home = *tab.FindString("home_url");
-        SetPinnedTabData(contents, home.empty() ? url : GURL(home),
-                         base::UTF8ToUTF16(*tab.FindString("name")));
-      }
-      // Restored background entries have no navigation commit to trigger
-      // session saving. Record their navigation and pin metadata before marking
-      // the tab complete, including tabs that the user never selects.
-      if (auto* session_service =
-              GetAppropriateSessionServiceIfExisting(browser)) {
-        session_service->TabRestored(contents, *tab.FindBool("pinned"));
-      }
-      ++added_tabs;
-      entry.Set("tabs_completed", static_cast<int>(tab_index + 1));
-      MarkCompleted(prefs, id, entry);
-    }
-    entry.Set("tabs", true);
-    MarkCompleted(prefs, id, entry);
+    *pending = std::make_unique<PendingPortableTabs>();
+    (*pending)->tabs = snapshot.FindList("tabs")->Clone();
+    (*pending)->space_map = std::move(space_map);
+    (*pending)->entry = entry.Clone();
+    (*pending)->transfer_id = id;
+    (*pending)->next = restored_tabs;
   }
   base::ListValue extension_items;
   if (Selected(*selected, "extensions")) {
@@ -1079,6 +1080,9 @@ PortableResult ApplyPortableData(BrowserWindowInterface* browser,
     // This is the reviewed list, not an installation success marker.
   }
   prefs.CommitPendingWrite();
+  if (&catalog_prefs != &prefs) {
+    catalog_prefs.CommitPendingWrite();
+  }
   return base::DictValue()
       .Set("partial", false)
       .Set("bookmarks", added_bookmarks)
@@ -1089,6 +1093,193 @@ PortableResult ApplyPortableData(BrowserWindowInterface* browser,
       .Set("extension_items", std::move(extension_items))
       .Set("already_imported", added_bookmarks == 0 && added_spaces == 0 &&
                                    added_tabs == 0 && !layout.has_value());
+}
+
+class PortableImportTabs : public base::RefCounted<PortableImportTabs> {
+ public:
+  PortableImportTabs(base::WeakPtr<BrowserWindowInterface> source,
+                     std::unique_ptr<PendingPortableTabs> plan,
+                     base::DictValue result,
+                     std::unique_ptr<PortableImportLease> lease,
+                     base::OnceCallback<void(PortableResult)> callback,
+                     base::RepeatingCallback<bool()> can_continue)
+      : source_(std::move(source)),
+        plan_(std::move(plan)),
+        result_(std::move(result)),
+        lease_(std::move(lease)),
+        callback_(std::move(callback)),
+        can_continue_(std::move(can_continue)) {}
+
+  void Next() {
+    if (!CanContinue()) {
+      Finish(true);
+      return;
+    }
+    if (plan_->next == plan_->tabs.size()) {
+      plan_->entry.Set("tabs", true);
+      auto& prefs = *source_->GetProfile()->GetPrefs();
+      MarkCompleted(prefs, plan_->transfer_id, plan_->entry);
+      prefs.CommitPendingWrite();
+      Finish(false);
+      return;
+    }
+    const auto& tab = plan_->tabs[plan_->next].GetDict();
+    const auto& id = plan_->space_map.at(*tab.FindString("space_id"));
+    if (ProfileSpacesEnabled()) {
+      AcquireProfileSpaceBrowser(source_.get(), id,
+                                 base::BindOnce(&PortableImportTabs::Insert,
+                                                base::WrapRefCounted(this)),
+                                 /*select=*/false);
+    } else {
+      Insert(source_.get());
+    }
+  }
+
+ private:
+  friend class base::RefCounted<PortableImportTabs>;
+  ~PortableImportTabs() = default;
+
+  bool CanContinue() const {
+    return callback_ && source_ && IsRegularBrowser(source_.get()) &&
+           !source_->GetProfile()->ShutdownStarted() &&
+           !source_->GetTabStripModel()->closing_all() &&
+           (!can_continue_ || can_continue_.Run());
+  }
+
+  void Insert(BrowserWindowInterface* target) {
+    if (!CanContinue() || !target || !IsRegularBrowser(target) ||
+        target->GetProfile()->ShutdownStarted() ||
+        target->GetTabStripModel()->closing_all()) {
+      Finish(true);
+      return;
+    }
+    const auto& tab = plan_->tabs[plan_->next].GetDict();
+    const auto& id = plan_->space_map.at(*tab.FindString("space_id"));
+    auto* profile = target->GetProfile();
+    if ((ProfileSpacesEnabled() &&
+         (ProfileSpaceId(profile) != id ||
+          SpaceCatalogProfile(profile) !=
+              SpaceCatalogProfile(source_->GetProfile()))) ||
+        target->GetTabStripModel()->count() >= 2000) {
+      Finish(true);
+      return;
+    }
+    const GURL url(*tab.FindString("url"));
+    const auto instance =
+        id.empty() ? content::SiteInstance::CreateForURL(profile, url)
+                   : SpaceSiteInstance(profile, url, id);
+    content::WebContents::CreateParams create(profile, instance);
+    create.initially_hidden = true;
+    create.desired_renderer_state =
+        content::WebContents::CreateParams::kNoRendererProcess;
+    auto contents_to_insert = content::WebContents::Create(create);
+    auto navigation = content::NavigationEntry::Create();
+    navigation->SetURL(url);
+    navigation->SetVirtualURL(url);
+    std::vector<std::unique_ptr<content::NavigationEntry>> history;
+    history.push_back(std::move(navigation));
+    contents_to_insert->GetController().Restore(
+        0, content::RestoreType::kRestored, &history);
+    NavigateParams params(target, std::move(contents_to_insert));
+    params.disposition = WindowOpenDisposition::NEW_BACKGROUND_TAB;
+    params.tabstrip_index = target->GetTabStripModel()->count();
+    params.tabstrip_add_types =
+        AddTabTypes::ADD_FORCE_INDEX |
+        (*tab.FindBool("pinned") ? AddTabTypes::ADD_PINNED
+                                 : AddTabTypes::ADD_NONE);
+    params.source_site_instance = instance;
+    params.window_action = NavigateParams::WindowAction::kNoAction;
+    Navigate(&params);
+    auto* contents = params.navigated_or_inserted_contents.get();
+    if (!contents || contents->GetBrowserContext() != profile ||
+        SpaceId(contents) != id) {
+      Finish(true);
+      return;
+    }
+    if (*tab.FindBool("pinned")) {
+      const auto& home = *tab.FindString("home_url");
+      SetPinnedTabData(contents, home.empty() ? url : GURL(home),
+                       base::UTF8ToUTF16(*tab.FindString("name")));
+    }
+    if (auto* service = GetAppropriateSessionServiceIfExisting(target)) {
+      service->TabRestored(contents, *tab.FindBool("pinned"));
+    }
+    ++added_;
+    ++plan_->next;
+    plan_->entry.Set("tabs_completed", static_cast<int>(plan_->next));
+    MarkCompleted(*source_->GetProfile()->GetPrefs(), plan_->transfer_id,
+                  plan_->entry);
+    base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+        FROM_HERE,
+        base::BindOnce(&PortableImportTabs::Next, base::WrapRefCounted(this)));
+  }
+
+  void Finish(bool partial) {
+    if (!callback_) {
+      return;
+    }
+    if (source_ && !source_->GetProfile()->ShutdownStarted()) {
+      source_->GetProfile()->GetPrefs()->CommitPendingWrite();
+    }
+    result_.Set("partial", partial);
+    result_.Set("tabs", added_);
+    if (partial) {
+      result_.Set("message",
+                  "Some tabs could not be opened. Completed imports and "
+                  "existing work were kept.");
+    }
+    if (partial || added_) {
+      result_.Set("already_imported", false);
+    }
+    lease_.reset();
+    std::move(callback_).Run(std::move(result_));
+  }
+
+  base::WeakPtr<BrowserWindowInterface> source_;
+  std::unique_ptr<PendingPortableTabs> plan_;
+  base::DictValue result_;
+  std::unique_ptr<PortableImportLease> lease_;
+  base::OnceCallback<void(PortableResult)> callback_;
+  base::RepeatingCallback<bool()> can_continue_;
+  int added_ = 0;
+};
+}  // namespace
+
+void ApplyPortableData(BrowserWindowInterface* browser,
+                       const base::DictValue& snapshot,
+                       const base::DictValue& categories,
+                       int expected_layout_revision,
+                       base::OnceCallback<void(PortableResult)> callback,
+                       base::RepeatingCallback<bool()> can_continue) {
+  if (can_continue && !can_continue.Run()) {
+    std::move(callback).Run(base::unexpected("Transfer canceled."));
+    return;
+  }
+  const auto* id = snapshot.FindString("transfer_id");
+  if (!IsRegularBrowser(browser) || !id || !IsUUID(*id)) {
+    std::move(callback).Run(base::unexpected(
+        "Choose a valid transfer in a regular browser window."));
+    return;
+  }
+  auto lease =
+      PortableImportLease::Acquire({browser->GetProfile()->GetPath(), *id});
+  if (!lease) {
+    std::move(callback).Run(base::unexpected(
+        "This transfer is already being imported in this profile."));
+    return;
+  }
+  std::unique_ptr<PendingPortableTabs> pending;
+  auto result = PreparePortableData(browser, snapshot, categories,
+                                    expected_layout_revision, &pending);
+  if (!result.has_value() || !pending) {
+    lease.reset();
+    std::move(callback).Run(std::move(result));
+    return;
+  }
+  auto run = base::MakeRefCounted<PortableImportTabs>(
+      browser->GetWeakPtr(), std::move(pending), std::move(*result),
+      std::move(lease), std::move(callback), std::move(can_continue));
+  run->Next();
 }
 
 }  // namespace noventra

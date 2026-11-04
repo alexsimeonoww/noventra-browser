@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "chrome/browser/profiles/noventra_account_spaces.h"
 #include "chrome/browser/sessions/session_restore.h"
 
 #include <stddef.h>
@@ -34,10 +33,12 @@
 #include "base/run_loop.h"
 #include "base/scoped_observation.h"
 #include "base/strings/string_number_conversions.h"
+#include "base/strings/string_util.h"
 #include "base/task/cancelable_task_tracker.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/time/time.h"
 #include "base/token.h"
+#include "base/uuid.h"
 #include "build/build_config.h"
 #include "chrome/browser/after_startup_task_utils.h"
 #include "chrome/browser/browser_process.h"
@@ -45,6 +46,9 @@
 #include "chrome/browser/prefs/session_startup_pref.h"
 #include "chrome/browser/profiles/keep_alive/profile_keep_alive_types.h"
 #include "chrome/browser/profiles/keep_alive/scoped_profile_keep_alive.h"
+#include "chrome/browser/profiles/noventra_account_spaces.h"
+#include "chrome/browser/profiles/noventra_space_migration.h"
+#include "chrome/browser/profiles/noventra_space_profile_registry.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_attributes_entry.h"
 #include "chrome/browser/profiles/profile_attributes_storage.h"
@@ -71,6 +75,7 @@
 #include "chrome/browser/ui/browser_window/public/profile_browser_collection.h"
 #include "chrome/browser/ui/navigator/browser_navigator.h"
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"
+#include "chrome/browser/ui/noventra/incognito_space_host.h"
 #include "chrome/browser/ui/noventra/window_mirror_service.h"
 #include "chrome/browser/ui/startup/startup_browser_creator.h"
 #include "chrome/browser/ui/startup/startup_tab.h"
@@ -147,6 +152,80 @@ using content::WebContents;
 using RestoredTab = SessionRestoreDelegate::RestoredTab;
 
 namespace {
+
+struct PreparedProfileSpaceSession {
+  std::vector<std::unique_ptr<sessions::SessionWindow>> windows;
+  SessionID active_window_id;
+};
+
+struct ProfileSpaceSessions {
+  std::map<base::FilePath, PreparedProfileSpaceSession> prepared;
+  std::set<base::FilePath> processing;
+  std::set<base::FilePath> consumed;
+  std::map<base::FilePath, std::string> startup_selection;
+};
+
+ProfileSpaceSessions& PreparedSpaceSessions() {
+  static base::NoDestructor<ProfileSpaceSessions> sessions;
+  return *sessions;
+}
+
+void PrepareProfileSpaceWindows(
+    Profile* profile,
+    std::vector<std::unique_ptr<sessions::SessionWindow>>* windows) {
+  const auto own_id = noventra::ProfileSpaceId(profile);
+  for (auto& window : *windows) {
+    if (window->type != sessions::SessionWindow::TYPE_NORMAL) {
+      continue;
+    }
+    if (!window->extra_data.contains(noventra::kProfileSpaceHostKey) &&
+        window->window_id.is_valid()) {
+      window->extra_data[noventra::kProfileSpaceHostKey] =
+          "legacy:" + base::NumberToString(window->window_id.id());
+    }
+    if (!own_id.empty()) {
+      continue;
+    }
+    std::set<std::string> open_spaces;
+    bool has_personal = false;
+    for (const auto& tab : window->tabs) {
+      const auto id = noventra::RestoredSpaceId(tab->extra_data);
+      has_personal |= id.empty();
+      if (base::Uuid::ParseLowercase(id).is_valid()) {
+        open_spaces.insert(id);
+      }
+    }
+    if (!open_spaces.empty()) {
+      const std::vector<std::string> values(open_spaces.begin(),
+                                            open_spaces.end());
+      if (!window->extra_data.contains(noventra::kProfileSpaceOpenKey)) {
+        window->extra_data[noventra::kProfileSpaceOpenKey] =
+            base::JoinString(values, ",");
+      }
+      if (!window->extra_data.contains(noventra::kProfileSpaceSelectedKey) &&
+          window->selected_tab_index >= 0 &&
+          static_cast<size_t>(window->selected_tab_index) <
+              window->tabs.size()) {
+        window->extra_data[noventra::kProfileSpaceSelectedKey] =
+            noventra::RestoredSpaceId(
+                window->tabs[window->selected_tab_index]->extra_data);
+      }
+      if (!has_personal) {
+        auto anchor = std::make_unique<sessions::SessionTab>();
+        anchor->window_id = window->window_id;
+        anchor->tab_id = SessionID::NewUnique();
+        anchor->tab_visual_index = static_cast<int>(window->tabs.size());
+        anchor->current_navigation_index = 0;
+        sessions::SerializedNavigationEntry navigation;
+        navigation.set_virtual_url(GURL("about:blank"));
+        navigation.set_transition_type(ui::PAGE_TRANSITION_AUTO_TOPLEVEL);
+        anchor->navigations.push_back(std::move(navigation));
+        window->tabs.push_back(std::move(anchor));
+      }
+    }
+  }
+  noventra::FilterSpaceSessionWindows(windows, own_id);
+}
 
 bool HasSingleNewTabPage(BrowserWindowInterface* browser) {
   if (!browser || !browser->GetTabStripModel() ||
@@ -367,6 +446,15 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
 
   bool synchronous() const { return synchronous_; }
 
+  BrowserWindowInterface* RestorePreparedProfileSpace(
+      std::vector<std::unique_ptr<sessions::SessionWindow>> windows,
+      SessionID active_window_id) {
+    CHECK(synchronous_);
+    input_ = RestoreInput::kPreparedProfileSpace;
+    PrepareProfileSpaceWindows(profile_, &windows);
+    return ProcessSessionWindowsAndNotify(&windows, active_window_id);
+  }
+
   BrowserWindowInterface* Restore() {
     if (restore_browser_) {
       SessionServiceBase* service =
@@ -423,6 +511,7 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
   std::vector<BrowserWindowInterface*> RestoreForeignSession(
       std::vector<const sessions::SessionWindow*>::const_iterator begin,
       std::vector<const sessions::SessionWindow*>::const_iterator end) {
+    input_ = RestoreInput::kForeignSession;
     std::vector<BrowserWindowInterface*> windows;
     std::vector<RestoredTab> restored_tabs;
     // Create a browser instance to put the restored tabs in.
@@ -462,6 +551,8 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
   // the WebContents of the restored tab.
   WebContents* RestoreForeignTab(const sessions::SessionTab& tab,
                                  WindowOpenDisposition disposition) {
+    input_ = RestoreInput::kForeignSession;
+    const auto extra_data = ExtraDataForRestore(tab.extra_data);
     DCHECK(!tab.navigations.empty());
     int selected_index = tab.current_navigation_index;
     selected_index = std::max(
@@ -470,10 +561,14 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
 
     bool use_new_window = disposition == WindowOpenDisposition::NEW_WINDOW;
 
-    BrowserWindowInterface* browser =
-        use_new_window ? CreateBrowserWindow(BrowserWindowCreateParams(
-                             profile_, /* from_user_gesture = */ true))
-                       : browser_.get();
+    BrowserWindowInterface* browser = browser_.get();
+    if (use_new_window) {
+      BrowserWindowCreateParams params(profile_, /*from_user_gesture=*/true);
+      browser = noventra::IsProfileSpace(profile_)
+                    ? noventra::CreateRestoredProfileSpaceBrowser(
+                          std::move(params), {}, 0)
+                    : CreateBrowserWindow(std::move(params));
+    }
     CHECK(browser);
     RecordAppLaunchForTab(browser, tab, selected_index);
 
@@ -482,7 +577,7 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
       DCHECK(!use_new_window);
       web_contents = chrome::ReplaceRestoredTab(
           browser, tab.navigations, selected_index, tab.extension_app_id,
-          nullptr, tab.user_agent_override, tab.extra_data,
+          nullptr, tab.user_agent_override, extra_data,
           true /* from_session_restore */);
     } else {
       int tab_index =
@@ -492,8 +587,8 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
           tab.extension_app_id, std::nullopt,
           disposition == WindowOpenDisposition::NEW_FOREGROUND_TAB,  // selected
           tab.pinned, base::TimeTicks(), base::Time(), nullptr,
-          tab.user_agent_override, tab.extra_data,
-          true /* from_session_restore */, std::nullopt);
+          tab.user_agent_override, extra_data, true /* from_session_restore */,
+          std::nullopt);
       // Start loading the tab immediately.
       web_contents->GetController().LoadIfNecessary();
     }
@@ -534,6 +629,18 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
   Profile* profile() { return profile_; }
 
  private:
+  std::map<std::string, std::string> ExtraDataForRestore(
+      const std::map<std::string, std::string>& source) const {
+    auto data = source;
+    if (input_ == RestoreInput::kForeignSession &&
+        noventra::ProfileSpacesEnabled() && !profile_->IsOffTheRecord()) {
+      // An explicit remote import targets the chosen local Profile. Remote
+      // UUIDs cannot select or allocate another local account's partition.
+      data[noventra::kSpaceExtraData] = noventra::ProfileSpaceId(profile_);
+    }
+    return data;
+  }
+
   // Invoked when done with creating all the tabs/browsers.
   //
   // |created_tabbed_browser| indicates whether a tabbed browser was created,
@@ -614,6 +721,9 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
       std::vector<std::unique_ptr<sessions::SessionWindow>> windows,
       SessionID active_window_id,
       bool read_error) {
+    if (!for_apps && noventra::ProfileSpacesEnabled()) {
+      PrepareProfileSpaceWindows(profile_, &windows);
+    }
 #if BUILDFLAG(IS_CHROMEOS)
     ash::BootTimesRecorder::Get()->AddLoginTimeMarker(
         "SessionRestore-GotSession", false);
@@ -879,6 +989,11 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
 #endif
       }
 
+      if (noventra::ProfileSpacesEnabled() && is_normal_window) {
+        noventra::RestoreProfileSpaceWindowIdentity(browser, window->extra_data,
+                                                    window->window_id.id());
+      }
+
       // 2. Track TYPE_NORMAL browsers.
       if (is_normal_window) {
         has_normal_browser = true;
@@ -999,7 +1114,10 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
     ash::BootTimesRecorder::Get()->AddLoginTimeMarker(
         "SessionRestore-CreatingTabs-End", false);
 #endif
-    if (browser_to_activate) {
+    if (browser_to_activate &&
+        (!noventra::IncognitoSpaceHost(browser_to_activate) ||
+         noventra::IncognitoSpaceHost(browser_to_activate) ==
+             browser_to_activate)) {
       browser_to_activate->GetWindow()->Activate();
     }
 
@@ -1014,7 +1132,10 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
 
     // Session cookies/storage needed for the session restore have now been
     // recreated by RestoreTab so it's safe to start deleting leftover data.
-    profile_->GetDefaultStoragePartition()->DeleteStaleSessionData();
+    profile_
+        ->GetStoragePartition(
+            noventra::SpaceConfig(profile_, noventra::ProfileSpaceId(profile_)))
+        ->DeleteStaleSessionData();
 
     return last_normal_browser ? last_normal_browser : last_app_browser;
   }
@@ -1166,12 +1287,16 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
     RecordAppLaunchForTab(browser, tab, selected_index);
 
     // Associate sessionStorage (if any) to the restored tab.
+    const auto extra_data = ExtraDataForRestore(tab.extra_data);
     scoped_refptr<content::SessionStorageNamespaceHandle>
         session_storage_namespace;
-    if (!tab.session_storage_persistent_id.empty()) {
+    if ((input_ != RestoreInput::kForeignSession ||
+         !noventra::ProfileSpacesEnabled()) &&
+        !tab.session_storage_persistent_id.empty()) {
       session_storage_namespace =
-          profile_->GetStoragePartition(noventra::SpaceConfig(
-              profile_, noventra::RestoredSpaceId(tab.extra_data)))
+          profile_
+              ->GetStoragePartition(noventra::SpaceConfig(
+                  profile_, noventra::RestoredSpaceId(extra_data)))
               ->GetDOMStorageContext()
               ->RecreateSessionStorage(tab.session_storage_persistent_id);
     }
@@ -1193,11 +1318,10 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
         browser, tab.navigations, tab_index, selected_index,
         tab.extension_app_id, new_group, is_selected_tab, tab.pinned,
         last_active_time_ticks, last_active_time,
-        session_storage_namespace.get(), tab.user_agent_override,
-        tab.extra_data, true /* from_session_restore */, is_active_browser,
-        is_selected_tab
-            ? chrome::RestoredTabLoadPolicy::kLoadIfVisible
-            : chrome::RestoredTabLoadPolicy::kDeferUntilActivation);
+        session_storage_namespace.get(), tab.user_agent_override, extra_data,
+        true /* from_session_restore */, is_active_browser,
+        is_selected_tab ? chrome::RestoredTabLoadPolicy::kLoadIfVisible
+                        : chrome::RestoredTabLoadPolicy::kDeferUntilActivation);
     DCHECK(web_contents);
 
     RestoredTab restored_tab(web_contents, is_selected_tab,
@@ -1365,7 +1489,7 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
     }
 
 #if BUILDFLAG(IS_OZONE)
-    params.restore_id = restore_id;
+    params.restore_id = std::max(0, restore_id);
 #endif
 
     params.initial_show_state = show_state;
@@ -1405,8 +1529,21 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
     }
 
     base::TimeTicks now = base::TimeTicks::Now();
+    auto host_data = extra_data;
+    if (input_ == RestoreInput::kForeignSession) {
+      host_data.erase(noventra::kProfileSpaceHostKey);
+      host_data.erase(noventra::kProfileSpaceOpenKey);
+      host_data.erase(noventra::kProfileSpaceSelectedKey);
+    }
     BrowserWindowInterface* browser_window =
-        CreateBrowserWindow(std::move(params));
+        noventra::IsProfileSpace(profile_) &&
+                type == BrowserWindowInterface::TYPE_NORMAL
+            ? noventra::CreateRestoredProfileSpaceBrowser(
+                  std::move(params), host_data,
+                  input_ == RestoreInput::kForeignSession ? 0 : restore_id,
+                  noventra::IncognitoSpaceHost(browser_))
+            : CreateBrowserWindow(std::move(params));
+    CHECK(browser_window);
     if (auto* manager =
             InitialWebUIWindowMetricsManager::From(browser_window)) {
       manager->SetWindowCreationInfo(
@@ -1424,6 +1561,11 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
         TabStripUserGestureDetails(
             TabStripUserGestureDetails::GestureType::kOther));
 
+    const auto* host = noventra::IncognitoSpaceHost(browser);
+    if (host && host != browser) {
+      BrowserInitState::From(browser)->set_is_session_restore(false);
+      return;
+    }
     if (browser_ == browser) {
       return;
     }
@@ -1520,8 +1662,16 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
     return browser_ &&
            browser_->GetType() == BrowserWindowInterface::Type::TYPE_NORMAL &&
            !browser_->GetProfile()->IsOffTheRecord() &&
+           !noventra::IsProfileSpace(browser_->GetProfile()) &&
            browser_->GetWindow()->IsVisible();
   }
+
+  enum class RestoreInput {
+    kNativeSession,
+    kForeignSession,
+    kPreparedProfileSpace,
+  };
+  RestoreInput input_ = RestoreInput::kNativeSession;
 
   // The profile to create the sessions for.
   raw_ptr<Profile> profile_;
@@ -1596,6 +1746,110 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
 };
 
 // SessionRestore -------------------------------------------------------------
+
+void SessionRestore::CacheProfileSpaceSession(
+    const base::FilePath& profile_path,
+    std::vector<std::unique_ptr<sessions::SessionWindow>> windows,
+    SessionID active_window_id) {
+  CHECK(noventra::ProfileSpacesEnabled());
+  CHECK(profile_path.IsAbsolute());
+  auto& cache = PreparedSpaceSessions();
+  CHECK(!cache.prepared.contains(profile_path));
+  CHECK(!cache.processing.contains(profile_path));
+  CHECK(!cache.consumed.contains(profile_path));
+  cache.prepared.emplace(
+      profile_path,
+      PreparedProfileSpaceSession{std::move(windows), active_window_id});
+}
+
+bool SessionRestore::HasPendingProfileSpaceSession(Profile* profile) {
+  if (!profile) {
+    return false;
+  }
+  const auto& cache = PreparedSpaceSessions();
+  return cache.prepared.contains(profile->GetPath()) ||
+         cache.processing.contains(profile->GetPath());
+}
+
+SessionRestore::ProfileSpaceSessionResult
+SessionRestore::RestoreProfileSpaceSession(Profile* profile,
+                                           BrowserWindowInterface* browser) {
+  if (!noventra::ProfileSpacesEnabled() || !noventra::IsProfileSpace(profile) ||
+      !browser || browser->GetProfile() != profile ||
+      profile->IsOffTheRecord() || profile->ShutdownStarted() ||
+      IsRestoring(profile)) {
+    return ProfileSpaceSessionResult::kUnavailable;
+  }
+  auto& cache = PreparedSpaceSessions();
+  const auto profile_path = profile->GetPath();
+  if (cache.processing.contains(profile_path)) {
+    return ProfileSpaceSessionResult::kUnavailable;
+  }
+  auto found = cache.prepared.find(profile_path);
+  if (found == cache.prepared.end()) {
+    if (cache.consumed.contains(profile->GetPath()) ||
+        (noventra::ProfileSpaceStorage(profile) ==
+             noventra::SpaceProfileStorage::kDefault &&
+         profile->GetPrefs()->GetInitializationStatus() ==
+             PrefService::INITIALIZATION_STATUS_CREATED_NEW_PREF_STORE)) {
+      return ProfileSpaceSessionResult::kNoSession;
+    }
+    return ProfileSpaceSessionResult::kUnavailable;
+  }
+  auto prepared = std::move(found->second);
+  cache.prepared.erase(found);
+  cache.processing.insert(profile_path);
+  auto finish_restore = [&] {
+    cache.processing.erase(profile_path);
+    cache.consumed.insert(profile_path);
+    if (auto* service =
+            SessionServiceFactory::GetForProfileIfExisting(profile)) {
+      service->RefreshSavingEnabled();
+    }
+  };
+  if (prepared.windows.empty()) {
+    finish_restore();
+    return ProfileSpaceSessionResult::kNoSession;
+  }
+  profile->set_restored_last_session(true);
+  SessionRestoreImpl restorer(profile, browser, true, false, false,
+                              /*restore_apps=*/false,
+                              /*restore_browser=*/true,
+                              /*log_event=*/false, StartupTabs());
+  if (!restorer.RestorePreparedProfileSpace(std::move(prepared.windows),
+                                            prepared.active_window_id) ||
+      profile->ShutdownStarted()) {
+    // Keep saving disabled. The original native session or immutable recovery
+    // seed remains on disk for the next startup after unsuccessful replay.
+    return ProfileSpaceSessionResult::kUnavailable;
+  }
+  // Permit a full snapshot of the materialized browsers. The native backend's
+  // final initial-state marker, rather than this callback, commits that state.
+  finish_restore();
+  return ProfileSpaceSessionResult::kRestored;
+}
+
+void SessionRestore::SetProfileSpaceStartupSelection(
+    const base::FilePath& root_profile_path,
+    const std::string& space_id) {
+  CHECK(noventra::ProfileSpacesEnabled());
+  CHECK(root_profile_path.IsAbsolute());
+  CHECK(base::Uuid::ParseLowercase(space_id).is_valid());
+  PreparedSpaceSessions().startup_selection[root_profile_path] = space_id;
+}
+
+std::optional<std::string> SessionRestore::TakeProfileSpaceStartupSelection(
+    Profile* root_profile) {
+  auto& selection = PreparedSpaceSessions().startup_selection;
+  auto found =
+      root_profile ? selection.find(root_profile->GetPath()) : selection.end();
+  if (found == selection.end()) {
+    return std::nullopt;
+  }
+  auto id = std::move(found->second);
+  selection.erase(found);
+  return id;
+}
 
 // static
 BrowserWindowInterface* SessionRestore::RestoreSession(

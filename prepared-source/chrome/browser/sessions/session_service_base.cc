@@ -65,6 +65,7 @@
 #include "ui/base/mojom/window_show_state.mojom.h"
 
 #if !BUILDFLAG(IS_ANDROID)
+#include "chrome/browser/ui/noventra/incognito_space_host.h"
 #include "chrome/browser/ui/noventra/pinned_tab_state.h"
 #include "chrome/browser/ui/noventra/window_mirror_service.h"
 #endif
@@ -791,6 +792,16 @@ void SessionServiceBase::BuildCommandsForBrowser(
                                                     key, value));
     }
   }
+
+#if !BUILDFLAG(IS_ANDROID)
+  std::map<std::string, std::string> space_window_data;
+  noventra::PopulateProfileSpaceWindowExtraData(browser, &space_window_data);
+  for (const auto& [key, value] : space_window_data) {
+    command_storage_manager()->AppendRebuildCommand(
+        sessions::CreateAddWindowExtraDataCommand(browser->GetSessionID(), key,
+                                                  value));
+  }
+#endif
 
   // Set the visual data for each tab group.
   TabStripModel* tab_strip = browser->GetTabStripModel();

@@ -7,6 +7,7 @@
 #include <set>
 #include <utility>
 
+#include "base/barrier_closure.h"
 #include "base/base64url.h"
 #include "base/files/file.h"
 #include "base/files/file_util.h"
@@ -28,6 +29,7 @@
 #endif
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/profiles/noventra_account_spaces.h"
+#include "chrome/browser/profiles/noventra_space_profile_registry.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_keyed_service_factory.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
@@ -37,11 +39,11 @@
 #include "chrome/browser/ui/noventra_commands.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/common/chrome_constants.h"
+#include "components/noventra_sync_vault/sync_vault_store.h"
 #include "components/os_crypt/async/browser/os_crypt_async.h"
 #include "components/os_crypt/async/common/encryptor.h"
 #include "components/prefs/pref_service.h"
 #include "components/sync/engine/cancelation_signal.h"
-#include "components/noventra_sync_vault/sync_vault_store.h"
 
 namespace noventra {
 namespace {
@@ -151,10 +153,30 @@ std::string StoreError(noventra_sync::SyncVaultStoreError error) {
   }
 }
 
-base::DictValue ReadModelPrefs(PrefService& prefs) {
+PrefService* ModelPrefs(Profile* profile, std::string_view key) {
+  auto* owner = key == kDockLayoutPref ? profile : SpaceCatalogProfile(profile);
+  return owner ? owner->GetPrefs() : nullptr;
+}
+
+base::DictValue ReadModelPrefs(Profile* profile) {
   base::DictValue result;
   for (const auto* key : kModelPrefs) {
-    result.Set(key, prefs.GetValue(key).Clone());
+    auto* prefs = ModelPrefs(profile, key);
+    if (!prefs) {
+      return {};
+    }
+    result.Set(key, prefs->GetValue(key).Clone());
+  }
+  return result;
+}
+
+WorkspaceSyncPrefWrites ExpectedModelWrites(Profile* profile) {
+  WorkspaceSyncPrefWrites result;
+  for (const auto* key : kModelPrefs) {
+    auto* owner =
+        key == kDockLayoutPref ? profile : SpaceCatalogProfile(profile);
+    CHECK(owner);
+    result[owner->GetPath()].Set(key, owner->GetPrefs()->GetValue(key).Clone());
   }
   return result;
 }
@@ -164,7 +186,8 @@ bool CanWriteModel(Profile* profile) {
     return false;
   }
   for (const auto* key : kModelPrefs) {
-    const auto* pref = profile->GetPrefs()->FindPreference(key);
+    auto* prefs = ModelPrefs(profile, key);
+    const auto* pref = prefs ? prefs->FindPreference(key) : nullptr;
     if (!pref || !pref->IsUserModifiable()) {
       return false;
     }
@@ -219,6 +242,11 @@ base::expected<WorkspaceSyncSnapshot, std::string> Capture(
   }
   WorkspaceSyncSnapshot snapshot;
   auto& prefs = *profile->GetPrefs();
+  auto* catalog = SpaceCatalogProfile(profile);
+  if (!catalog) {
+    return base::unexpected("sync_awaiting_window");
+  }
+  auto& catalog_prefs = *catalog->GetPrefs();
   snapshot.capabilities = GetLayoutCapabilities(prefs);
   auto saved_layout =
       ValidateLayout(base::Value(prefs.GetDict(kDockLayoutPref).Clone()),
@@ -236,14 +264,18 @@ base::expected<WorkspaceSyncSnapshot, std::string> Capture(
       known.push_back(id);
     }
   };
-  for (const auto [id, name] : prefs.GetDict(kSpacesPref)) {
+  for (const auto& id : RegisteredSpaceIds(catalog)) {
+    add(id);
+  }
+  for (const auto [id, name] : catalog_prefs.GetDict(kSpacesPref)) {
     if (name.is_string()) {
       add(id);
     }
   }
   GlobalBrowserCollection::GetInstance()->ForEach(
       [&](BrowserWindowInterface* candidate) {
-        if (candidate->GetProfile() == profile &&
+        if (!candidate->GetProfile()->IsOffTheRecord() &&
+            SpaceCatalogProfile(candidate->GetProfile()) == catalog &&
             candidate->GetTabStripModel()) {
           for (int i = 0; i < candidate->GetTabStripModel()->count(); ++i) {
             add(SpaceId(candidate->GetTabStripModel()->GetWebContentsAt(i)));
@@ -252,7 +284,7 @@ base::expected<WorkspaceSyncSnapshot, std::string> Capture(
         return true;
       });
   std::vector<std::string> ids;
-  for (const auto& value : prefs.GetList(kSpaceOrderPref)) {
+  for (const auto& value : catalog_prefs.GetList(kSpaceOrderPref)) {
     if (value.is_string() &&
         std::ranges::find(known, value.GetString()) != known.end() &&
         std::ranges::find(ids, value.GetString()) == ids.end()) {
@@ -268,12 +300,12 @@ base::expected<WorkspaceSyncSnapshot, std::string> Capture(
     return base::unexpected("too_many_local_workspaces");
   }
   for (const auto& id : ids) {
-    const auto* name = prefs.GetDict(kSpacesPref).FindString(id);
+    const auto* name = catalog_prefs.GetDict(kSpacesPref).FindString(id);
     snapshot.local.spaces.push_back(
         {id, name ? *name : (id.empty() ? "Personal" : "Account space"),
          IsSpaceArchived(profile, id)});
   }
-  snapshot.prefs = ReadModelPrefs(prefs);
+  snapshot.prefs = ReadModelPrefs(profile);
   return snapshot;
 }
 
@@ -712,7 +744,7 @@ class WorkspaceSyncWorker {
     return Reply("conflict", std::move(error));
   }
 
-  WorkspaceSyncReply FinishApply(base::DictValue expected) {
+  WorkspaceSyncReply FinishApply(WorkspaceSyncPrefWrites expected) {
     if (cancelation_->IsSignalled()) {
       return Reply("error", "sync_aborted");
     }
@@ -723,28 +755,32 @@ class WorkspaceSyncWorker {
     // CommitPendingWrite's callback is just a sequencing barrier and has no
     // success bit. Independently read back exactly the affected persisted prefs
     // and flush their file before clearing the durable replay intent.
-    const auto preferences_path =
-        profile_path_.Append(chrome::kPreferencesFilename);
-    std::string bytes;
-    if (!base::ReadFileToStringWithMaxSize(preferences_path, &bytes,
-                                           64 * 1024 * 1024)) {
+    if (expected.empty()) {
       return Reply("error", "sync_storage_error");
     }
-    auto disk = base::JSONReader::ReadDict(bytes, base::JSON_PARSE_RFC);
-    if (!disk) {
-      return Reply("error", "sync_storage_error");
-    }
-    for (const auto* key : kModelPrefs) {
-      const auto* value = disk->FindByDottedPath(key);
-      if (!value || !expected.Find(key) || *value != *expected.Find(key)) {
-        return Reply("error", "sync_preferences_not_durable");
+    for (const auto& [owner, expected_prefs] : expected) {
+      const auto preferences_path = owner.Append(chrome::kPreferencesFilename);
+      std::string bytes;
+      if (!base::ReadFileToStringWithMaxSize(preferences_path, &bytes,
+                                             64 * 1024 * 1024)) {
+        return Reply("error", "sync_storage_error");
       }
-    }
-    base::File file(preferences_path, base::File::FLAG_OPEN |
-                                          base::File::FLAG_READ |
-                                          base::File::FLAG_WRITE);
-    if (!file.IsValid() || !file.Flush() || !FlushDirectory(profile_path_)) {
-      return Reply("error", "sync_storage_error");
+      auto disk = base::JSONReader::ReadDict(bytes, base::JSON_PARSE_RFC);
+      if (!disk) {
+        return Reply("error", "sync_storage_error");
+      }
+      for (const auto [key, expected_value] : expected_prefs) {
+        const auto* value = disk->FindByDottedPath(key);
+        if (!value || *value != expected_value) {
+          return Reply("error", "sync_preferences_not_durable");
+        }
+      }
+      base::File file(preferences_path, base::File::FLAG_OPEN |
+                                            base::File::FLAG_READ |
+                                            base::File::FLAG_WRITE);
+      if (!file.IsValid() || !file.Flush() || !FlushDirectory(owner)) {
+        return Reply("error", "sync_storage_error");
+      }
     }
     auto document = pending->FindDict("document")->Clone();
     // Detach removed logical spaces only after their physical locals have
@@ -891,7 +927,8 @@ class WorkspaceSyncWorker {
     return valid;
   }
 
-  static base::DictValue HeadIdentity(const noventra_sync::SyncVaultState& remote) {
+  static base::DictValue HeadIdentity(
+      const noventra_sync::SyncVaultState& remote) {
     return base::DictValue()
         .Set("revision", remote.head_revision.value_or(""))
         .Set("generation", base::NumberToString(remote.head.generation))
@@ -1141,10 +1178,19 @@ WorkspaceSyncService::WorkspaceSyncService(Profile* profile)
       status_(EmptyStatus()) {
   status_.Set("state", "initializing");
   prefs_registrar_.Init(profile_->GetPrefs());
+  auto* catalog = SpaceCatalogProfile(profile_);
+  if (catalog) {
+    catalog_prefs_registrar_.Init(catalog->GetPrefs());
+  }
   for (const auto* key : kModelPrefs) {
-    prefs_registrar_.Add(
-        key, base::BindRepeating(&WorkspaceSyncService::OnLocalChange,
-                                 weak_factory_.GetWeakPtr()));
+    auto* registrar = std::string_view(key) == kDockLayoutPref
+                          ? &prefs_registrar_
+                          : &catalog_prefs_registrar_;
+    if (ModelPrefs(profile_, key)) {
+      registrar->Add(key,
+                     base::BindRepeating(&WorkspaceSyncService::OnLocalChange,
+                                         weak_factory_.GetWeakPtr()));
+    }
   }
   // Merely launching an unconfigured browser must not prompt for its keyring.
   base::ThreadPool::PostTaskAndReplyWithResult(
@@ -1460,6 +1506,15 @@ void WorkspaceSyncService::OnReply(uint64_t operation,
     return;
   }
   auto& prefs = *profile_->GetPrefs();
+  auto* catalog = SpaceCatalogProfile(profile_);
+  if (!catalog) {
+    worker_.AsyncCall(&WorkspaceSyncWorker::RejectApply)
+        .WithArgs("sync_awaiting_window")
+        .Then(base::BindOnce(&WorkspaceSyncService::OnReply,
+                             weak_factory_.GetWeakPtr(), operation));
+    return;
+  }
+  auto& catalog_prefs = *catalog->GetPrefs();
   auto& plan = *reply.apply;
   auto checked =
       ValidateWorkspaceSyncDocument(WorkspaceSyncDocumentToValue(plan.document),
@@ -1467,7 +1522,7 @@ void WorkspaceSyncService::OnReply(uint64_t operation,
   std::string error;
   if (!CanWriteModel(profile_) || !checked.has_value()) {
     error = "workspace_settings_managed";
-  } else if (!CanReplay(ReadModelPrefs(prefs), plan.before, plan.after)) {
+  } else if (!CanReplay(ReadModelPrefs(profile_), plan.before, plan.after)) {
     error = "sync_local_changed";
   }
   if (!error.empty()) {
@@ -1492,8 +1547,8 @@ void WorkspaceSyncService::OnReply(uint64_t operation,
   if (error.empty()) {
     const auto& names = *plan.after.FindDict(kSpacesPref);
     const auto& order = *plan.after.FindList(kSpaceOrderPref);
-    prefs.SetDict(kSpacesPref, names.Clone());
-    prefs.SetList(kSpaceOrderPref, order.Clone());
+    catalog_prefs.SetDict(kSpacesPref, names.Clone());
+    catalog_prefs.SetList(kSpaceOrderPref, order.Clone());
     for (const auto& space : plan.document.spaces) {
       const auto& id = plan.mapping.at(space.id);
       if (id.empty()) {
@@ -1503,7 +1558,7 @@ void WorkspaceSyncService::OnReply(uint64_t operation,
       if (space.archived) {
         GlobalBrowserCollection::GetInstance()->ForEach(
             [&](BrowserWindowInterface* candidate) {
-              if (candidate->GetProfile()->GetOriginalProfile() == profile_ &&
+              if (SpaceCatalogProfile(candidate->GetProfile()) == catalog &&
                   candidate->GetTabStripModel() &&
                   SpaceId(
                       candidate->GetTabStripModel()->GetActiveWebContents()) ==
@@ -1525,8 +1580,8 @@ void WorkspaceSyncService::OnReply(uint64_t operation,
   if (error.empty()) {
     // Persist effective empty defaults too: a missing disk entry must not be
     // mistaken for proof that a non-default write completed.
-    prefs.SetList(kArchivedSpacesPref,
-                  plan.after.FindList(kArchivedSpacesPref)->Clone());
+    catalog_prefs.SetList(kArchivedSpacesPref,
+                          plan.after.FindList(kArchivedSpacesPref)->Clone());
     prefs.SetDict(kDockLayoutPref, prefs.GetDict(kDockLayoutPref).Clone());
   }
   applying_ = false;
@@ -1539,13 +1594,19 @@ void WorkspaceSyncService::OnReply(uint64_t operation,
   }
   // Native ApplyLayout advances only the local edit revision and its existing
   // pref observer delivers noventra-layout-changed to any open editor.
-  prefs.CommitPendingWrite(base::BindOnce(&WorkspaceSyncService::OnPrefsWritten,
+  auto written =
+      base::BarrierClosure(&prefs == &catalog_prefs ? 1 : 2,
+                           base::BindOnce(&WorkspaceSyncService::OnPrefsWritten,
                                           weak_factory_.GetWeakPtr(), operation,
-                                          ReadModelPrefs(prefs)));
+                                          ExpectedModelWrites(profile_)));
+  prefs.CommitPendingWrite(written);
+  if (&prefs != &catalog_prefs) {
+    catalog_prefs.CommitPendingWrite(written);
+  }
 }
 
 void WorkspaceSyncService::OnPrefsWritten(uint64_t operation,
-                                          base::DictValue expected) {
+                                          WorkspaceSyncPrefWrites expected) {
   if (shutdown_ || operation != operation_) {
     return;
   }
@@ -1633,6 +1694,7 @@ void WorkspaceSyncService::Shutdown() {
   debounce_timer_.Stop();
   initialization_timer_.Stop();
   prefs_registrar_.RemoveAll();
+  catalog_prefs_registrar_.RemoveAll();
   weak_factory_.InvalidateWeakPtrs();
   if (callback_) {
     std::move(callback_).Run(base::unexpected("sync_aborted"));

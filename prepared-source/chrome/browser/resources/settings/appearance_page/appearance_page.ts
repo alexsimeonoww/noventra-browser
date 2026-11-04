@@ -99,6 +99,7 @@ const NOVENTRA_SECTIONS = {
 } as const;
 type NoventraSection = typeof NOVENTRA_SECTIONS[keyof typeof NOVENTRA_SECTIONS];
 interface NoventraSpace {
+  profileIsolated?: boolean;
   id: string; name: string; archived: boolean;
   color: string; icon: string; theme: string;
   appearanceEditable: boolean; themeEditable: boolean;

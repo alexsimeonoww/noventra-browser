@@ -1,8 +1,9 @@
+#include "chrome/browser/profiles/noventra_account_spaces.h"
+#include "chrome/browser/profiles/noventra_space_profile_registry.h"
 #include "chrome/browser/ui/noventra/incognito_space_host.h"
-#include "chrome/browser/ui/views/frame/noventra_window_mirror_view.h"
 #include "chrome/browser/ui/noventra/window_mirror_service.h"
 #include "chrome/browser/ui/noventra_commands.h"
-#include "chrome/browser/profiles/noventra_account_spaces.h"
+#include "chrome/browser/ui/views/frame/noventra_window_mirror_view.h"
 // Copyright 2012 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -550,7 +551,11 @@ void MoveTabsToWindowImpl(BrowserWindowInterface* source,
 BrowserWindowInterface* CreateNewBrowser(BrowserWindowInterface* browser,
                                          bool user_gesture) {
   auto params = BrowserWindowCreateParams(browser->GetProfile(), user_gesture);
-  return CreateBrowserWindow(std::move(params));
+  return noventra::IsProfileSpace(browser->GetProfile()) &&
+                 !browser->GetProfile()->IsOffTheRecord()
+             ? noventra::CreateRestoredProfileSpaceBrowser(std::move(params),
+                                                           {}, 0)
+             : CreateBrowserWindow(std::move(params));
 }
 
 struct MruTabResult {
@@ -1023,7 +1028,14 @@ BrowserWindowInterface* OpenEmptyWindow(Profile* profile,
   params.should_trigger_session_restore = should_trigger_session_restore;
 
   base::TimeTicks now = base::TimeTicks::Now();
-  BrowserWindowInterface* browser = CreateBrowserWindow(std::move(params));
+  BrowserWindowInterface* browser =
+      noventra::IsProfileSpace(profile) && !profile->IsOffTheRecord()
+          ? noventra::CreateRestoredProfileSpaceBrowser(std::move(params), {},
+                                                        0)
+          : CreateBrowserWindow(std::move(params));
+  if (!browser) {
+    return nullptr;
+  }
   if (auto* manager = InitialWebUIWindowMetricsManager::From(browser)) {
     manager->SetWindowCreationInfo(
         waap::NewWindowCreationSource::kBrowserInitiated, now);
@@ -2077,9 +2089,7 @@ void ConvertPopupToTabbedBrowser(BrowserWindowInterface* browser) {
   // will trigger OnShutdownStarting for Window close. Create the new browser
   // object first, before removing the existing object from the browser-list in
   // order to avoid incorrectly triggering a shutdown.
-  BrowserWindowInterface* new_tabbed_browser =
-      CreateBrowserWindow(BrowserWindowCreateParams(
-          *browser->GetProfile(), /*from_user_gesture=*/true));
+  BrowserWindowInterface* new_tabbed_browser = CreateNewBrowser(browser, true);
   // This method moves a WebContents from a non-normal browser window to a
   // normal browser window. We cannot move the Tab over directly since TabModel
   // enforces the requirement that it cannot move between window types.
@@ -3030,8 +3040,7 @@ BrowserWindowInterface* OpenInChrome(
           ->FindTabbedBrowser();
 
   if (!target_browser) {
-    target_browser = CreateBrowserWindow(
-        BrowserWindowCreateParams(hosted_app_browser->GetProfile(), true));
+    target_browser = CreateNewBrowser(hosted_app_browser, true);
   }
 
   base::WeakPtr<BrowserWindowInterface> target_browser_weak =
@@ -3291,11 +3300,14 @@ void SaveSpaceOrder(PrefService* prefs, const std::vector<std::string>& order) {
 // spaces. An order/archive entry alone is never evidence that a space exists.
 std::vector<std::string> KnownSpaceIds(BrowserWindowInterface* browser) {
   std::vector<std::string> ids = {""};
-  Profile* profile = browser->GetProfile();
+  Profile* profile = SpaceCatalogProfile(browser->GetProfile());
   for (const auto [id, name] : profile->GetPrefs()->GetDict(kSpacesPref)) {
     if (name.is_string()) {
       AppendSpaceId(ids, id);
     }
+  }
+  for (const auto& id : RegisteredSpaceIds(profile)) {
+    AppendSpaceId(ids, id);
   }
   const auto discover = [&](BrowserWindowInterface* candidate) {
     if (candidate->GetProfile() == profile) {
@@ -3316,12 +3328,14 @@ std::vector<std::string> KnownSpaceIds(BrowserWindowInterface* browser) {
 }  // namespace
 
 bool IsSpaceArchived(Profile* profile, const std::string& id) {
+  profile = SpaceCatalogProfile(profile);
   return profile && !id.empty() && IsValidSpaceId(id) &&
          profile->GetPrefs()->FindPreference(kArchivedSpacesPref) &&
          profile->GetPrefs()->GetList(kArchivedSpacesPref).contains(id);
 }
 
 bool CanManageSpaces(Profile* profile) {
+  profile = SpaceCatalogProfile(profile);
   if (!profile) {
     return false;
   }
@@ -3380,6 +3394,7 @@ const SpaceTheme* GetSpaceTheme(BrowserWindowInterface* browser) {
 }
 
 SpaceAppearance GetSpaceAppearance(Profile* profile, const std::string& id) {
+  profile = SpaceCatalogProfile(profile);
   SpaceAppearance result;
   if (!profile || !IsValidSpaceId(id)) {
     return result;
@@ -3416,7 +3431,7 @@ bool SetSpaceAppearance(BrowserWindowInterface* browser,
       (theme != "browser" && !FindSpaceTheme(theme))) {
     return false;
   }
-  auto* prefs = browser->GetProfile()->GetPrefs();
+  auto* prefs = SpaceCatalogProfile(browser->GetProfile())->GetPrefs();
   if (!prefs->FindPreference(kSpaceAppearancePref) ||
       prefs->IsManagedPreference(kSpaceAppearancePref)) {
     return false;
@@ -3453,7 +3468,7 @@ std::vector<std::string> SpaceIds(BrowserWindowInterface* browser,
   if (auto* host = IncognitoSpaceHost(browser); host && host != browser) {
     return SpaceIds(host, include_archived);
   }
-  Profile* profile = browser->GetProfile();
+  Profile* profile = SpaceCatalogProfile(browser->GetProfile());
   auto* prefs = profile->GetPrefs();
   const auto known = KnownSpaceIds(browser);
   auto order = ReadSpaceOrder(prefs);
@@ -3486,6 +3501,9 @@ std::string CurrentSpaceId(BrowserWindowInterface* browser) {
   if (!browser) return {};
   const auto private_id = IncognitoSpaceId(browser);
   if (!private_id.empty()) return private_id;
+  if (IsProfileSpace(browser->GetProfile())) {
+    return ProfileSpaceId(browser->GetProfile());
+  }
   if (auto* mirror = WindowMirrorService::GetForProfile(browser->GetProfile());
       mirror && mirror->IsEnrolled(browser)) {
     return mirror->SelectedSpace(browser);
@@ -3504,7 +3522,7 @@ bool SetSpaceName(BrowserWindowInterface* browser,
       !base::IsStringUTF8(trimmed)) {
     return false;
   }
-  auto* prefs = browser->GetProfile()->GetPrefs();
+  auto* prefs = SpaceCatalogProfile(browser->GetProfile())->GetPrefs();
   const auto known = KnownSpaceIds(browser);
   const bool exists = std::ranges::find(known, id) != known.end();
   auto order = ReadSpaceOrder(prefs);
@@ -3543,7 +3561,7 @@ bool MoveSpace(BrowserWindowInterface* browser,
       std::ranges::find(known, target) == known.end()) {
     return false;
   }
-  auto* prefs = browser->GetProfile()->GetPrefs();
+  auto* prefs = SpaceCatalogProfile(browser->GetProfile())->GetPrefs();
   auto order = ReadSpaceOrder(prefs);
   for (const auto& known_id : known) {
     AppendSpaceId(order, known_id);
@@ -3562,7 +3580,7 @@ bool SetSpaceArchived(BrowserWindowInterface* browser,
       !IsValidSpaceId(id)) {
     return false;
   }
-  Profile* profile = browser->GetProfile();
+  Profile* profile = SpaceCatalogProfile(browser->GetProfile());
   const auto known = KnownSpaceIds(browser);
   if (std::ranges::find(known, id) == known.end()) {
     return false;
@@ -3590,8 +3608,7 @@ bool SetSpaceArchived(BrowserWindowInterface* browser,
       // Regular-profile prefs may be inherited by an off-the-record window.
       // Respect each window's effective archive pref, without mixing its tabs
       // or its account partition with the regular profile's contents.
-      if (candidate->GetProfile()->GetOriginalProfile() ==
-          profile->GetOriginalProfile()) {
+      if (SpaceCatalogProfile(candidate->GetProfile()) == profile) {
         auto* model = candidate->GetTabStripModel();
         if (model && !candidate->IsDeleteScheduled() && !model->closing_all() &&
             SpaceId(model->GetActiveWebContents()) == id &&
@@ -3611,6 +3628,9 @@ void SwitchSpace(BrowserWindowInterface* browser, const std::string& id) {
   if (!browser || browser->IsDeleteScheduled() ||
       !browser->GetTabStripModel() ||
       browser->GetTabStripModel()->closing_all()) {
+    return;
+  }
+  if (SelectProfileSpace(browser, id)) {
     return;
   }
   if (IncognitoSpaceHost(browser)) {

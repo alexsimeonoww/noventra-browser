@@ -122,7 +122,8 @@ std::unique_ptr<BrowserFrameView> CreateBrowserFrameViewWin(
 std::unique_ptr<BrowserFrameView> CreateBrowserFrameView(
     BrowserWidget* widget,
     BrowserView* browser_view) {
-  if (!noventra::IncognitoSpaceId(browser_view->browser()).empty()) {
+  if (auto* host = noventra::IncognitoSpaceHost(browser_view->browser());
+      host && host != browser_view->browser()) {
     auto frame = std::make_unique<OpaqueBrowserFrameView>(
         widget, browser_view, new OpaqueBrowserFrameViewLayout());
     frame->InitViews();

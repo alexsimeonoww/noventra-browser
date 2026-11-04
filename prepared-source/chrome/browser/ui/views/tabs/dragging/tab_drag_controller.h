@@ -152,6 +152,10 @@ class TabDragController : public views::WidgetObserver,
   // Returns true if there is a drag underway.
   static bool IsActive();
 
+  // Includes finalization after IsActive() becomes false. The empty temporary
+  // browser must close rather than acquire a regular Space's replacement tab.
+  static bool IsNewBrowserForDrag(BrowserWindowInterface* browser);
+
   // Called when `browser`'s tab strip becomes empty. If a touch drag session is
   // active, takes ownership of closing `browser` (deferring it until the drag
   // completes) and returns true. Returns false if the caller should close
@@ -671,6 +675,8 @@ class TabDragController : public views::WidgetObserver,
   // True if `attached_context_` is in a browser specifically created for
   // the drag.
   bool is_dragging_new_browser_;
+
+  std::vector<base::WeakPtr<BrowserWindowInterface>> created_drag_browsers_;
 
   // True if `source_context_` was maximized before the drag.
   bool was_source_maximized_;
