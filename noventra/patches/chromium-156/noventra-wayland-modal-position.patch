@@ -1,0 +1,14 @@
+diff --git a/chrome/browser/ui/views/chrome_javascript_app_modal_view_factory_views.cc b/chrome/browser/ui/views/chrome_javascript_app_modal_view_factory_views.cc
+--- a/chrome/browser/ui/views/chrome_javascript_app_modal_view_factory_views.cc
++++ b/chrome/browser/ui/views/chrome_javascript_app_modal_view_factory_views.cc
+@@ -83,6 +83,10 @@
+ };
+ 
+ void AdjustWidgetBoundsIfOffscreen(views::Widget* widget) {
++  if (!constrained_window::SupportsGlobalScreenCoordinates()) {
++    return;
++  }
++
+   gfx::Rect widget_bounds = widget->GetWindowBoundsInScreen();
+   gfx::Rect screen_rect =
+       display::Screen::Get()

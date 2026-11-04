@@ -83,6 +83,10 @@ class ChromeJavaScriptAppModalDialogViews
 };
 
 void AdjustWidgetBoundsIfOffscreen(views::Widget* widget) {
+  if (!constrained_window::SupportsGlobalScreenCoordinates()) {
+    return;
+  }
+
   gfx::Rect widget_bounds = widget->GetWindowBoundsInScreen();
   gfx::Rect screen_rect =
       display::Screen::Get()

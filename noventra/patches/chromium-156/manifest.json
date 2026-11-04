@@ -278,7 +278,7 @@
     "chrome/browser/ui/views/bookmarks/bookmark_bar_view.cc": "d4dee84d8d7db1628483460901b296e283656c34100a56e341da59cc9e01310f",
     "chrome/browser/ui/views/bookmarks/bookmark_menu_delegate.cc": "75b3666aa8d6d76b2a2d245adade3f93447dd6364af126941b976fbb3436c15f",
     "chrome/browser/ui/views/bookmarks/bookmark_menu_delegate.h": "7731f4ed23ede911219aa93af4900047fe3a85b6e8be50d19325850df63041a5",
-    "chrome/browser/ui/views/chrome_javascript_app_modal_view_factory_views.cc": "d8517ab87e330c03d03fa21106b447cb3e5b12159918d0f2bad59a3fc14d5e94",
+    "chrome/browser/ui/views/chrome_javascript_app_modal_view_factory_views.cc": "daac5fe502a2fbe95eaed0b434cd661c2ae6043bda170ea08ea0fde97b630df2",
     "chrome/browser/ui/views/chrome_layout_provider.cc": "847a24dba4a5307b7d90dc13809bcef5f4f2cdae31c3363d8873a51b917656f5",
     "chrome/browser/ui/views/extensions/extension_popup.cc": "d37f603cb6c58d9d6c217edaca8be07dc5927975e95a0516a142c44a0f899fc9",
     "chrome/browser/ui/views/extensions/extensions_toolbar_button.cc": "868bf90f5498daab7cd8fd486c5437572945fe3ba0970805b2465a41b5e8f66c",
@@ -779,6 +779,10 @@
     {
       "file": "noventra-sidebar-space-capacity-animation.patch",
       "sha256": "f8da0079d1cc1445958a88fa19b3a8973ce1a3f5a4e3920b0f4b6bfe4f7d18a8"
+    },
+    {
+      "file": "noventra-wayland-modal-position.patch",
+      "sha256": "aee7e20f0216e7d42135770f180b9368458602820e0c737a034e4ede4b4a2294"
     }
   ],
   "pristine_files": {
@@ -1533,7 +1537,7 @@
     "wordmark.svg": "a8b007ca4d0a67c33a2426b2db320d5561ba960cab8f2baa46500c1af65ba803"
   },
   "schema": 1,
-  "series_sha256": "c76ba07d0cbaf245862993be5bd7c2fd7933ae8d729ba5bc295c8859e4cf0245",
+  "series_sha256": "075840d59c84f1d3f8df6210984517e65f0989dedc9f6328133c4d798d8ab631",
   "tooling": {
     ".github/scripts/build.sh": "fd92ff208ef7439765d7b3a5b89b422234abf7408137646e4d615e68df128537",
     "docker/build.Dockerfile": "f133ae4b6340e0bfc42338e6bd1d42d85d8a850652aa10dba6e37f82fe3ca080",
