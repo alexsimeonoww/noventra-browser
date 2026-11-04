@@ -14,6 +14,7 @@
 #include <utility>
 #include <variant>
 
+#include "base/auto_reset.h"
 #include "base/callback_list.h"
 #include "base/check_is_test.h"
 #include "base/containers/map_util.h"
@@ -159,7 +160,14 @@ class Animator : public views::AnimationDelegateViews {
     animation_.Start();
   }
 
-  void Stop() { animation_.Stop(); }
+  void Stop() {
+    // GroupData sends its own completion/cancellation notification. In
+    // particular, stopping during the final progress callback must not send a
+    // second AnimationEnded callback back into the group.
+    animation_.set_delegate(nullptr);
+    animation_.Stop();
+    animation_.set_delegate(this);
+  }
 
   void SetAnimationContainerForTesting(gfx::AnimationContainer* container) {
     animation_.SetContainer(container);
@@ -488,6 +496,7 @@ class BrowserAnimationController::GroupData : public gfx::AnimationDelegate {
   void Start(BrowserAnimationMotion motion, MotionInfo motion_info) {
     const auto params = GetParamsLookup();
     OnCancel(params);
+    const size_t generation = ++motion_generation_;
     current_motion_ = motion;
     current_motion_info_ = std::move(motion_info);
     UpdateCurrentValues(base::Milliseconds(0), 0.0, params);
@@ -498,7 +507,9 @@ class BrowserAnimationController::GroupData : public gfx::AnimationDelegate {
       Notify(BrowserAnimationUpdate::kStarted);
     } else {
       Notify(BrowserAnimationUpdate::kStarted);
-      OnAnimationEnded(params);
+      if (motion_generation_ == generation) {
+        OnAnimationEnded(params);
+      }
     }
   }
 
@@ -509,7 +520,9 @@ class BrowserAnimationController::GroupData : public gfx::AnimationDelegate {
       OnCancel(params);
       current_motion_ = motion;
       current_motion_info_ = std::move(motion_info);
-    } else if (animator_) {
+    }
+    ++motion_generation_;
+    if (animator_) {
       // Completing the current motion must also remove its scheduled ticks.
       // Otherwise the next frame runs after OnAnimationEnded clears the motion.
       animator_->Stop();
@@ -623,7 +636,16 @@ class BrowserAnimationController::GroupData : public gfx::AnimationDelegate {
       logger_->MaybeLog();
       logger_.reset();
     }
+    const size_t generation = motion_generation_;
+    base::AutoReset notifying(&notifying_generation_,
+                              std::optional<size_t>(generation));
     Notify(BrowserAnimationUpdate::kEnded);
+    // Completing a collapse can synchronously start an expand-on-hover motion.
+    // Its values and scheduled ticks now belong to the replacement, including
+    // when a callback restarts the very same motion.
+    if (motion_generation_ != generation) {
+      return;
+    }
     current_motion_ = BrowserAnimationMotion();
     PersistCurrentValues(params);
   }
@@ -635,9 +657,10 @@ class BrowserAnimationController::GroupData : public gfx::AnimationDelegate {
     }
     PersistCurrentValues(params);
     logger_.reset();
-    animator_->Stop();
-    Notify(BrowserAnimationUpdate::kCanceled);
-    current_motion_ = BrowserAnimationMotion();
+    if (animator_) {
+      animator_->Stop();
+    }
+    NotifyCanceledAndClearMotion();
     return true;
   }
 
@@ -649,10 +672,27 @@ class BrowserAnimationController::GroupData : public gfx::AnimationDelegate {
       return false;
     }
     logger_.reset();
-    animator_->Stop();
-    Notify(BrowserAnimationUpdate::kCanceled);
-    current_motion_ = BrowserAnimationMotion();
+    if (animator_) {
+      animator_->Stop();
+    }
+    NotifyCanceledAndClearMotion();
     return true;
+  }
+
+  void NotifyCanceledAndClearMotion() {
+    const size_t generation = motion_generation_;
+    // Preserve the finishing motion during its notification. A callback may
+    // start another motion, which must not cancel this one recursively or be
+    // cleared when the original notification returns.
+    if (notifying_generation_ != generation) {
+      base::AutoReset notifying(&notifying_generation_,
+                                std::optional<size_t>(generation));
+      Notify(BrowserAnimationUpdate::kCanceled);
+    }
+    if (motion_generation_ == generation) {
+      current_motion_ = BrowserAnimationMotion();
+      ++motion_generation_;
+    }
   }
 
   // Calculates all current values based on the current time and progress
@@ -710,6 +750,8 @@ class BrowserAnimationController::GroupData : public gfx::AnimationDelegate {
   ValueLookup current_values_;
   BrowserAnimationMotion current_motion_;
   MotionInfo current_motion_info_;
+  size_t motion_generation_ = 0;
+  std::optional<size_t> notifying_generation_;
   std::optional<Animator> animator_;
   std::optional<Logger> logger_;
 

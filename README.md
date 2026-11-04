@@ -9,6 +9,15 @@ vertical tabs, Spaces, split views and configurable browser controls.
 The first public target is **Linux x86_64 preview**. Windows and macOS downloads
 are not available yet. Preview builds need testing before everyday use.
 
+## Sidebar space controls and floating resize
+
+Linux preview 5 fixes the hidden third space in the default expanded sidebar
+when Bookmarks and More share its footer. Space controls use the available width
+without counting the footer's padding twice. It also fixes an animation
+completion problem that could crash the browser while a floating sidebar was
+being narrowed. See [the follow-up notes](docs/noventra/sidebar-space-capacity-animation-2026-11-04.md)
+for the verification scope.
+
 ## Closing pinned sites
 
 Linux preview 4 keeps a pinned site's shortcut when its page is closed. Hover
@@ -34,7 +43,7 @@ verified update is ready. It closes the browser normally, installs the signed
 update, then reopens regular tabs and Spaces. Cancelling an unsaved-page or
 Incognito warning cancels the restart. Incognito sessions are not restored.
 
-To receive preview 4 from preview 3, open About Noventra and use **Update and
+To receive preview 5 from preview 4, open About Noventra and use **Update and
 restart** once the verified update is ready. Preview 2 uses its existing flow:
 let About prepare the update, then close every Noventra window and reopen it
 once. The button is hidden while the installed version is current.

@@ -44,3 +44,16 @@ cases and the existing pin lifecycle/editing cases. The exporter includes these
 fixtures and their Python/helper closure for review. Their private display and
 namespace ownership requirements remain in force; they are not public CI jobs.
 No Windows, native Mac or Wayland/GPU result is implied by these X11 checks.
+
+## Sidebar capacity and floating narrowing regression source
+
+`../space_capacity_resize_smoke.py` exercises the three-space footer at the
+default expanded sidebar width with Bookmarks and More, plus native resizing.
+`../sidebar_narrowing_smoke.py` exercises repeated narrowing in the floating
+sidebar. Their local helper closure is inventoried with this source kit.
+The preserved preview 5 candidate passed 536 native checks across owned X11
+and software-rendered Wayland displays. All 44 focused animation-controller
+C++ tests also passed using the current production controller objects. The
+Wayland wrapper, pointer/keyboard clients and protocol definitions are included;
+they require the system dependencies documented by `../with_private_sway.py`.
+No native Mac/Windows build or hardware GPU qualification is claimed.

@@ -11,7 +11,7 @@ The 2026-11-04 OS-aware page update is live in download Worker version
 `2506d1a5-6ee3-4ac8-9e24-a0829766abfb`; the previous version
 `6d8a8885-0b40-4116-90da-87b90489f6e1` is retained for rollback. It changes page
 rendering without writing to R2 or publishing a browser release. This source kit accompanies
-Linux preview 4 / signed sequence 4. Page presentation changes remain separate
+Linux preview 5 / signed sequence 5. Page presentation changes remain separate
 from browser release publication.
 
 HTML uses existing browser platform hints or a bounded User-Agent fallback to

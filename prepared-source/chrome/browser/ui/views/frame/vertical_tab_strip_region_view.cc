@@ -645,7 +645,7 @@ class AccountSpacesButton : public views::View, public TabStripModelObserver {
     }
     const size_t capacity = SharedMenu()
         ? static_cast<size_t>(std::clamp(
-              (width - 2 * kSpaceFooterPadding) / kSpaceTargetSize, 1,
+              width / kSpaceTargetSize, 1,
               GetProperty(kNoventraDockCompact) ? 1 : 4))
         : (width < kSpaceRowMinWidth && !SharedMenu())
             ? kMaxRailSpaceDots

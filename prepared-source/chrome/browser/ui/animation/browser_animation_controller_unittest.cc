@@ -533,6 +533,75 @@ TEST_F(BrowserAnimationControllerTest, AtEndOfAnimationDuringFinalCallback) {
   EXPECT_EQ(1.0, values.back());
 }
 
+TEST_F(BrowserAnimationControllerTest, CompletionCallbackStartsReplacement) {
+  for (bool reset : {false, true}) {
+    for (bool same_motion : {false, true}) {
+      SCOPED_TRACE(testing::Message()
+                   << "reset=" << reset << " same_motion=" << same_motion);
+      const auto replacement =
+          same_motion ? kTestAnimationMotion1 : kTestAnimationMotion2;
+      int ended = 0;
+      int canceled = 0;
+      UNCALLED_MOCK_CALLBACK(BrowserAnimationCallback, callback);
+      const auto subscription =
+          controller()->Subscribe(kTestAnimationGroup, callback.Get());
+      EXPECT_CALL(callback, Run)
+          .WillRepeatedly([&](const BrowserAnimationController*,
+                              BrowserAnimationUpdate status) {
+            if (status == BrowserAnimationUpdate::kCanceled) {
+              ++canceled;
+            }
+            if (status == BrowserAnimationUpdate::kEnded && ++ended == 1) {
+              EXPECT_EQ(kTestAnimationMotion1,
+                        controller()->GetCurrentMotion(kTestAnimationGroup));
+              EXPECT_EQ(1.0, controller()->GetCurrentValue(
+                                 kTestAnimationGroup, kTestAnimationSequence1));
+              controller()->Start(kTestAnimationGroup, replacement);
+            }
+          });
+      controller()->Start(kTestAnimationGroup, kTestAnimationMotion1);
+      if (reset) {
+        FastForwardMs(100);
+        controller()->Reset(kTestAnimationGroup, kTestAnimationMotion1);
+      } else {
+        FastForwardMs(1050);
+      }
+      EXPECT_EQ(replacement,
+                controller()->GetCurrentMotion(kTestAnimationGroup));
+      FastForwardMs(100);
+      EXPECT_TRUE(controller()->IsAnimating(kTestAnimationGroup));
+      FastForwardMs(1200);
+      EXPECT_FALSE(controller()->IsAnimating(kTestAnimationGroup));
+      EXPECT_EQ(2, ended);
+      EXPECT_EQ(0, canceled);
+    }
+  }
+}
+
+TEST_F(BrowserAnimationControllerTest, ClearCallbackStartsReplacement) {
+  int canceled = 0;
+  UNCALLED_MOCK_CALLBACK(BrowserAnimationCallback, callback);
+  const auto subscription =
+      controller()->Subscribe(kTestAnimationGroup, callback.Get());
+  EXPECT_CALL(callback, Run)
+      .WillRepeatedly([&](const BrowserAnimationController*,
+                          BrowserAnimationUpdate status) {
+        if (status == BrowserAnimationUpdate::kCanceled && ++canceled == 1) {
+          controller()->Start(kTestAnimationGroup, kTestAnimationMotion2);
+        }
+      });
+  controller()->Start(kTestAnimationGroup, kTestAnimationMotion1);
+  FastForwardMs(100);
+  controller()->Clear(kTestAnimationGroup);
+  EXPECT_EQ(kTestAnimationMotion2,
+            controller()->GetCurrentMotion(kTestAnimationGroup));
+  FastForwardMs(200);
+  EXPECT_TRUE(controller()->IsAnimating(kTestAnimationGroup));
+  FastForwardMs(400);
+  EXPECT_FALSE(controller()->IsAnimating(kTestAnimationGroup));
+  EXPECT_EQ(1, canceled);
+}
+
 TEST_F(BrowserAnimationControllerTest, AnimationClearedCallback) {
   std::vector<double> values;
   bool canceled = false;
@@ -1243,7 +1312,7 @@ TEST_F(BrowserAnimationControllerTest, Reset_MidMotion_NoMotionSpecified) {
   FastForwardMs(1100);
   EXPECT_FALSE(controller()->IsAnimating(kTestAnimationGroup));
   EXPECT_EQ(1.0, controller()->GetCurrentValue(kTestAnimationGroup,
-                                             kTestAnimationSequence1));
+                                               kTestAnimationSequence1));
 }
 
 TEST_F(BrowserAnimationControllerTest, Reset_MidMotion_DifferentMotion) {
@@ -1302,7 +1371,7 @@ TEST_F(BrowserAnimationControllerTest, Reset_MidMotion_SameMotion) {
   FastForwardMs(1100);
   EXPECT_FALSE(controller()->IsAnimating(kTestAnimationGroup));
   EXPECT_EQ(1.0, controller()->GetCurrentValue(kTestAnimationGroup,
-                                             kTestAnimationSequence1));
+                                               kTestAnimationSequence1));
 }
 
 TEST_F(BrowserAnimationControllerTest, Reset_NoMotion_NoMotionSpecified) {

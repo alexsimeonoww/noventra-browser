@@ -1,0 +1,237 @@
+diff --git a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
+--- a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
++++ b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
+@@ -645,7 +645,7 @@
+     }
+     const size_t capacity = SharedMenu()
+         ? static_cast<size_t>(std::clamp(
+-              (width - 2 * kSpaceFooterPadding) / kSpaceTargetSize, 1,
++              width / kSpaceTargetSize, 1,
+               GetProperty(kNoventraDockCompact) ? 1 : 4))
+         : (width < kSpaceRowMinWidth && !SharedMenu())
+             ? kMaxRailSpaceDots
+diff --git a/chrome/browser/ui/animation/browser_animation_controller.cc b/chrome/browser/ui/animation/browser_animation_controller.cc
+--- a/chrome/browser/ui/animation/browser_animation_controller.cc
++++ b/chrome/browser/ui/animation/browser_animation_controller.cc
+@@ -14,6 +14,7 @@
+ #include <utility>
+ #include <variant>
+ 
++#include "base/auto_reset.h"
+ #include "base/callback_list.h"
+ #include "base/check_is_test.h"
+ #include "base/containers/map_util.h"
+@@ -159,7 +160,14 @@
+     animation_.Start();
+   }
+ 
+-  void Stop() { animation_.Stop(); }
++  void Stop() {
++    // GroupData sends its own completion/cancellation notification. In
++    // particular, stopping during the final progress callback must not send a
++    // second AnimationEnded callback back into the group.
++    animation_.set_delegate(nullptr);
++    animation_.Stop();
++    animation_.set_delegate(this);
++  }
+ 
+   void SetAnimationContainerForTesting(gfx::AnimationContainer* container) {
+     animation_.SetContainer(container);
+@@ -488,6 +496,7 @@
+   void Start(BrowserAnimationMotion motion, MotionInfo motion_info) {
+     const auto params = GetParamsLookup();
+     OnCancel(params);
++    const size_t generation = ++motion_generation_;
+     current_motion_ = motion;
+     current_motion_info_ = std::move(motion_info);
+     UpdateCurrentValues(base::Milliseconds(0), 0.0, params);
+@@ -498,7 +507,9 @@
+       Notify(BrowserAnimationUpdate::kStarted);
+     } else {
+       Notify(BrowserAnimationUpdate::kStarted);
+-      OnAnimationEnded(params);
++      if (motion_generation_ == generation) {
++        OnAnimationEnded(params);
++      }
+     }
+   }
+ 
+@@ -509,7 +520,9 @@
+       OnCancel(params);
+       current_motion_ = motion;
+       current_motion_info_ = std::move(motion_info);
+-    } else if (animator_) {
++    }
++    ++motion_generation_;
++    if (animator_) {
+       // Completing the current motion must also remove its scheduled ticks.
+       // Otherwise the next frame runs after OnAnimationEnded clears the motion.
+       animator_->Stop();
+@@ -623,7 +636,16 @@
+       logger_->MaybeLog();
+       logger_.reset();
+     }
++    const size_t generation = motion_generation_;
++    base::AutoReset notifying(&notifying_generation_,
++                              std::optional<size_t>(generation));
+     Notify(BrowserAnimationUpdate::kEnded);
++    // Completing a collapse can synchronously start an expand-on-hover motion.
++    // Its values and scheduled ticks now belong to the replacement, including
++    // when a callback restarts the very same motion.
++    if (motion_generation_ != generation) {
++      return;
++    }
+     current_motion_ = BrowserAnimationMotion();
+     PersistCurrentValues(params);
+   }
+@@ -635,9 +657,10 @@
+     }
+     PersistCurrentValues(params);
+     logger_.reset();
+-    animator_->Stop();
+-    Notify(BrowserAnimationUpdate::kCanceled);
+-    current_motion_ = BrowserAnimationMotion();
++    if (animator_) {
++      animator_->Stop();
++    }
++    NotifyCanceledAndClearMotion();
+     return true;
+   }
+ 
+@@ -649,10 +672,27 @@
+       return false;
+     }
+     logger_.reset();
+-    animator_->Stop();
+-    Notify(BrowserAnimationUpdate::kCanceled);
+-    current_motion_ = BrowserAnimationMotion();
++    if (animator_) {
++      animator_->Stop();
++    }
++    NotifyCanceledAndClearMotion();
+     return true;
++  }
++
++  void NotifyCanceledAndClearMotion() {
++    const size_t generation = motion_generation_;
++    // Preserve the finishing motion during its notification. A callback may
++    // start another motion, which must not cancel this one recursively or be
++    // cleared when the original notification returns.
++    if (notifying_generation_ != generation) {
++      base::AutoReset notifying(&notifying_generation_,
++                                std::optional<size_t>(generation));
++      Notify(BrowserAnimationUpdate::kCanceled);
++    }
++    if (motion_generation_ == generation) {
++      current_motion_ = BrowserAnimationMotion();
++      ++motion_generation_;
++    }
+   }
+ 
+   // Calculates all current values based on the current time and progress
+@@ -710,6 +750,8 @@
+   ValueLookup current_values_;
+   BrowserAnimationMotion current_motion_;
+   MotionInfo current_motion_info_;
++  size_t motion_generation_ = 0;
++  std::optional<size_t> notifying_generation_;
+   std::optional<Animator> animator_;
+   std::optional<Logger> logger_;
+ 
+diff --git a/chrome/browser/ui/animation/browser_animation_controller_unittest.cc b/chrome/browser/ui/animation/browser_animation_controller_unittest.cc
+--- a/chrome/browser/ui/animation/browser_animation_controller_unittest.cc
++++ b/chrome/browser/ui/animation/browser_animation_controller_unittest.cc
+@@ -533,6 +533,75 @@
+   EXPECT_EQ(1.0, values.back());
+ }
+ 
++TEST_F(BrowserAnimationControllerTest, CompletionCallbackStartsReplacement) {
++  for (bool reset : {false, true}) {
++    for (bool same_motion : {false, true}) {
++      SCOPED_TRACE(testing::Message()
++                   << "reset=" << reset << " same_motion=" << same_motion);
++      const auto replacement =
++          same_motion ? kTestAnimationMotion1 : kTestAnimationMotion2;
++      int ended = 0;
++      int canceled = 0;
++      UNCALLED_MOCK_CALLBACK(BrowserAnimationCallback, callback);
++      const auto subscription =
++          controller()->Subscribe(kTestAnimationGroup, callback.Get());
++      EXPECT_CALL(callback, Run)
++          .WillRepeatedly([&](const BrowserAnimationController*,
++                              BrowserAnimationUpdate status) {
++            if (status == BrowserAnimationUpdate::kCanceled) {
++              ++canceled;
++            }
++            if (status == BrowserAnimationUpdate::kEnded && ++ended == 1) {
++              EXPECT_EQ(kTestAnimationMotion1,
++                        controller()->GetCurrentMotion(kTestAnimationGroup));
++              EXPECT_EQ(1.0, controller()->GetCurrentValue(
++                                 kTestAnimationGroup, kTestAnimationSequence1));
++              controller()->Start(kTestAnimationGroup, replacement);
++            }
++          });
++      controller()->Start(kTestAnimationGroup, kTestAnimationMotion1);
++      if (reset) {
++        FastForwardMs(100);
++        controller()->Reset(kTestAnimationGroup, kTestAnimationMotion1);
++      } else {
++        FastForwardMs(1050);
++      }
++      EXPECT_EQ(replacement,
++                controller()->GetCurrentMotion(kTestAnimationGroup));
++      FastForwardMs(100);
++      EXPECT_TRUE(controller()->IsAnimating(kTestAnimationGroup));
++      FastForwardMs(1200);
++      EXPECT_FALSE(controller()->IsAnimating(kTestAnimationGroup));
++      EXPECT_EQ(2, ended);
++      EXPECT_EQ(0, canceled);
++    }
++  }
++}
++
++TEST_F(BrowserAnimationControllerTest, ClearCallbackStartsReplacement) {
++  int canceled = 0;
++  UNCALLED_MOCK_CALLBACK(BrowserAnimationCallback, callback);
++  const auto subscription =
++      controller()->Subscribe(kTestAnimationGroup, callback.Get());
++  EXPECT_CALL(callback, Run)
++      .WillRepeatedly([&](const BrowserAnimationController*,
++                          BrowserAnimationUpdate status) {
++        if (status == BrowserAnimationUpdate::kCanceled && ++canceled == 1) {
++          controller()->Start(kTestAnimationGroup, kTestAnimationMotion2);
++        }
++      });
++  controller()->Start(kTestAnimationGroup, kTestAnimationMotion1);
++  FastForwardMs(100);
++  controller()->Clear(kTestAnimationGroup);
++  EXPECT_EQ(kTestAnimationMotion2,
++            controller()->GetCurrentMotion(kTestAnimationGroup));
++  FastForwardMs(200);
++  EXPECT_TRUE(controller()->IsAnimating(kTestAnimationGroup));
++  FastForwardMs(400);
++  EXPECT_FALSE(controller()->IsAnimating(kTestAnimationGroup));
++  EXPECT_EQ(1, canceled);
++}
++
+ TEST_F(BrowserAnimationControllerTest, AnimationClearedCallback) {
+   std::vector<double> values;
+   bool canceled = false;
+@@ -1243,7 +1312,7 @@
+   FastForwardMs(1100);
+   EXPECT_FALSE(controller()->IsAnimating(kTestAnimationGroup));
+   EXPECT_EQ(1.0, controller()->GetCurrentValue(kTestAnimationGroup,
+-                                             kTestAnimationSequence1));
++                                               kTestAnimationSequence1));
+ }
+ 
+ TEST_F(BrowserAnimationControllerTest, Reset_MidMotion_DifferentMotion) {
+@@ -1302,7 +1371,7 @@
+   FastForwardMs(1100);
+   EXPECT_FALSE(controller()->IsAnimating(kTestAnimationGroup));
+   EXPECT_EQ(1.0, controller()->GetCurrentValue(kTestAnimationGroup,
+-                                             kTestAnimationSequence1));
++                                               kTestAnimationSequence1));
+ }
+ 
+ TEST_F(BrowserAnimationControllerTest, Reset_NoMotion_NoMotionSpecified) {
