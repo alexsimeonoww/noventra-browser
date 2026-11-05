@@ -1,0 +1,8 @@
+{
+  "architecture": "x86_64",
+  "base_url": "https://downloads.noventrastudio.com/browser/updates/stable/linux-x86_64/",
+  "channel": "stable",
+  "format": 1,
+  "public_key": "release-public.pem",
+  "sequence": 8
+}

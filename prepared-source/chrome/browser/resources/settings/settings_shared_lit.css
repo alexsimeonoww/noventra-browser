@@ -33,6 +33,25 @@
 
 /* Common styles for Material Design settings. */
 
+.cr-centered-card-container {
+  min-width: 0;
+}
+
+@media (max-width: 550px) {
+  .cr-row:has(> .header-aligned-button),
+  .list-item:has(> cr-button:not([hidden])) {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .cr-row > .header-aligned-button,
+  .list-item > cr-button {
+    align-self: flex-start;
+    margin-block: 0 12px;
+    margin-inline-start: 0;
+  }
+}
+
 /* Prevent action-links from being selected to avoid accidental
  * selection when trying to click it. */
 a[is=action-link] {

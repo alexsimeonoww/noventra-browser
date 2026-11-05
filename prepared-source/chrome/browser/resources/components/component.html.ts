@@ -25,6 +25,13 @@ export function getHtml(data: ComponentsData) {
       <h2>Protected streaming</h2>
       <p>Some streaming services need Widevine from Google. Enabling downloads
         installs it and keeps it updated.</p>
+      <p id="widevine-not-installed" role="status"
+          ?hidden="${data.components.some(item =>
+              item.widevine && item.version !== '0.0.0.0')}">
+        Widevine is not installed. Allow downloads below, wait for an installed
+        version to appear, then restart Noventra and reload your streaming page.
+        If installation fails, use Check for update and review its status below.
+      </p>
       <label>
         <input id="widevine-downloads" type="checkbox"
             .checked="${!!data.widevineDownloadsEnabled}"

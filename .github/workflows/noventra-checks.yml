@@ -36,6 +36,7 @@ jobs:
           openssl version
           python3 -B -m unittest discover -s tests/noventra -p test_package_distribution.py -v
           python3 -B -m unittest discover -s tests/noventra -p test_package_installer.py -v
+          python3 -B -m unittest discover -s tests/noventra -p test_desktop_registration.py -v
           python3 -B -m unittest discover -s tests/noventra -p test_update_delivery.py -v
           python3 -B -m unittest discover -s tests/noventra -p test_desktop_updater.py -v
           python3 -B -m unittest discover -s tests/noventra -p test_atomic_update_recovery.py -v

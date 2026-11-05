@@ -13,14 +13,19 @@
       "sha256": "fd92ff208ef7439765d7b3a5b89b422234abf7408137646e4d615e68df128537"
     },
     "build-inputs/.github/workflows/noventra-checks.yml": {
-      "bytes": 1807,
+      "bytes": 1902,
       "mode": 420,
-      "sha256": "2f4c40cdba92df4eb314a7da9aa63dfaf958e8e137ff4d22c1463f1b1163a692"
+      "sha256": "b88be5515eab1926c4caafa351918db896bcd900073e31fd6cd3919db86da686"
     },
     "build-inputs/LICENSE": {
       "bytes": 35071,
       "mode": 420,
       "sha256": "a0279a9937ce228eb71ea2a0252d0830458708570fee3df516fa4bd4c8a134bc"
+    },
+    "build-inputs/README.md": {
+      "bytes": 9019,
+      "mode": 420,
+      "sha256": "653f7bd1c6f4d73d1bda80ccb20c4b8649a20958f307f623f38518ec72e23177"
     },
     "build-inputs/docker/build.Dockerfile": {
       "bytes": 2079,
@@ -52,6 +57,11 @@
       "mode": 420,
       "sha256": "ef31a1c038d74521497999535a1df02a3c7e8dc301ac3b43015976890c3afd26"
     },
+    "build-inputs/docs/noventra/settings-media-default-browser-2026-11-05.md": {
+      "bytes": 3489,
+      "mode": 420,
+      "sha256": "92458f20f370076d3c679776341e299510681087b2b6bbda097cfd8ec9e2df90"
+    },
     "build-inputs/docs/noventra/sidebar-space-capacity-animation-2026-11-04.md": {
       "bytes": 1797,
       "mode": 420,
@@ -76,6 +86,11 @@
       "bytes": 495,
       "mode": 420,
       "sha256": "13c0ded9ba9ccc5161d69be555434146c5c4a19163a0be2a86cebe40e55eda7d"
+    },
+    "build-inputs/experiments/rust-gui/compare-cdp.mjs": {
+      "bytes": 1218,
+      "mode": 420,
+      "sha256": "d8b89afdaee77a7c00866c54bcaa99219c41c023f6a43c77250d22904e863637"
     },
     "build-inputs/noventra/licenses/LICENSE-Chromium": {
       "bytes": 1536,
@@ -118,9 +133,9 @@
       "sha256": "5460c64fdf505b8d51c11edecd13d9d86e667abe2962c1e4128b7c0ad1c3567d"
     },
     "build-inputs/noventra/package/installer.py": {
-      "bytes": 40300,
+      "bytes": 40374,
       "mode": 420,
-      "sha256": "e03e57542a0a67aa92b7c8d1ac7d146b63a10538b149b7a31ec94f1077c7a284"
+      "sha256": "4df5fd8f8f307702206e31fb88c81a99d95dc126a1b7e643cbac2c0327229b1b"
     },
     "build-inputs/noventra/package/local.noventra.browser.metainfo.xml": {
       "bytes": 785,
@@ -153,9 +168,9 @@
       "sha256": "8149d7388c3354310a36fa41bc22c3c5b5f236ca020a8c4ad86bb520bee6de14"
     },
     "build-inputs/noventra/patches/chromium-156/manifest.json": {
-      "bytes": 186267,
+      "bytes": 186685,
       "mode": 420,
-      "sha256": "8c6cc0bc21c7c341fe8f386cede7f78a0dcedebd54594e829fecb2923ab85058"
+      "sha256": "f7629533cb77fb88c9fa2176591c7477a3c99d53cf53ba2d2cfd8226d8c5c822"
     },
     "build-inputs/noventra/patches/chromium-156/noventra-about-licenses.patch": {
       "bytes": 783,
@@ -232,6 +247,11 @@
       "mode": 420,
       "sha256": "bcbce3e8d63da8e7004ab011ee052220da46d3e40b590034bcfff789096e70c7"
     },
+    "build-inputs/noventra/patches/chromium-156/noventra-settings-media-defaults.patch": {
+      "bytes": 10293,
+      "mode": 420,
+      "sha256": "19c2bfcbafe8051b0d01bd60193dc3c0613904a7b83e8c0f41087c816928a183"
+    },
     "build-inputs/noventra/patches/chromium-156/noventra-sidebar-space-capacity-animation.patch": {
       "bytes": 9311,
       "mode": 420,
@@ -273,9 +293,9 @@
       "sha256": "d0f4d7550871a03512e8e880f2071522393a9db0489e97a4e88daf9bab0afbd8"
     },
     "build-inputs/noventra/patches/chromium-156/series": {
-      "bytes": 841,
+      "bytes": 880,
       "mode": 420,
-      "sha256": "daa940dbf138af2dd79798776e3f7ca2eb5c381888ea0c89c7c48195763fcb05"
+      "sha256": "32b976a604739ed26dde071268dd454fcbf33c9803e37dc9fb3ef185c941887d"
     },
     "build-inputs/noventra/qualified-args.gn": {
       "bytes": 894,
@@ -647,6 +667,11 @@
       "mode": 420,
       "sha256": "a8b007ca4d0a67c33a2426b2db320d5561ba960cab8f2baa46500c1af65ba803"
     },
+    "build-inputs/noventra/update/qualified-package-config.json": {
+      "bytes": 215,
+      "mode": 420,
+      "sha256": "36eb5e78acf660076f1676717b32ce8fb4d04080ed5a801d5ddc7e5004d5ca86"
+    },
     "build-inputs/noventra/update/release-public.pem": {
       "bytes": 113,
       "mode": 420,
@@ -716,6 +741,11 @@
       "bytes": 40884,
       "mode": 420,
       "sha256": "7099a46f93eacbc79f61cabc746e525db617b120981bd408b1d8562316301813"
+    },
+    "build-inputs/tests/noventra/default_browser_smoke.py": {
+      "bytes": 7097,
+      "mode": 420,
+      "sha256": "a7522aebe56238456441c69c997a291d80d0aac117b770bbef2bac47b7a16fe1"
     },
     "build-inputs/tests/noventra/dock_controls_smoke.py": {
       "bytes": 5697,
@@ -862,6 +892,11 @@
       "mode": 420,
       "sha256": "c0458a837a6edb859a98250500e330d5ea2dbe84f998c6778567860ace89dbb1"
     },
+    "build-inputs/tests/noventra/protected_media_smoke.py": {
+      "bytes": 16909,
+      "mode": 420,
+      "sha256": "014690c8bcf6ce66615f6290edae4808ae6437efe969e4492642f761f5f1247e"
+    },
     "build-inputs/tests/noventra/protocols/virtual-keyboard-unstable-v1.xml": {
       "bytes": 4886,
       "mode": 420,
@@ -881,6 +916,11 @@
       "bytes": 3116,
       "mode": 420,
       "sha256": "6574c9d2823b0a6defdc1dacf5303e4a3432e6149f9d78f66cddf8c01528a319"
+    },
+    "build-inputs/tests/noventra/settings_responsive_smoke.py": {
+      "bytes": 11806,
+      "mode": 420,
+      "sha256": "650c2986f1bb2dd9d73dc5cd29967621d67063d1a54fda5465b3e791718fa26b"
     },
     "build-inputs/tests/noventra/sidebar_command_footer_smoke.py": {
       "bytes": 36402,
@@ -927,10 +967,20 @@
       "mode": 420,
       "sha256": "0a2df0d555ec4ba2b7468041ef8aaf52b03fe4436a62caa817c7046add645edd"
     },
+    "build-inputs/tests/noventra/tab_memory_settings_smoke.py": {
+      "bytes": 4399,
+      "mode": 420,
+      "sha256": "fc0934955316f010a5ad35f6f47e2910b0ccf52699155f4fb507f5fc9eb985a8"
+    },
     "build-inputs/tests/noventra/test_atomic_update_recovery.py": {
       "bytes": 23328,
       "mode": 420,
       "sha256": "772872ab7b9c2c5bd0c7b5a26d6f85123e3f1b9580b4abcf9dca4e9652f7baf0"
+    },
+    "build-inputs/tests/noventra/test_desktop_registration.py": {
+      "bytes": 3739,
+      "mode": 420,
+      "sha256": "9c46358c9bdadae562eed04d4cfc1eadccba060d66c6d4795137b701039f0d1c"
     },
     "build-inputs/tests/noventra/test_desktop_updater.py": {
       "bytes": 54476,
@@ -1051,6 +1101,11 @@
       "bytes": 23950,
       "mode": 420,
       "sha256": "22e390daf898b51a0f41bd70e9dc5444dfe515936eb0a61ead836a63c58e2746"
+    },
+    "build-inputs/tools/noventra/install_desktop.py": {
+      "bytes": 6747,
+      "mode": 420,
+      "sha256": "d7b756edbd4f31260f529d6764b97a68aad4e4b1875dc38463d9bec7c2491bb3"
     },
     "build-inputs/tools/noventra/local_delivery_server.py": {
       "bytes": 3464,
@@ -1718,9 +1773,9 @@
       "sha256": "3174d0a39fd5c4c66c35fd107c21eac84d843887f3ecd97122585167b8211df8"
     },
     "prepared-source/chrome/browser/resources/components/component.html.ts": {
-      "bytes": 3484,
+      "bytes": 3900,
       "mode": 420,
-      "sha256": "57060892284c710417e6aba304c8501be06ba1c70e1d7b8871e5ebbb55b9309d"
+      "sha256": "843216cc5ab123dfabcd29457a7ed98f4e708c84b3a9163b953a7214d02c339a"
     },
     "prepared-source/chrome/browser/resources/components/components.ts": {
       "bytes": 7580,
@@ -1783,9 +1838,9 @@
       "sha256": "13b15144bf337ce7a90a94e675bceab0d07ed30de79dda54d7b4ec378aaf6c4c"
     },
     "prepared-source/chrome/browser/resources/settings/appearance_page/appearance_page.html.ts": {
-      "bytes": 51902,
+      "bytes": 51999,
       "mode": 420,
-      "sha256": "2f571f1bc81a23abebc7bd72ac269da76826823e6b8da84b82abf1d629af899d"
+      "sha256": "26b1faaf4de559a3d47ced8e243e72dab8c68233fc42fea72c8bb39bb05cf97c"
     },
     "prepared-source/chrome/browser/resources/settings/appearance_page/appearance_page.ts": {
       "bytes": 87829,
@@ -1933,9 +1988,9 @@
       "sha256": "8d0e4adbb134a4eaa28e29fff39f61b240f1c4e3c2df0b71afb0c1cf81551aaa"
     },
     "prepared-source/chrome/browser/resources/settings/settings_shared_lit.css": {
-      "bytes": 9361,
+      "bytes": 9736,
       "mode": 420,
-      "sha256": "b699f1384c8a6952366ad3f1a4b198e0bb76ab05bf25691e2f1eb1386fc4cbb7"
+      "sha256": "67f63cfe68cb41eacd91ac24dc32488968a523ed1f051d74a577ffb96c6b8ff1"
     },
     "prepared-source/chrome/browser/resources/settings/settings_ui/settings_ui.html": {
       "bytes": 5159,
@@ -1948,9 +2003,9 @@
       "sha256": "698120a664c674a1926ca4441696928aca2a1ab237244f7176a3a12f90f4e66b"
     },
     "prepared-source/chrome/browser/resources/settings/site_settings/protected_content_page.html": {
-      "bytes": 3358,
+      "bytes": 3992,
       "mode": 420,
-      "sha256": "8b7053c92fe3ec92ace3c7a53fbf8213c815208f20e1892b1936c8b10b03cbc0"
+      "sha256": "e7c12ea69668cffa00fdbb8daabc40c8176079199e864a0d2a3023ea23b1345b"
     },
     "prepared-source/chrome/browser/resources/settings/system_page/browser_shortcuts_page.html": {
       "bytes": 8142,
@@ -2063,9 +2118,9 @@
       "sha256": "b23eaa43839fa63591979e859520572cf6a7832e4961003414d93b7ebb3a7c90"
     },
     "prepared-source/chrome/browser/shell_integration_linux.cc": {
-      "bytes": 32851,
+      "bytes": 33412,
       "mode": 420,
-      "sha256": "deac0047d2adb4bc00416cdbc572a1e47337a12d6cd040bf04313c74638cf224"
+      "sha256": "b7e21b12b37c98c3c7efc42e18d3ffc949e0b4b1331ec45609d4cb21de037728"
     },
     "prepared-source/chrome/browser/spellchecker/spellcheck_hunspell_dictionary.cc": {
       "bytes": 18849,
@@ -4597,6 +4652,11 @@
       "mode": 420,
       "sha256": "a985853542b5033335c65d3888a1eb28088281e19668fdd586e410f65d07ad73"
     },
+    "prepared-source/ui/webui/resources/cr_elements/cr_collapse/cr_collapse.ts": {
+      "bytes": 3707,
+      "mode": 420,
+      "sha256": "697163005912911e638cbf080138bb184533c57122a30beb420d9470d3603bf9"
+    },
     "prepared-source/ui/webui/resources/cr_elements/cr_icon/cr_icon.css": {
       "bytes": 1623,
       "mode": 420,
@@ -4619,9 +4679,9 @@
     }
   },
   "format": 1,
-  "layer_manifest_sha256": "8c6cc0bc21c7c341fe8f386cede7f78a0dcedebd54594e829fecb2923ab85058",
+  "layer_manifest_sha256": "f7629533cb77fb88c9fa2176591c7477a3c99d53cf53ba2d2cfd8226d8c5c822",
   "product": "local.noventra.browser",
-  "snapshot_sha256": "af59116d87f55ca931fc99e6792e833f01a642a9586b51f2308fa56f3ba5ab41",
-  "source_freeze_sha256": "2656107a2d8aeb28bc9927145b3f7d44032f1ef5de4d7fc0d5e01c0ffc98d817",
-  "version_label": "0.1.7"
+  "snapshot_sha256": "1c3908c1c570ea8a2efc813de6d8183a583217acd3b582879cddcf328c32a17f",
+  "source_freeze_sha256": "fcf092cb13f7b56cce1938fd1d11fe6eef6c6d6a7aa6d78ceaf7f9adb6c1ed18",
+  "version_label": "0.1.8"
 }

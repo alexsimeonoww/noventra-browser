@@ -97,6 +97,18 @@ std::string GetFileContents(GKeyFile* key_file) {
 // We delegate the difficulty of setting the default browser and default url
 // scheme handler in Linux desktop environments to an xdg utility, xdg-settings.
 
+std::vector<std::string> GetXdgSettingsCommand(base::Environment* env,
+                                            const std::string& scheme) {
+  if (scheme.empty() &&
+      base::FilePath(env->GetVar("BROWSER").value_or("")).BaseName().value() ==
+          "omarchy-launch-browser") {
+    // Omarchy's dispatcher and desktop MIME list point back to its launcher.
+    // Use the same environment as its own default-browser command.
+    return {"env", "-u", "BROWSER", "XDG_CURRENT_DESKTOP=", kXdgSettings};
+  }
+  return {kXdgSettings};
+}
+
 // If |scheme| is empty this function sets Chrome as the default browser,
 // otherwise it sets Chrome as the default handler application for |scheme|.
 bool SetDefaultWebClient(const std::string& scheme) {
@@ -105,8 +117,7 @@ bool SetDefaultWebClient(const std::string& scheme) {
 #else
   std::unique_ptr<base::Environment> env(base::Environment::Create());
 
-  std::vector<std::string> argv;
-  argv.push_back(kXdgSettings);
+  std::vector<std::string> argv = GetXdgSettingsCommand(env.get(), scheme);
   argv.push_back("set");
   if (scheme.empty()) {
     argv.push_back(kXdgSettingsDefaultBrowser);
@@ -139,8 +150,7 @@ shell_integration::DefaultWebClientState GetIsDefaultWebClient(
     return shell_integration::CANNOT_BE_DEFAULT;
   }
 
-  std::vector<std::string> argv;
-  argv.push_back(kXdgSettings);
+  std::vector<std::string> argv = GetXdgSettingsCommand(env.get(), scheme);
   argv.push_back("check");
   if (scheme.empty()) {
     argv.push_back(kXdgSettingsDefaultBrowser);

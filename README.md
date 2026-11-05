@@ -9,6 +9,19 @@ vertical tabs, Spaces, split views and configurable browser controls.
 The first public target is **Linux x86_64 preview**. Windows and macOS downloads
 are not available yet. Preview builds need testing before everyday use.
 
+## Noventra 0.1.8: Settings and protected streaming setup
+
+Settings cards keep their controls visible in narrow windows, and interrupted
+Spell check expansion no longer clips its contents. Tab-memory previews are
+visible under Customize Noventra, Tabs & browsing, Tab previews. Linux
+default-browser selection handles Omarchy's dispatcher, and the installer
+registers simple launcher paths so Omarchy can discover them.
+
+The protected-streaming controls explain optional Widevine installation and
+when to quit completely and reopen. Public encrypted playback passed. Netflix
+and Voyo account playback remain unverified. See the
+[settings and streaming guide](docs/noventra/settings-media-default-browser-2026-11-05.md).
+
 ## Noventra 0.1.7: separate Space profiles and compact pins
 
 Regular Linux Spaces use independent profiles for history, bookmarks, saved
@@ -69,7 +82,7 @@ verified update is ready. It closes the browser normally, installs the signed
 update, then reopens regular tabs and Spaces. Cancelling an unsaved-page or
 Incognito warning cancels the restart. Incognito sessions are not restored.
 
-To receive preview 6 from an earlier preview, open About Noventra and use **Update and
+To receive the latest Linux release, open About Noventra and use **Update and
 restart** once the verified update is ready. Preview 2 uses its existing flow:
 let About prepare the update, then close every Noventra window and reopen it
 once. The button is hidden while the installed version is current.

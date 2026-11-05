@@ -132,7 +132,7 @@
     "chrome/browser/profiles/profile_manager.cc": "b6aeffdbbd5a7367e8fef79527011bf6e3a45ccd1d37ae1065141cc2830c8100",
     "chrome/browser/renderer_context_menu/render_view_context_menu.cc": "bdc3fd8397fa48d0cc39b555b6e2eb7cf3e714c14308f5aa17fe12b3e5769f17",
     "chrome/browser/resource_coordinator/tab_lifecycle_unit.cc": "3174d0a39fd5c4c66c35fd107c21eac84d843887f3ecd97122585167b8211df8",
-    "chrome/browser/resources/components/component.html.ts": "57060892284c710417e6aba304c8501be06ba1c70e1d7b8871e5ebbb55b9309d",
+    "chrome/browser/resources/components/component.html.ts": "843216cc5ab123dfabcd29457a7ed98f4e708c84b3a9163b953a7214d02c339a",
     "chrome/browser/resources/components/components.ts": "d03af48a3c75d31a1e69ec80b110749cdc9c7042c6af6690c3dc305d85092b59",
     "chrome/browser/resources/new_tab_page/app.css": "de851c01253ca79163e0ad2dc20406dfb58d6c02ec56b1ca844f5321a42e77b6",
     "chrome/browser/resources/new_tab_page/app.html": "2867873a7863d632fec27da8c4c8633fbd634d533b111337aa081b7f8203fffc",
@@ -145,7 +145,7 @@
     "chrome/browser/resources/settings/about_page/about_page.html.ts": "5d5cdd6908989de9f22eafdc20fb2c3d599aa136ab571f46887cdefe57cc0c84",
     "chrome/browser/resources/settings/about_page/about_page.ts": "c00678408c688163fe154f3234535aa13ea8c22a905fd4cb6f8b0355449f0f5e",
     "chrome/browser/resources/settings/appearance_page/appearance_page.css": "13b15144bf337ce7a90a94e675bceab0d07ed30de79dda54d7b4ec378aaf6c4c",
-    "chrome/browser/resources/settings/appearance_page/appearance_page.html.ts": "2f571f1bc81a23abebc7bd72ac269da76826823e6b8da84b82abf1d629af899d",
+    "chrome/browser/resources/settings/appearance_page/appearance_page.html.ts": "26b1faaf4de559a3d47ced8e243e72dab8c68233fc42fea72c8bb39bb05cf97c",
     "chrome/browser/resources/settings/appearance_page/appearance_page.ts": "46bc5d3f24ff444506574fe7cf19e0ab300882f7a28496a0586458f3af8173aa",
     "chrome/browser/resources/settings/appearance_page/appearance_page_index.css": "32a58bc6f74499447bd8aaa5a53951dfa88780626328f670a36be4e757a105da",
     "chrome/browser/resources/settings/appearance_page/appearance_page_index.html.ts": "6bb7a96f6dd1b286b8208136edc1ad2be40e7f6c430481c616d2ef06bdc09662",
@@ -175,10 +175,10 @@
     "chrome/browser/resources/settings/settings_menu/settings_menu.ts": "5d383968268c75f8e8d659f996faacca6606663de0ba9b4ad61b68d6926bcc73",
     "chrome/browser/resources/settings/settings_page/settings_section.css": "5fc468c4564f31091a04546128a1549bcdb01a08d0b1e596dd43bd30f94d4a3f",
     "chrome/browser/resources/settings/settings_page/settings_subpage.css": "8d0e4adbb134a4eaa28e29fff39f61b240f1c4e3c2df0b71afb0c1cf81551aaa",
-    "chrome/browser/resources/settings/settings_shared_lit.css": "b699f1384c8a6952366ad3f1a4b198e0bb76ab05bf25691e2f1eb1386fc4cbb7",
+    "chrome/browser/resources/settings/settings_shared_lit.css": "67f63cfe68cb41eacd91ac24dc32488968a523ed1f051d74a577ffb96c6b8ff1",
     "chrome/browser/resources/settings/settings_ui/settings_ui.html": "7ebdfbe850ceda69ae954d2221a1bcfe90674523cc8bfe3d21ee8256dca2f327",
     "chrome/browser/resources/settings/settings_vars.css": "698120a664c674a1926ca4441696928aca2a1ab237244f7176a3a12f90f4e66b",
-    "chrome/browser/resources/settings/site_settings/protected_content_page.html": "8b7053c92fe3ec92ace3c7a53fbf8213c815208f20e1892b1936c8b10b03cbc0",
+    "chrome/browser/resources/settings/site_settings/protected_content_page.html": "e7c12ea69668cffa00fdbb8daabc40c8176079199e864a0d2a3023ea23b1345b",
     "chrome/browser/resources/settings/system_page/browser_shortcuts_page.html": "6c2ec2facb46ececc6feddeb45177994c65d26190cc44cabac78fc2f8db6df61",
     "chrome/browser/resources/side_panel/bookmarks/power_bookmark_row_item.css": "cf4681b4e669411f1e52a7c7a94f0f3259623be9172c3f37d678b21e1d4bd9d3",
     "chrome/browser/resources/side_panel/bookmarks/power_bookmarks_list.css": "cf4f060b5bf9141554f2ca24dd9554e636b72151a3327e6f9a761bd8a2f081f8",
@@ -201,7 +201,7 @@
     "chrome/browser/sessions/session_service.cc": "03c38861f036c987170db75d6e33d23a617745adcd55b49e0c070904b9a7292d",
     "chrome/browser/sessions/session_service.h": "772b47fdd387260677d8aa8ea2bf99194c7b962c7d7a14b28b6de5c24f86b75b",
     "chrome/browser/sessions/session_service_base.cc": "b23eaa43839fa63591979e859520572cf6a7832e4961003414d93b7ebb3a7c90",
-    "chrome/browser/shell_integration_linux.cc": "deac0047d2adb4bc00416cdbc572a1e47337a12d6cd040bf04313c74638cf224",
+    "chrome/browser/shell_integration_linux.cc": "b7e21b12b37c98c3c7efc42e18d3ffc949e0b4b1331ec45609d4cb21de037728",
     "chrome/browser/spellchecker/spellcheck_hunspell_dictionary.cc": "1e615fddfe8530e4d46ef27e25f891f51d2a1fc9c91d69b5bad3e5bd0b5d541b",
     "chrome/browser/themes/theme_service.cc": "d7a627d681ecf64c5ed44f10ccdc6a72b5e36ce270a8f739e3c03e76271fef16",
     "chrome/browser/ui/BUILD.gn": "0a2a8392fccc5236c671efa3bd5fbb79c5237c76d5941270661e56f513bb654b",
@@ -708,6 +708,7 @@
     "ui/webui/resources/cr_components/searchbox/searchbox_icon.html.ts": "9515ccf402b28528e3dc32e69d0c78e69665734e00bdae883d742e00e551945e",
     "ui/webui/resources/cr_components/searchbox/searchbox_icon.ts": "b4b183e7a3b8c869bef8c4cf4defc8f714a10ec4868e08adbb721db41fec889b",
     "ui/webui/resources/cr_components/searchbox/searchbox_match.css": "a985853542b5033335c65d3888a1eb28088281e19668fdd586e410f65d07ad73",
+    "ui/webui/resources/cr_elements/cr_collapse/cr_collapse.ts": "697163005912911e638cbf080138bb184533c57122a30beb420d9470d3603bf9",
     "ui/webui/resources/cr_elements/cr_icon/cr_icon.css": "3144d4a8c37956a5ec4d562aa7d4076a53b0f089775872adccf6adc8ca7381d6",
     "ui/webui/resources/cr_elements/cr_icon/cr_icon.ts": "00dc3c34031bcf5b43868d231305ae276641eed15e3c39286dd830e8c798f169",
     "ui/webui/resources/cr_elements/cr_toolbar/cr_toolbar.css": "c58b971bfee429f4556a0be844885faea7de6a360190a27f649d091826863fa0",
@@ -810,6 +811,10 @@
     {
       "file": "noventra-profile-spaces-compact-pins.patch",
       "sha256": "bcbce3e8d63da8e7004ab011ee052220da46d3e40b590034bcfff789096e70c7"
+    },
+    {
+      "file": "noventra-settings-media-defaults.patch",
+      "sha256": "19c2bfcbafe8051b0d01bd60193dc3c0613904a7b83e8c0f41087c816928a183"
     }
   ],
   "pristine_files": {
@@ -1513,6 +1518,7 @@
     "ui/webui/resources/cr_components/searchbox/searchbox_icon.html.ts": "0e2ca2954500cbfb21a6bdda34c6390737108f497b22816e4c68d39a48b5e402",
     "ui/webui/resources/cr_components/searchbox/searchbox_icon.ts": "5b2e57334cf43b497656c404155aed0d87cd88406d8da24ad155f6f79cdca2f2",
     "ui/webui/resources/cr_components/searchbox/searchbox_match.css": "f3452e9a10dcea7ab24d9cfee67c6d64aed7c9ef38ae8723c9ec546cad393a07",
+    "ui/webui/resources/cr_elements/cr_collapse/cr_collapse.ts": "023d5711c1d216d5ac1d946d364d3d31097b49e67f218ab749b08e2a3fea7504",
     "ui/webui/resources/cr_elements/cr_icon/cr_icon.css": "43632a70c662f1ddbc13a54a0ea7926595ec93f28bd7364d022f01d2fb24ce64",
     "ui/webui/resources/cr_elements/cr_icon/cr_icon.ts": "b2697cc0914ff7e316b6ea6a167b0757e0335e34a6dfb099280269110cf0517b",
     "ui/webui/resources/cr_elements/cr_toolbar/cr_toolbar.css": "461e0b3efbd23e5337dc786d79f45290515e2736247c6f6b8b87e6574fdde750",
@@ -1587,7 +1593,7 @@
     "wordmark.svg": "a8b007ca4d0a67c33a2426b2db320d5561ba960cab8f2baa46500c1af65ba803"
   },
   "schema": 1,
-  "series_sha256": "daa940dbf138af2dd79798776e3f7ca2eb5c381888ea0c89c7c48195763fcb05",
+  "series_sha256": "32b976a604739ed26dde071268dd454fcbf33c9803e37dc9fb3ef185c941887d",
   "tooling": {
     ".github/scripts/build.sh": "fd92ff208ef7439765d7b3a5b89b422234abf7408137646e4d615e68df128537",
     "docker/build.Dockerfile": "f133ae4b6340e0bfc42338e6bd1d42d85d8a850652aa10dba6e37f82fe3ca080",

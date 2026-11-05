@@ -13,9 +13,21 @@
     <div id="description" class="secondary">
       $i18n{siteSettingsProtectedContentDescription}
     </div>
+    <h2>Streaming setup</h2>
     <p class="secondary">
-      Some streaming services need Widevine.
-      <a href="chrome://components/">Manage protected playback</a>
+      Allowing protected content below does not install Widevine.
+      Some streaming services also need this component from Google.
+      Its downloads are optional and off by default.
+    </p>
+    <ol class="secondary">
+      <li><a href="chrome://components/">Install or manage Widevine</a>
+        and allow its downloads. Wait for an installed version to appear.</li>
+      <li>After installation, quit Noventra completely, then reopen the browser.</li>
+      <li>Allow protected content below, then reload your streaming page.</li>
+    </ol>
+    <p class="secondary">
+      Some services require an approved browser. Installing Widevine does not
+      guarantee that every streaming service supports Noventra.
     </p>
     <h2>$i18n{siteSettingsDefaultBehavior}</h2>
     <div class="secondary radio-sub-heading">

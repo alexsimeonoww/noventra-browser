@@ -301,7 +301,8 @@ def desktop_contents(source, launcher, icon):
     require(not any(c in value for c in ('\n', '\r', '\0')), 'Invalid installation path')
     for character in ('\\', '"', '`', '$'):
         value = value.replace(character, '\\' + character)
-    command = '"' + value.replace('\\', '\\\\').replace('%', '%%') + '"'
+    command = (value if re.fullmatch(r'[/A-Za-z0-9._:+-]+', value) else
+               '"' + value.replace('\\', '\\\\').replace('%', '%%') + '"')
     if '%' in str(launcher):
         command = '/usr/bin/env ' + command
     lines, count = [], 0

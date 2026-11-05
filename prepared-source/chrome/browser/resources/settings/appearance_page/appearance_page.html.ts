@@ -728,6 +728,32 @@ export function getHtml(this: SettingsAppearancePageElement) {
         Keyboard shortcuts
       </a>
     </div>
+    <h3 class="settings-group-heading">Tab previews</h3>
+    ${!this.showHoverCardImagesOption_ ? html`
+      <settings-toggle-button id="hoverCardMemoryUsageToggle"
+          ?hidden="${!this.pageVisibility_.hoverCard}"
+          pref-key="browser.hovercard.memory_usage_enabled"
+          label="$i18n{showHoverCardMemoryUsageStandalone}"
+            sub-label="Shows an estimate when you hover over a tab. Open Task Manager from More tools for tab and process details.">
+      </settings-toggle-button>
+    ` : ''}
+    ${this.showHoverCardImagesOption_ ? html`
+      <div>
+        <settings-toggle-button id="hoverCardImagesToggle"
+            ?hidden="${!this.pageVisibility_.hoverCard}"
+            @settings-boolean-control-change="${this.onHoverCardImagesSettingsBooleanControlChange_}"
+            pref-key="browser.hovercard.image_previews_enabled"
+            label="$i18n{showHoverCardImages}">
+        </settings-toggle-button>
+        <settings-toggle-button id="hoverCardMemoryUsageToggle" class="hr"
+            ?hidden="${!this.pageVisibility_.hoverCard}"
+            @settings-boolean-control-change="${this.onHoverCardMemoryUsageSettingsBooleanControlChange_}"
+            pref-key="browser.hovercard.memory_usage_enabled"
+            label="$i18n{showHoverCardMemoryUsage}"
+            sub-label="Shows an estimate when you hover over a tab. Open Task Manager from More tools for tab and process details.">
+        </settings-toggle-button>
+      </div>
+    ` : ''}
     <h3 class="settings-group-heading">Links</h3>
     <settings-toggle-button id="noventraLinkPreview"
         pref-key="noventra.browser.link_preview"
@@ -818,33 +844,7 @@ export function getHtml(this: SettingsAppearancePageElement) {
       </settings-toggle-button>
     ` : ''}
 
-    ${!this.showHoverCardImagesOption_ ? html`
-      <div class="hr" ?hidden="${!this.pageVisibility_.hoverCard}"></div>
-      <settings-toggle-button id="hoverCardMemoryUsageToggle"
-          ?hidden="${!this.pageVisibility_.hoverCard}"
-          pref-key="browser.hovercard.memory_usage_enabled"
-          label="$i18n{showHoverCardMemoryUsageStandalone}">
-      </settings-toggle-button>
-    ` : ''}
-    ${this.showHoverCardImagesOption_ ? html`
-      <div class="cr-row" ?hidden="${!this.pageVisibility_.hoverCard}">
-        $i18n{hoverCardTitle}
-      </div>
-      <div class="list-frame indented-toggles">
-        <settings-toggle-button id="hoverCardImagesToggle"
-            ?hidden="${!this.pageVisibility_.hoverCard}"
-            @settings-boolean-control-change="${this.onHoverCardImagesSettingsBooleanControlChange_}"
-            pref-key="browser.hovercard.image_previews_enabled"
-            label="$i18n{showHoverCardImages}">
-        </settings-toggle-button>
-        <settings-toggle-button id="hoverCardMemoryUsageToggle" class="hr"
-            ?hidden="${!this.pageVisibility_.hoverCard}"
-            @settings-boolean-control-change="${this.onHoverCardMemoryUsageSettingsBooleanControlChange_}"
-            pref-key="browser.hovercard.memory_usage_enabled"
-            label="$i18n{showHoverCardMemoryUsage}">
-        </settings-toggle-button>
-      </div>
-    ` : ''}
+
 
 
 <if expr="is_macosx">

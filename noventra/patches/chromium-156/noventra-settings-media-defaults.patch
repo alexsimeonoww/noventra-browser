@@ -1,0 +1,231 @@
+diff --git a/chrome/browser/resources/components/component.html.ts b/chrome/browser/resources/components/component.html.ts
+--- a/chrome/browser/resources/components/component.html.ts
++++ b/chrome/browser/resources/components/component.html.ts
+@@ -25,6 +25,13 @@
+       <h2>Protected streaming</h2>
+       <p>Some streaming services need Widevine from Google. Enabling downloads
+         installs it and keeps it updated.</p>
++      <p id="widevine-not-installed" role="status"
++          ?hidden="${data.components.some(item =>
++              item.widevine && item.version !== '0.0.0.0')}">
++        Widevine is not installed. Allow downloads below, wait for an installed
++        version to appear, then restart Noventra and reload your streaming page.
++        If installation fails, use Check for update and review its status below.
++      </p>
+       <label>
+         <input id="widevine-downloads" type="checkbox"
+             .checked="${!!data.widevineDownloadsEnabled}"
+diff --git a/chrome/browser/resources/settings/appearance_page/appearance_page.html.ts b/chrome/browser/resources/settings/appearance_page/appearance_page.html.ts
+--- a/chrome/browser/resources/settings/appearance_page/appearance_page.html.ts
++++ b/chrome/browser/resources/settings/appearance_page/appearance_page.html.ts
+@@ -728,6 +728,32 @@
+         Keyboard shortcuts
+       </a>
+     </div>
++    <h3 class="settings-group-heading">Tab previews</h3>
++    ${!this.showHoverCardImagesOption_ ? html`
++      <settings-toggle-button id="hoverCardMemoryUsageToggle"
++          ?hidden="${!this.pageVisibility_.hoverCard}"
++          pref-key="browser.hovercard.memory_usage_enabled"
++          label="$i18n{showHoverCardMemoryUsageStandalone}"
++            sub-label="Shows an estimate when you hover over a tab. Open Task Manager from More tools for tab and process details.">
++      </settings-toggle-button>
++    ` : ''}
++    ${this.showHoverCardImagesOption_ ? html`
++      <div>
++        <settings-toggle-button id="hoverCardImagesToggle"
++            ?hidden="${!this.pageVisibility_.hoverCard}"
++            @settings-boolean-control-change="${this.onHoverCardImagesSettingsBooleanControlChange_}"
++            pref-key="browser.hovercard.image_previews_enabled"
++            label="$i18n{showHoverCardImages}">
++        </settings-toggle-button>
++        <settings-toggle-button id="hoverCardMemoryUsageToggle" class="hr"
++            ?hidden="${!this.pageVisibility_.hoverCard}"
++            @settings-boolean-control-change="${this.onHoverCardMemoryUsageSettingsBooleanControlChange_}"
++            pref-key="browser.hovercard.memory_usage_enabled"
++            label="$i18n{showHoverCardMemoryUsage}"
++            sub-label="Shows an estimate when you hover over a tab. Open Task Manager from More tools for tab and process details.">
++        </settings-toggle-button>
++      </div>
++    ` : ''}
+     <h3 class="settings-group-heading">Links</h3>
+     <settings-toggle-button id="noventraLinkPreview"
+         pref-key="noventra.browser.link_preview"
+@@ -818,33 +844,7 @@
+       </settings-toggle-button>
+     ` : ''}
+ 
+-    ${!this.showHoverCardImagesOption_ ? html`
+-      <div class="hr" ?hidden="${!this.pageVisibility_.hoverCard}"></div>
+-      <settings-toggle-button id="hoverCardMemoryUsageToggle"
+-          ?hidden="${!this.pageVisibility_.hoverCard}"
+-          pref-key="browser.hovercard.memory_usage_enabled"
+-          label="$i18n{showHoverCardMemoryUsageStandalone}">
+-      </settings-toggle-button>
+-    ` : ''}
+-    ${this.showHoverCardImagesOption_ ? html`
+-      <div class="cr-row" ?hidden="${!this.pageVisibility_.hoverCard}">
+-        $i18n{hoverCardTitle}
+-      </div>
+-      <div class="list-frame indented-toggles">
+-        <settings-toggle-button id="hoverCardImagesToggle"
+-            ?hidden="${!this.pageVisibility_.hoverCard}"
+-            @settings-boolean-control-change="${this.onHoverCardImagesSettingsBooleanControlChange_}"
+-            pref-key="browser.hovercard.image_previews_enabled"
+-            label="$i18n{showHoverCardImages}">
+-        </settings-toggle-button>
+-        <settings-toggle-button id="hoverCardMemoryUsageToggle" class="hr"
+-            ?hidden="${!this.pageVisibility_.hoverCard}"
+-            @settings-boolean-control-change="${this.onHoverCardMemoryUsageSettingsBooleanControlChange_}"
+-            pref-key="browser.hovercard.memory_usage_enabled"
+-            label="$i18n{showHoverCardMemoryUsage}">
+-        </settings-toggle-button>
+-      </div>
+-    ` : ''}
++
+ 
+ 
+ <if expr="is_macosx">
+diff --git a/chrome/browser/resources/settings/settings_shared_lit.css b/chrome/browser/resources/settings/settings_shared_lit.css
+--- a/chrome/browser/resources/settings/settings_shared_lit.css
++++ b/chrome/browser/resources/settings/settings_shared_lit.css
+@@ -32,6 +32,25 @@
+ }
+ 
+ /* Common styles for Material Design settings. */
++
++.cr-centered-card-container {
++  min-width: 0;
++}
++
++@media (max-width: 550px) {
++  .cr-row:has(> .header-aligned-button),
++  .list-item:has(> cr-button:not([hidden])) {
++    align-items: stretch;
++    flex-direction: column;
++  }
++
++  .cr-row > .header-aligned-button,
++  .list-item > cr-button {
++    align-self: flex-start;
++    margin-block: 0 12px;
++    margin-inline-start: 0;
++  }
++}
+ 
+ /* Prevent action-links from being selected to avoid accidental
+  * selection when trying to click it. */
+diff --git a/chrome/browser/resources/settings/site_settings/protected_content_page.html b/chrome/browser/resources/settings/site_settings/protected_content_page.html
+--- a/chrome/browser/resources/settings/site_settings/protected_content_page.html
++++ b/chrome/browser/resources/settings/site_settings/protected_content_page.html
+@@ -13,9 +13,21 @@
+     <div id="description" class="secondary">
+       $i18n{siteSettingsProtectedContentDescription}
+     </div>
++    <h2>Streaming setup</h2>
+     <p class="secondary">
+-      Some streaming services need Widevine.
+-      <a href="chrome://components/">Manage protected playback</a>
++      Allowing protected content below does not install Widevine.
++      Some streaming services also need this component from Google.
++      Its downloads are optional and off by default.
++    </p>
++    <ol class="secondary">
++      <li><a href="chrome://components/">Install or manage Widevine</a>
++        and allow its downloads. Wait for an installed version to appear.</li>
++      <li>After installation, quit Noventra completely, then reopen the browser.</li>
++      <li>Allow protected content below, then reload your streaming page.</li>
++    </ol>
++    <p class="secondary">
++      Some services require an approved browser. Installing Widevine does not
++      guarantee that every streaming service supports Noventra.
+     </p>
+     <h2>$i18n{siteSettingsDefaultBehavior}</h2>
+     <div class="secondary radio-sub-heading">
+diff --git a/chrome/browser/shell_integration_linux.cc b/chrome/browser/shell_integration_linux.cc
+--- a/chrome/browser/shell_integration_linux.cc
++++ b/chrome/browser/shell_integration_linux.cc
+@@ -97,6 +97,18 @@
+ // We delegate the difficulty of setting the default browser and default url
+ // scheme handler in Linux desktop environments to an xdg utility, xdg-settings.
+ 
++std::vector<std::string> GetXdgSettingsCommand(base::Environment* env,
++                                            const std::string& scheme) {
++  if (scheme.empty() &&
++      base::FilePath(env->GetVar("BROWSER").value_or("")).BaseName().value() ==
++          "omarchy-launch-browser") {
++    // Omarchy's dispatcher and desktop MIME list point back to its launcher.
++    // Use the same environment as its own default-browser command.
++    return {"env", "-u", "BROWSER", "XDG_CURRENT_DESKTOP=", kXdgSettings};
++  }
++  return {kXdgSettings};
++}
++
+ // If |scheme| is empty this function sets Chrome as the default browser,
+ // otherwise it sets Chrome as the default handler application for |scheme|.
+ bool SetDefaultWebClient(const std::string& scheme) {
+@@ -105,8 +117,7 @@
+ #else
+   std::unique_ptr<base::Environment> env(base::Environment::Create());
+ 
+-  std::vector<std::string> argv;
+-  argv.push_back(kXdgSettings);
++  std::vector<std::string> argv = GetXdgSettingsCommand(env.get(), scheme);
+   argv.push_back("set");
+   if (scheme.empty()) {
+     argv.push_back(kXdgSettingsDefaultBrowser);
+@@ -139,8 +150,7 @@
+     return shell_integration::CANNOT_BE_DEFAULT;
+   }
+ 
+-  std::vector<std::string> argv;
+-  argv.push_back(kXdgSettings);
++  std::vector<std::string> argv = GetXdgSettingsCommand(env.get(), scheme);
+   argv.push_back("check");
+   if (scheme.empty()) {
+     argv.push_back(kXdgSettingsDefaultBrowser);
+diff --git a/ui/webui/resources/cr_elements/cr_collapse/cr_collapse.ts b/ui/webui/resources/cr_elements/cr_collapse/cr_collapse.ts
+--- a/ui/webui/resources/cr_elements/cr_collapse/cr_collapse.ts
++++ b/ui/webui/resources/cr_elements/cr_collapse/cr_collapse.ts
+@@ -56,7 +56,9 @@
+     }
+     this.setAttribute('aria-hidden', 'true');
+     this.addEventListener(
+-        'transitionend', (e: Event) => this.onTransitionEnd_(e));
++        'transitionend', (e: Event) => this.onTransitionComplete_(e));
++    this.addEventListener(
++        'transitioncancel', (e: Event) => this.onTransitionComplete_(e));
+   }
+ 
+   override updated(changedProperties: PropertyValues<this>) {
+@@ -96,16 +98,26 @@
+     this.style.maxHeight = animationEndSize;
+ 
+     // If it won't animate, set correct classes. Otherwise these are set in
+-    // onTransitionEnd_().
++    // onTransitionComplete_().
+     if (!willAnimate) {
+       this.updateStyles_();
+     }
+   }
+ 
+-  private onTransitionEnd_(e: Event) {
+-    if (e.composedPath()[0] === this) {
+-      this.updateStyles_();
++  private onTransitionComplete_(e: Event) {
++    if (e.composedPath()[0] !== this) {
++      return;
+     }
++    // A reversed transition can already be running when cancellation is sent.
++    if (e.type === 'transitioncancel' &&
++        this.getAnimations().some(animation =>
++            animation instanceof CSSTransition &&
++            animation.transitionProperty === 'max-height' &&
++            animation.playState !== 'idle' &&
++            animation.playState !== 'finished')) {
++      return;
++    }
++    this.updateStyles_();
+   }
+ 
+   private updateStyles_() {
