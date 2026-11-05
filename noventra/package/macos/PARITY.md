@@ -6,8 +6,10 @@ The Mac source includes all portable shared changes from Linux commit
 declared pristine hashes are preserved. The complete series passes reverse and
 forward replay with every final hash checked.
 
-This is source synchronization. The current combined layer has not been
-compiled or tested natively on macOS. It is not an installable Mac update.
+The combined layer compiled incrementally in the existing Mac workspace and
+passed isolated native version and JavaScript DOM checks. The source kit does
+not provide a packaged Mac update. Native UI and platform integrations remain
+unqualified.
 
 ## Shared changes present
 
@@ -28,22 +30,22 @@ allowlist, and Apple-issued signing-identity requirements.
 
 | Area | Mac state | Work needed before enabling or releasing |
 | --- | --- | --- |
-| Settings, tab previews, setup transfer entry, and compact pin/split source | Shared changes present | Native compile and UI checks |
+| Settings, tab previews, setup transfer entry, and compact pin/split source | Shared source compiled; headless execution passed | Native UI checks |
 | Regular-Space browser profiles | Shared registry, migration, session, and UI code present; Linux/Aura gate retained | Native Cocoa window host and migration qualification |
 | Same-window Incognito | Genuine private-window fallback retained | Native host and lifecycle qualification |
 | Cookie import | Shared plumbing present; Linux/DBus capability gate retained | Mac source readers, Keychain integration, access and schema checks |
 | Protected streaming | Optional Widevine controls present | Native installation, restart, encrypted playback, and service support checks |
 | Automatic updates | Sparkle and Chromium updater remain disabled | Qualified Mac package, approved signing/notarization, and a signed Mac delivery route |
-| Installer | Build/package tools preserved | Native build and appropriate available Apple application-signing identity |
+| Installer | Native compiler app built; package tools preserved | Appropriate Apple application-signing identity and package qualification |
 
 Linux cookie encryption and Aura browser hosting cannot be enabled by changing
 their platform flags. The Mac UI continues to describe its actual shared-data
 model while independent profiles remain disabled. Cookie capabilities remain
 hidden when the backend does not support them.
 
-The earlier eight-patch compiler app passed headless checks with mock Keychain.
-Its protected ad-hoc DMG failed before startup. Those historical checks do not
-qualify this newer layer. See [native findings](RUNTIME.md).
+The current sixteen-patch compiler app passes headless checks with mock Keychain.
+The earlier protected ad-hoc DMG failed before startup. Native compiler success
+does not qualify that package. See [native findings](RUNTIME.md).
 
 ## Build without overwriting an earlier Mac checkout
 

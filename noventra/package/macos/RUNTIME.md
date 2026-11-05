@@ -1,12 +1,37 @@
-# Native runtime findings, November 4, 2026
+# Native runtime findings
+
+## November 5: incremental build of the sixteen-patch source
+
+The sixteen-patch layer with manifest
+`d5ca765513c1547fae6c71807ff01a88fcff3fccf3dd58b399381bff95029be9`
+compiled successfully in the existing Apple silicon compiler workspace using
+the published incremental updater from commit
+`1e53c1d14b3ce2e66c0322ce4245885c0d989e3c`. All 722 kit inputs, 677 native
+source paths and 72 offline tests passed. The compiler retained the existing
+absolute source/output paths, GN arguments, objects and ThinLTO cache. Bounded
+object and cache samples retained their recorded hashes and timestamps.
+
+The resulting arm64 app passes native version and JavaScript DOM checks using
+owned incognito profiles and mock Keychain. Both checks passed again after
+removing the stopped duplicate compiler workspace. No owned processes remained.
+The app inventory SHA256 is
+`abafe426bddb370652438c29e271b488e23f99461169ac5758c6c59ee5369864`;
+the generated signing-input inventory SHA256 is
+`2c2090629e3a80d7f24c4ffe4fb9801ca7f22ea9485309034905e1804e3e56ca`.
+
+Source-kit candidate flags remain conservative; these native receipts qualify
+this exact manifest's local compiler app. They do not qualify a distributed
+binary, native GUI, real Keychain, imports, transfer or protected streaming.
+No signing, packaging, installation or automatic-update publication occurred.
+
+## November 4: historical eight-patch candidate
 
 These findings apply to the eight-patch native candidate with manifest
 `ac3892eb84990a54b28f9bb1a8d69852959e27376cdcc2a9391422301946e9f9`.
 The current source has sixteen patches and 677 declared paths. All twelve
 previous Mac patches are preserved, with four shared Linux 0.1.8 deltas added.
-The combined layer passes source replay. It has not been compiled or qualified
-on the Mac. The findings below remain historical evidence for the eight-patch
-candidate.
+The current layer's incremental native checks are recorded above. The findings
+below remain historical evidence for the earlier eight-patch candidate.
 
 Native evidence was collected on an Apple silicon Mac. Its owned compiler
 workspace and test profiles remain outside this source kit.

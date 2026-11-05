@@ -1,12 +1,12 @@
 # Build the Apple silicon test app
 
-The eight-patch ARM64 candidate with manifest
-`ac3892eb84990a54b28f9bb1a8d69852959e27376cdcc2a9391422301946e9f9`
-compiled and linked on the M5 MacBook. That compiler app passes isolated
-headless JS DOM checks with mock Keychain. The existing
-ad-hoc test DMG aborts under library validation. At the November 4 native audit,
-no suitable Apple signing identity was installed. See [RUNTIME.md](RUNTIME.md) for evidence and
-limits. Native UI, imports, real Keychain and transfer remain unqualified.
+The current sixteen-patch ARM64 source compiled and linked incrementally in
+the existing M5 MacBook workspace. Its compiler app passes isolated version
+and JavaScript DOM checks with mock Keychain. The earlier protected ad-hoc DMG
+aborts under library validation, and no suitable Apple signing identity was
+available at the native audit. See [RUNTIME.md](RUNTIME.md) for exact source and
+artifact identities. Native UI, imports, real Keychain and transfer remain
+unqualified; no signed Mac download or automatic update was published.
 
 The shared source includes five-step onboarding with a dedicated search-engine choice, one Data page and selected browser imports at Finish, immediate layout saving, separate normal/compact top layouts, theme/bookmark polish and vertical bookmark-bar defaults.
 These flows still require native macOS testing.
@@ -24,8 +24,8 @@ automatic updates or produce a public signed/notarized download.
 
 The twelve previous Mac patches remain unchanged. Four new shared deltas
 were appended after them. The combined sixteen-patch source passes exact
-reverse and forward replay checks. Native compilation and runtime evidence
-still cover only the earlier eight-patch artifact.
+reverse and forward replay checks. Native compilation and isolated headless
+checks also cover this exact sixteen-patch manifest.
 
 Use an Apple silicon Mac running native arm64 Python, an APFS compiler volume,
 and a complete Xcode installation with Mac SDK **26.5 or newer**. The pinned
