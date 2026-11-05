@@ -25,6 +25,42 @@ TEMPLATE = ROOT / 'noventra/package/noventra-browser.desktop'
 
 
 class DesktopRegistrationTests(unittest.TestCase):
+    @unittest.skipUnless(shutil.which('xdg-settings') and shutil.which('desktop-file-validate'),
+                         'XDG desktop integration unavailable')
+    def test_selecting_default_preserves_registered_desktop_file(self):
+        with tempfile.TemporaryDirectory(prefix='noventra-default-registration-') as temporary:
+            root = Path(temporary)
+            launcher = root / 'AppRun'
+            launcher.write_text('#!/bin/sh\nexit 0\n')
+            launcher.chmod(0o755)
+            for name, content in (
+                    ('package', installer.desktop_contents(TEMPLATE, launcher, root / 'icon.png')),
+                    ('development', development.desktop_contents(launcher, root / 'icon.png'))):
+                with self.subTest(registration=name):
+                    data = root / name / 'data'
+                    config = root / name / 'config'
+                    desktop = data / 'applications/noventra-browser.desktop'
+                    desktop.parent.mkdir(parents=True)
+                    config.mkdir()
+                    desktop.write_bytes(content)
+                    before = installer.describe(desktop)
+                    env = dict(os.environ, XDG_DATA_HOME=str(data), XDG_CONFIG_HOME=str(config),
+                               XDG_CONFIG_DIRS=str(root / 'empty-config'),
+                               XDG_CURRENT_DESKTOP='', DESKTOP_SESSION='', DE='')
+                    env.pop('BROWSER', None)
+                    for _ in range(2):
+                        selected = subprocess.run(
+                            ['xdg-settings', 'set', 'default-web-browser', desktop.name],
+                            env=env, text=True, capture_output=True)
+                        self.assertEqual(selected.returncode, 0, selected.stderr)
+                        self.assertEqual(installer.describe(desktop), before,
+                                         'Default selection changed the installer-owned desktop file')
+                        checked = subprocess.run(
+                            ['xdg-settings', 'check', 'default-web-browser', desktop.name],
+                            env=env, text=True, capture_output=True, check=True)
+                        self.assertEqual(checked.stdout.strip(), 'yes')
+                    subprocess.run(['desktop-file-validate', str(desktop)], check=True)
+
     def test_simple_install_paths_work_with_omarchy_command_discovery(self):
         with tempfile.TemporaryDirectory(prefix='noventra-desktop-discovery-') as temporary:
             root = Path(temporary)

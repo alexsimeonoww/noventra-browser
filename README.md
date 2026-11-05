@@ -9,6 +9,13 @@ vertical tabs, Spaces, split views and configurable browser controls.
 The first public target is **Linux x86_64 preview**. Windows and macOS downloads
 are not available yet. Preview builds need testing before everyday use.
 
+## Noventra 0.1.9: reliable default-browser registration
+
+Linux default-browser selection keeps the installed desktop entry valid and
+preserves its installer ownership record. Repeated selection through XDG or
+Omarchy no longer rewrites the entry. This packaging update uses the same
+qualified native browser and resources as 0.1.8.
+
 ## Mac source and native build tools
 
 The Apple silicon source layer is synchronized with the portable Linux 0.1.8

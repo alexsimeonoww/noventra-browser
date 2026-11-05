@@ -1,4 +1,4 @@
-# Settings, default browser, and protected playback in Noventra 0.1.8
+# Settings, default browser, and protected playback in Noventra 0.1.9
 
 Noventra 0.1.8 corrects narrow Settings cards, interrupted Spell check expansion,
 and default-browser selection with Omarchy's browser dispatcher. It also makes
@@ -7,6 +7,10 @@ tab-memory previews and optional protected-streaming setup easier to find.
 To update a managed Linux installation, open **About Noventra**, check for
 updates, then choose **Update and restart** when the download is ready.
 Older installations can require a complete quit and reopen after staging.
+
+Noventra 0.1.9 corrects the Linux desktop registration used by default-browser
+selection. Its native browser and resources are identical to the qualified
+0.1.8 release.
 
 ## Show memory for a tab
 
@@ -24,6 +28,12 @@ The native Make default action handles Omarchy's `BROWSER` dispatcher without
 changing other browser overrides or URL-scheme handlers. The Linux installer
 leaves simple Exec paths unquoted so Omarchy's launcher can discover them.
 Paths with reserved characters retain Desktop Entry escaping.
+
+The main desktop entry declares the `about` and `unknown` URL handlers used by
+XDG's generic browser setter. Missing declarations caused XDG to move the MIME
+list into a desktop action and invalidate the installer's ownership record.
+The regression test selects the browser twice and verifies that registration,
+permissions, and file identity remain intact.
 
 An Omarchy default-browser chooser can use a fixed application list. Its
 supported user-menu extension can add a Noventra entry. This browser release
