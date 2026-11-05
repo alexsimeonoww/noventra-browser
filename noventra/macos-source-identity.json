@@ -21,19 +21,19 @@
       "sha256": "a0279a9937ce228eb71ea2a0252d0830458708570fee3df516fa4bd4c8a134bc"
     },
     "noventra/package/macos/BUILD.md": {
-      "bytes": 10652,
+      "bytes": 12835,
       "mode": 420,
-      "sha256": "33b6f2fb4bcad7c4549ca46335f962324389631e4d09a880d77da265197cf0bc"
+      "sha256": "219a5118de784534acd3ad96670d1ec5105ff97b506b37ebe99987a7621e0eec"
     },
     "noventra/package/macos/PARITY.md": {
-      "bytes": 4011,
+      "bytes": 4219,
       "mode": 420,
-      "sha256": "3e29c8610a4b47873424d8c4564da26ad101910aff9a05d4d2a0ef70b9c567c4"
+      "sha256": "943d728befe124d0d89b2a24227e4e37cb57a094e5a06bd02f93bf8845d40b12"
     },
     "noventra/package/macos/README.md": {
-      "bytes": 9451,
+      "bytes": 9469,
       "mode": 420,
-      "sha256": "0b1782a4b0fcebb5494baec90fb2a9a092bc44131827fa9c5c25318557b83ed7"
+      "sha256": "619a78e5876831125bb523c6ef60f0ef34a8312713946154c63a2f0208158b8c"
     },
     "noventra/package/macos/RUNTIME.md": {
       "bytes": 7441,
@@ -3595,10 +3595,15 @@
       "mode": 420,
       "sha256": "e73505020101a502b1838ac56b09d819795a4db3016aa85f38e7975ee671ec5c"
     },
-    "tools/noventra/build_macos.py": {
-      "bytes": 32370,
+    "tests/noventra/test_update_macos.py": {
+      "bytes": 24674,
       "mode": 420,
-      "sha256": "4f62077a5bb3bd739ed495d1d6a0c03c3f12d92bbd94dd5b82fbd894e37a3c7e"
+      "sha256": "13b1498626829cce0d6c647b21d0e81f81c72f92e6e06201d8923216f7e3eeaa"
+    },
+    "tools/noventra/build_macos.py": {
+      "bytes": 32459,
+      "mode": 420,
+      "sha256": "d2e8b815d1b4f9fd781f1afe0dac05a7dbfedf558af670e9c54a2294858fb5bc"
     },
     "tools/noventra/package_macos.py": {
       "bytes": 31646,
@@ -3609,6 +3614,11 @@
       "bytes": 6433,
       "mode": 420,
       "sha256": "07140507896c4d94eb3379a366cc5da750bc2722c9ad423de4e6e4da2d385cb3"
+    },
+    "tools/noventra/update_macos.py": {
+      "bytes": 26941,
+      "mode": 420,
+      "sha256": "6d8f05389837b4fbf98a8b8f1d03df265e4029218f3f69ffeb83bd0b1519d562"
     }
   },
   "format": 1,

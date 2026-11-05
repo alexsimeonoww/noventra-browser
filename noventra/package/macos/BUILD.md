@@ -64,10 +64,12 @@ The pins are Chromium `156.0.8078.79` /
 its baseline was reconstructed and strictly replayed on Linux. Native exact
 preimage verification remains mandatory.
 
-## Prepare isolated native source
+## Prepare native source once
 
 Make only the parent directory first; the build tool creates and owns the new
-workspace. Choose a fresh name so existing sources and build outputs stay intact.
+workspace. This step is for the first build or a change of engine/platform pins.
+Keep this workspace and its compiled output for later source updates. For an
+existing build, use the incremental update below.
 
 ```sh
 mkdir -p "$HOME/NoventraMacBuilds"
@@ -131,9 +133,51 @@ limited RAM; the chosen count is recorded in the build receipt.
 
 A failed compile can be resumed by rerunning `build` against the same owned,
 unchanged preparation. A workspace binds its input manifest, builder tool,
-initial preferences, pins and paths; changed bindings require a fresh workspace.
-Logs and failure/state JSON remain in the workspace. Only the tool's own native
-build output is reused, and it never restarts destructive upstream preparation.
+initial preferences, pins and paths. Ordinary build/resume refuses changed
+bindings; use the explicit incremental update command to move an existing
+workspace to a newer source layer at the same engine pins. Logs and failure/state
+JSON remain in the workspace.
+
+## Update an existing build
+
+Keep one active compiler workspace for small browser changes. From the newer
+source kit, supply the exact previous kit that created the workspace:
+
+```sh
+NOVENTRA_MAC_WORKSPACE="$HOME/NoventraMacBuilds/noventra-156-arm64-test-1"
+NOVENTRA_MAC_PREVIOUS_KIT="/absolute/path/to/previous-source-kit"
+
+python3.13 -B tools/noventra/update_macos.py \
+  --workspace "$NOVENTRA_MAC_WORKSPACE" \
+  --previous-kit "$NOVENTRA_MAC_PREVIOUS_KIT"
+
+python3.13 -B tools/noventra/build_macos.py build \
+  --workspace "$NOVENTRA_MAC_WORKSPACE" \
+  --platform-root "$NOVENTRA_MAC_WORKSPACE/platform" \
+  --jobs 2
+```
+
+Use the workspace's existing platform path if it is outside the workspace.
+Keep the previous kit available until the update has completed. The update
+requires the same engine/platform pins and an idle, owned compiler workspace.
+Unexplained source edits or changed input hashes stop it before replacement.
+
+The updater reverses the old patch series in a small staging tree, checks the
+new pristine hashes, and applies the new layer there before replacing changed
+files. It preserves unchanged file timestamps and the existing compiler output,
+Siso state and link caches. Changed source and previous receipts are backed up
+in the workspace's update history. A failed or interrupted update has a guarded
+recovery path; follow its recorded recovery command before building.
+For an interrupted transaction, run the same updater with `--workspace` and
+`--rollback-update` pointing to its recorded `source-updates/<id>` directory.
+Recovery refuses to overwrite subsequent edits.
+
+The next build regenerates GN and lets the compiler rebuild affected targets
+in the same directory. Header, build-flag or widely shared source changes can
+still require substantial compilation. This path avoids another source download
+and a duplicate full compiler workspace. This version refuses a shrinking patch
+scope or changed native icon sources before updating. Engine/platform changes
+require separate preparation.
 
 Successful compilation produces:
 
@@ -189,5 +233,5 @@ Primary build references: [pinned Helium Mac helper](https://github.com/imputnet
 [pinned platform requirements](https://github.com/imputnet/helium-macos/blob/0c7da2ba0b61a2143adf1c6d56ccd0df6a53d0bf/docs/building.md),
 [pinned Chromium Mac requirements](https://github.com/chromium/chromium/blob/a21ce95c24ce3964416f09ae1862f53f319eb4d0/docs/mac_build_instructions.md).
 
-Native bundle validation repair: the pinned Chromium copy-from-disk-image `Resources/install.sh` is accepted only at the active framework resource path with SHA256 `1b541faca17a7a1a124d9e288fd27bf66785f3667d788243383ab17700489b69`. Modified or misplaced executable scripts remain rejected. The resource is never executed by the builder or packager. The current offline suite has 53 tests, including native bundle and owned-process
-regressions. These tests do not compile, sign, or qualify a Mac application.
+Native bundle validation repair: the pinned Chromium copy-from-disk-image `Resources/install.sh` is accepted only at the active framework resource path with SHA256 `1b541faca17a7a1a124d9e288fd27bf66785f3667d788243383ab17700489b69`. Modified or misplaced executable scripts remain rejected. The resource is never executed by the builder or packager. The offline suite covers native bundle checks, owned-process regressions and
+incremental source-update recovery. These tests do not compile, sign, or qualify a Mac application.

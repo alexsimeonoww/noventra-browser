@@ -47,9 +47,12 @@ qualify this newer layer. See [native findings](RUNTIME.md).
 
 ## Build without overwriting an earlier Mac checkout
 
-Use a new source checkout and a fresh compiler workspace. Preserve any local
-changes in an earlier Mac checkout before merging or copying files. The build
-tool refuses to adopt an unrelated workspace or resume with changed bindings.
+Preserve the existing compiler workspace and its compiled output. For a newer
+source kit at the same engine/platform pins, follow the
+[incremental update instructions](BUILD.md#update-an-existing-build). The explicit
+update verifies the old source and saves changed-file backups before rebinding
+the workspace. Ordinary build/resume still refuses unexplained input changes.
+First builds and engine/platform changes use separate preparation.
 Follow [BUILD.md](BUILD.md) and [the package guide](README.md).
 
 `noventra/macos-source-identity.json` inventories the published Mac prepared

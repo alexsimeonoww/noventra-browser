@@ -216,7 +216,8 @@ def verify_platform(root):
 
 
 class Workspace:
-    def __init__(self, path, platform_root, identity, *, create=False, project=ROOT):
+    def __init__(self, path, platform_root, identity, *, create=False, project=ROOT,
+                 tool_path=None, preferences_path=None):
         requested = Path(path).absolute()
         require(not requested.is_symlink(), 'Workspace cannot be a symlink')
         parent = requested.parent.resolve(strict=True)
@@ -233,8 +234,8 @@ class Workspace:
         self.output = child(self.root, 'src/out/Default')
         self.bindings = {'format': 1, 'kind': WORKSPACE_KIND, 'workspace': str(self.root),
                          'platform_root': str(self.platform), 'engine': ENGINE,
-                         'manifest_sha256': identity, 'tool_sha256': sha(Path(__file__)),
-                         'initial_preferences_sha256': sha(PREFERENCES)}
+                         'manifest_sha256': identity, 'tool_sha256': sha(tool_path or Path(__file__)),
+                         'initial_preferences_sha256': sha(preferences_path or PREFERENCES)}
         if self.root.exists():
             require(self.state_path.is_file() and not self.state_path.is_symlink(),
                     'Existing workspace has no Noventra ownership receipt; refusing to adopt it')
