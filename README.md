@@ -9,6 +9,18 @@ vertical tabs, Spaces, split views and configurable browser controls.
 The first public target is **Linux x86_64 preview**. Windows and macOS downloads
 are not available yet. Preview builds need testing before everyday use.
 
+## Mac source and native build tools
+
+The Apple silicon source layer is synchronized with the portable Linux 0.1.8
+changes while preserving the earlier Mac-specific fixes. It includes native
+build/package tools and a separate source inventory. See the
+[Mac source parity matrix](noventra/package/macos/PARITY.md) and
+[native build guide](noventra/package/macos/BUILD.md).
+
+This source update does not provide a Mac application or automatic update.
+Native compilation, runtime checks, suitable Apple signing, and the remaining
+Mac profile-host and cookie-reader work are still required.
+
 ## Noventra 0.1.8: Settings and protected streaming setup
 
 Settings cards keep their controls visible in narrow windows, and interrupted

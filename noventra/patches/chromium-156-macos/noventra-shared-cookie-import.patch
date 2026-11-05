@@ -1,0 +1,2631 @@
+diff --git a/chrome/browser/importer/BUILD.gn b/chrome/browser/importer/BUILD.gn
+--- a/chrome/browser/importer/BUILD.gn
++++ b/chrome/browser/importer/BUILD.gn
+@@ -19,11 +19,14 @@
+     "importer_uma.h",
+     "in_process_importer_bridge.h",
+     "profile_writer.h",
++    "noventra_cookie_profile_writer.h",
+     "noventra_password_profile_writer.h",
+   ]
+ 
+   public_deps = [
+     "//base",
++    "//content/public/browser",
++    "//net",
+     "//chrome/app:generated_resources",
+     "//chrome/common/importer",
+     "//chrome/common/importer:interfaces",
+@@ -53,12 +56,14 @@
+     "importer_uma.cc",
+     "in_process_importer_bridge.cc",
+     "profile_writer.cc",
++    "noventra_cookie_profile_writer.cc",
+     "noventra_password_profile_writer.cc",
+   ]
+ 
+   deps = [
+     ":importer",
+     "//build/config/linux/dbus:buildflags",
++    "//services/network/public/mojom:cookies_mojom",
+     "//chrome/browser:shell_integration",
+     "//chrome/browser/bookmarks",
+     "//chrome/browser/favicon",
+diff --git a/chrome/browser/importer/external_process_importer_client.cc b/chrome/browser/importer/external_process_importer_client.cc
+--- a/chrome/browser/importer/external_process_importer_client.cc
++++ b/chrome/browser/importer/external_process_importer_client.cc
+@@ -89,8 +89,9 @@
+ }
+ 
+ void ExternalProcessImporterClient::Cancel() {
+-  if (cancelled_)
+-    return;
++  if (cancelled_) {
++    return;
++  }
+ 
+   cancelled_ = true;
+   profile_import_->CancelImport();
+@@ -100,26 +101,30 @@
+ 
+ void ExternalProcessImporterClient::OnProcessCrashed() {
+   DLOG(ERROR) << __func__;
+-  if (cancelled_)
+-    return;
++  if (cancelled_) {
++    return;
++  }
+ 
+   // If the host is still around, cancel the import; otherwise it means the
+   // import was already cancelled or completed and this message can be dropped.
+-  if (process_importer_host_.get())
++  if (process_importer_host_.get()) {
+     process_importer_host_->Cancel();
++  }
+ }
+ 
+ void ExternalProcessImporterClient::OnImportStart() {
+-  if (cancelled_)
+-    return;
++  if (cancelled_) {
++    return;
++  }
+ 
+   bridge_->NotifyStarted();
+ }
+ 
+-void ExternalProcessImporterClient::OnImportFinished(
+-    bool succeeded, const std::string&) {
+-  if (cancelled_)
+-    return;
++void ExternalProcessImporterClient::OnImportFinished(bool succeeded,
++                                                     const std::string&) {
++  if (cancelled_) {
++    return;
++  }
+ 
+   if (!succeeded) {
+     // Importer diagnostics can contain source data. Keep them out of logs and
+@@ -132,25 +137,40 @@
+ 
+ void ExternalProcessImporterClient::OnImportItemStart(
+     user_data_importer::ImportItem import_item) {
+-  if (cancelled_)
+-    return;
++  if (cancelled_) {
++    return;
++  }
+ 
+   bridge_->NotifyItemStarted(import_item);
+ }
+ 
+ void ExternalProcessImporterClient::OnImportItemFinished(
+     user_data_importer::ImportItem import_item) {
+-  if (cancelled_)
+-    return;
++  if (cancelled_) {
++    return;
++  }
+ 
+   bridge_->NotifyItemEnded(import_item);
+   profile_import_->ReportImportItemFinished(import_item);
+ }
+ 
++void ExternalProcessImporterClient::OnCookiesImportReady(
++    const std::vector<net::CanonicalCookie>& cookies,
++    uint32_t skipped_count,
++    OnCookiesImportReadyCallback callback) {
++  if (cancelled_ || !process_importer_host_ || cookies.size() > 100 ||
++      skipped_count > 100000) {
++    std::move(callback).Run(false);
++    return;
++  }
++  bridge_->WriteCookies(cookies, skipped_count, std::move(callback));
++}
++
+ void ExternalProcessImporterClient::OnHistoryImportStart(
+     uint32_t total_history_rows_count) {
+-  if (cancelled_)
+-    return;
++  if (cancelled_) {
++    return;
++  }
+ 
+   total_history_rows_count_ = total_history_rows_count;
+   history_rows_.reserve(total_history_rows_count);
+@@ -159,21 +179,24 @@
+ void ExternalProcessImporterClient::OnHistoryImportGroup(
+     const std::vector<user_data_importer::ImporterURLRow>& history_rows_group,
+     int visit_source) {
+-  if (cancelled_)
+-    return;
++  if (cancelled_) {
++    return;
++  }
+ 
+   history_rows_.insert(history_rows_.end(), history_rows_group.begin(),
+                        history_rows_group.end());
+-  if (history_rows_.size() >= total_history_rows_count_)
++  if (history_rows_.size() >= total_history_rows_count_) {
+     bridge_->SetHistoryItems(
+         history_rows_,
+         static_cast<user_data_importer::VisitSource>(visit_source));
++  }
+ }
+ 
+ void ExternalProcessImporterClient::OnHomePageImportReady(
+     const GURL& home_page) {
+-  if (cancelled_)
+-    return;
++  if (cancelled_) {
++    return;
++  }
+ 
+   bridge_->AddHomePage(home_page);
+ }
+@@ -181,8 +204,9 @@
+ void ExternalProcessImporterClient::OnBookmarksImportStart(
+     const std::u16string& first_folder_name,
+     uint32_t total_bookmarks_count) {
+-  if (cancelled_)
+-    return;
++  if (cancelled_) {
++    return;
++  }
+ 
+   bookmarks_first_folder_name_ = first_folder_name;
+   total_bookmarks_count_ = total_bookmarks_count;
+@@ -192,21 +216,24 @@
+ void ExternalProcessImporterClient::OnBookmarksImportGroup(
+     const std::vector<user_data_importer::ImportedBookmarkEntry>&
+         bookmarks_group) {
+-  if (cancelled_)
+-    return;
++  if (cancelled_) {
++    return;
++  }
+ 
+   // Collect sets of bookmarks from importer process until we have reached
+   // total_bookmarks_count_:
+   bookmarks_.insert(bookmarks_.end(), bookmarks_group.begin(),
+                     bookmarks_group.end());
+-  if (bookmarks_.size() >= total_bookmarks_count_)
++  if (bookmarks_.size() >= total_bookmarks_count_) {
+     bridge_->AddBookmarks(bookmarks_, bookmarks_first_folder_name_);
++  }
+ }
+ 
+ void ExternalProcessImporterClient::OnFaviconsImportStart(
+     uint32_t total_favicons_count) {
+-  if (cancelled_)
+-    return;
++  if (cancelled_) {
++    return;
++  }
+ 
+   total_favicons_count_ = total_favicons_count;
+   favicons_.reserve(total_favicons_count);
+@@ -214,19 +241,22 @@
+ 
+ void ExternalProcessImporterClient::OnFaviconsImportGroup(
+     const favicon_base::FaviconUsageDataList& favicons_group) {
+-  if (cancelled_)
+-    return;
++  if (cancelled_) {
++    return;
++  }
+ 
+   favicons_.insert(favicons_.end(), favicons_group.begin(),
+-                    favicons_group.end());
+-  if (favicons_.size() >= total_favicons_count_)
++                   favicons_group.end());
++  if (favicons_.size() >= total_favicons_count_) {
+     bridge_->SetFavicons(favicons_);
++  }
+ }
+ 
+ void ExternalProcessImporterClient::OnPasswordFormImportReady(
+     const user_data_importer::ImportedPasswordForm& form) {
+-  if (cancelled_)
+-    return;
++  if (cancelled_) {
++    return;
++  }
+ 
+   bridge_->SetPasswordForm(form);
+ }
+@@ -234,15 +264,17 @@
+ void ExternalProcessImporterClient::OnKeywordsImportReady(
+     const std::vector<user_data_importer::SearchEngineInfo>& search_engines,
+     bool unique_on_host_and_path) {
+-  if (cancelled_)
+-    return;
++  if (cancelled_) {
++    return;
++  }
+   bridge_->SetKeywords(search_engines, unique_on_host_and_path);
+ }
+ 
+ void ExternalProcessImporterClient::OnAutofillFormDataImportStart(
+     uint32_t total_autofill_form_data_entry_count) {
+-  if (cancelled_)
+-    return;
++  if (cancelled_) {
++    return;
++  }
+ 
+   total_autofill_form_data_entry_count_ = total_autofill_form_data_entry_count;
+   autofill_form_data_.reserve(total_autofill_form_data_entry_count);
+@@ -251,24 +283,28 @@
+ void ExternalProcessImporterClient::OnAutofillFormDataImportGroup(
+     const std::vector<ImporterAutofillFormDataEntry>&
+         autofill_form_data_entry_group) {
+-  if (cancelled_)
+-    return;
++  if (cancelled_) {
++    return;
++  }
+ 
+   autofill_form_data_.insert(autofill_form_data_.end(),
+                              autofill_form_data_entry_group.begin(),
+                              autofill_form_data_entry_group.end());
+-  if (autofill_form_data_.size() >= total_autofill_form_data_entry_count_)
++  if (autofill_form_data_.size() >= total_autofill_form_data_entry_count_) {
+     bridge_->SetAutofillFormData(autofill_form_data_);
++  }
+ }
+ 
+ ExternalProcessImporterClient::~ExternalProcessImporterClient() = default;
+ 
+ void ExternalProcessImporterClient::Cleanup() {
+-  if (cancelled_)
+-    return;
+-
+-  if (process_importer_host_.get())
++  if (cancelled_) {
++    return;
++  }
++
++  if (process_importer_host_.get()) {
+     process_importer_host_->NotifyImportEnded();
++  }
+   CloseMojoHandles();
+   Release();
+ }
+diff --git a/chrome/browser/importer/external_process_importer_client.h b/chrome/browser/importer/external_process_importer_client.h
+--- a/chrome/browser/importer/external_process_importer_client.h
++++ b/chrome/browser/importer/external_process_importer_client.h
+@@ -73,6 +73,9 @@
+       const favicon_base::FaviconUsageDataList& favicons_group) override;
+   void OnPasswordFormImportReady(
+       const user_data_importer::ImportedPasswordForm& form) override;
++  void OnCookiesImportReady(const std::vector<net::CanonicalCookie>& cookies,
++                            uint32_t skipped_count,
++                            OnCookiesImportReadyCallback callback) override;
+   void OnKeywordsImportReady(
+       const std::vector<user_data_importer::SearchEngineInfo>& search_engines,
+       bool unique_on_host_and_path) override;
+@@ -82,7 +85,7 @@
+       const std::vector<ImporterAutofillFormDataEntry>&
+           autofill_form_data_entry_group) override;
+ 
+- friend class BraveExternalProcessImporterClient;
++  friend class BraveExternalProcessImporterClient;
+ 
+  protected:
+   ~ExternalProcessImporterClient() override;
+diff --git a/chrome/browser/importer/importer_list.cc b/chrome/browser/importer/importer_list.cc
+--- a/chrome/browser/importer/importer_list.cc
++++ b/chrome/browser/importer/importer_list.cc
+@@ -34,15 +34,26 @@
+ 
+ uint16_t FilterSupportedServices(
+     const user_data_importer::SourceProfile& profile) {
+-  uint16_t blocked = user_data_importer::PASSWORDS |
++  uint16_t supported = profile.services_supported;
++  uint16_t blocked = user_data_importer::COOKIES |
++                     user_data_importer::PASSWORDS |
+                      user_data_importer::AUTOFILL_FORM_DATA;
+ #if BUILDFLAG(IS_LINUX) && BUILDFLAG(USE_DBUS)
++  if (profile.importer_type == user_data_importer::TYPE_FIREFOX &&
++      base::PathExists(profile.source_path.AppendASCII("cookies.sqlite"))) {
++    supported |= user_data_importer::COOKIES;
++  }
++  if (profile.importer_type == user_data_importer::TYPE_FIREFOX ||
++      profile.importer_type == user_data_importer::TYPE_CHROME ||
++      profile.importer_type == user_data_importer::TYPE_BRAVE) {
++    blocked &= ~user_data_importer::COOKIES;
++  }
+   if (profile.importer_type == user_data_importer::TYPE_CHROME ||
+       profile.importer_type == user_data_importer::TYPE_BRAVE) {
+     blocked &= ~user_data_importer::PASSWORDS;
+   }
+ #endif
+-  return profile.services_supported & ~blocked;
++  return supported & ~blocked;
+ }
+ 
+ #if BUILDFLAG(IS_WIN)
+diff --git a/chrome/browser/importer/in_process_importer_bridge.cc b/chrome/browser/importer/in_process_importer_bridge.cc
+--- a/chrome/browser/importer/in_process_importer_bridge.cc
++++ b/chrome/browser/importer/in_process_importer_bridge.cc
+@@ -8,6 +8,7 @@
+ 
+ #include <iterator>
+ 
++#include "base/functional/bind.h"
+ #include "base/strings/string_util.h"
+ #include "base/strings/utf_string_conversions.h"
+ #include "build/build_config.h"
+@@ -95,8 +96,9 @@
+ std::unique_ptr<TemplateURL> CreateTemplateURL(const std::u16string& url,
+                                                const std::u16string& keyword,
+                                                const std::u16string& title) {
+-  if (url.empty() || keyword.empty())
++  if (url.empty() || keyword.empty()) {
+     return nullptr;
++  }
+   TemplateURLData data;
+   data.SetKeyword(keyword);
+   // We set short name by using the title if it exists.
+@@ -110,9 +112,8 @@
+ 
+ InProcessImporterBridge::InProcessImporterBridge(
+     ProfileWriter* writer,
+-    base::WeakPtr<ExternalProcessImporterHost> host) : writer_(writer),
+-                                                       host_(host) {
+-}
++    base::WeakPtr<ExternalProcessImporterHost> host)
++    : writer_(writer), host_(host) {}
+ 
+ void InProcessImporterBridge::AddBookmarks(
+     const std::vector<user_data_importer::ImportedBookmarkEntry>& bookmarks,
+@@ -139,6 +140,24 @@
+   writer_->AddHistoryPage(converted_rows, converted_visit_source);
+ }
+ 
++void InProcessImporterBridge::WriteCookies(
++    const std::vector<net::CanonicalCookie>& cookies,
++    uint32_t skipped,
++    base::OnceCallback<void(bool)> callback) {
++  if (!host_) {
++    std::move(callback).Run(false);
++    return;
++  }
++  writer_->WriteCookies(
++      cookies, skipped,
++      base::BindRepeating(
++          [](base::WeakPtr<ExternalProcessImporterHost> host) {
++            return !!host;
++          },
++          host_),
++      std::move(callback));
++}
++
+ void InProcessImporterBridge::SetKeywords(
+     const std::vector<user_data_importer::SearchEngineInfo>& search_engines,
+     bool unique_on_host_and_path) {
+@@ -146,8 +165,9 @@
+   for (const auto& search_engine : search_engines) {
+     std::unique_ptr<TemplateURL> owned_template_url = CreateTemplateURL(
+         search_engine.url, search_engine.keyword, search_engine.display_name);
+-    if (owned_template_url)
++    if (owned_template_url) {
+       owned_template_urls.push_back(std::move(owned_template_url));
++    }
+   }
+   writer_->AddKeywords(std::move(owned_template_urls), unique_on_host_and_path);
+ }
+@@ -165,8 +185,9 @@
+     // terminating symbols.
+     const std::u16string name = entry.name.c_str();
+     const std::u16string value = entry.value.c_str();
+-    if (name.empty() || value.empty())
++    if (name.empty() || value.empty()) {
+       continue;
++    }
+     autocomplete_entries.emplace_back(autofill::AutocompleteKey(name, value),
+                                       entry.first_used, entry.last_used);
+   }
+diff --git a/chrome/browser/importer/in_process_importer_bridge.h b/chrome/browser/importer/in_process_importer_bridge.h
+--- a/chrome/browser/importer/in_process_importer_bridge.h
++++ b/chrome/browser/importer/in_process_importer_bridge.h
+@@ -52,6 +52,10 @@
+   void SetAutofillFormData(
+       const std::vector<ImporterAutofillFormDataEntry>& entries) override;
+ 
++  void WriteCookies(const std::vector<net::CanonicalCookie>& cookies,
++                    uint32_t skipped,
++                    base::OnceCallback<void(bool)> callback);
++
+   void NotifyStarted() override;
+   void NotifyItemStarted(user_data_importer::ImportItem item) override;
+   void NotifyItemEnded(user_data_importer::ImportItem item) override;
+@@ -61,6 +65,7 @@
+   std::u16string GetLocalizedString(int message_id) override;
+   // End ImporterBridge implementation.
+   friend class BraveInProcessImporterBridge;
++
+  private:
+   ~InProcessImporterBridge() override;
+ 
+diff --git a/chrome/browser/importer/noventra_cookie_profile_writer.cc b/chrome/browser/importer/noventra_cookie_profile_writer.cc
+new file mode 100644
+--- /dev/null
++++ b/chrome/browser/importer/noventra_cookie_profile_writer.cc
+@@ -0,0 +1,160 @@
++// Copyright 2026 Noventra contributors
++// SPDX-License-Identifier: GPL-3.0-only
++#include "chrome/browser/importer/noventra_cookie_profile_writer.h"
++
++#include <set>
++#include <utility>
++
++#include "base/functional/bind.h"
++#include "base/memory/ref_counted.h"
++#include "base/strings/string_number_conversions.h"
++#include "base/timer/timer.h"
++#include "chrome/browser/profiles/profile.h"
++#include "content/public/browser/storage_partition.h"
++#include "mojo/public/cpp/bindings/remote.h"
++#include "net/cookies/cookie_access_result.h"
++#include "net/cookies/cookie_options.h"
++#include "net/cookies/cookie_util.h"
++#include "net/cookies/unique_cookie_key.h"
++#include "services/network/public/mojom/cookie_manager.mojom.h"
++
++namespace noventra {
++namespace {
++class CookieWriteOperation : public base::RefCounted<CookieWriteOperation> {
++ public:
++  CookieWriteOperation(
++      base::WeakPtr<Profile> profile,
++      std::vector<net::CanonicalCookie> cookies,
++      uint32_t skipped,
++      base::RepeatingCallback<bool()> can_continue,
++      base::RepeatingCallback<void(uint32_t, uint32_t)> summary,
++      base::OnceCallback<void(bool)> callback)
++      : profile_(profile),
++        cookies_(std::move(cookies)),
++        skipped_(skipped),
++        can_continue_(std::move(can_continue)),
++        summary_(std::move(summary)),
++        callback_(std::move(callback)) {}
++
++  void Start(const content::StoragePartitionConfig& config) {
++    if (!CanContinue() || profile_->IsOffTheRecord() || config.in_memory() ||
++        cookies_.size() > 100) {
++      Finish(false);
++      return;
++    }
++    auto* partition = profile_->GetStoragePartition(config, true);
++    if (!partition) {
++      Finish(false);
++      return;
++    }
++    partition->GetCookieManagerForBrowserProcess()->CloneInterface(
++        manager_.BindNewPipeAndPassReceiver());
++    manager_.set_disconnect_handler(base::BindOnce(
++        &CookieWriteOperation::Finish, base::RetainedRef(this), false));
++    timeout_.Start(FROM_HERE, base::Seconds(30),
++                   base::BindOnce(&CookieWriteOperation::Finish,
++                                  base::RetainedRef(this), false));
++    manager_->GetAllCookies(base::BindOnce(&CookieWriteOperation::OnExisting,
++                                           base::RetainedRef(this)));
++  }
++
++ private:
++  friend class base::RefCounted<CookieWriteOperation>;
++  ~CookieWriteOperation() = default;
++  bool CanContinue() const { return profile_ && can_continue_.Run(); }
++  void OnExisting(const std::vector<net::CanonicalCookie>& cookies) {
++    if (!CanContinue()) {
++      Finish(false);
++      return;
++    }
++    for (const auto& cookie : cookies) {
++      existing_.insert(cookie.LegacyUniqueKey());
++    }
++    Next();
++  }
++  void Next() {
++    if (!CanContinue()) {
++      Finish(false);
++      return;
++    }
++    while (index_ < cookies_.size()) {
++      const auto& cookie = cookies_[index_++];
++      if (!cookie.IsCanonical() || cookie.IsPartitioned() ||
++          (!cookie.ExpiryDate().is_null() &&
++           cookie.ExpiryDate() <= base::Time::Now()) ||
++          !existing_.insert(cookie.LegacyUniqueKey()).second) {
++        ++skipped_;
++        continue;
++      }
++      GURL source = net::cookie_util::SimulatedCookieSource(
++          cookie, cookie.SourceScheme() == net::CookieSourceScheme::kSecure ||
++                          cookie.IsSecure()
++                      ? "https"
++                      : "http");
++      if (cookie.SourcePort() >= 0) {
++        const std::string port = base::NumberToString(cookie.SourcePort());
++        GURL::Replacements replace;
++        replace.SetPortStr(port);
++        source = source.ReplaceComponents(replace);
++      }
++      if (!source.is_valid() || !source.SchemeIsHTTPOrHTTPS()) {
++        ++skipped_;
++        continue;
++      }
++      manager_->SetCanonicalCookie(
++          cookie, source, net::CookieOptions::MakeAllInclusive(),
++          base::BindOnce(&CookieWriteOperation::OnWritten,
++                         base::RetainedRef(this)));
++      return;
++    }
++    manager_->FlushCookieStore(base::BindOnce(&CookieWriteOperation::Finish,
++                                              base::RetainedRef(this), true));
++  }
++  void OnWritten(net::CookieAccessResult result) {
++    if (!result.status.IsInclude()) {
++      Finish(false);
++      return;
++    }
++    ++imported_;
++    Next();
++  }
++  void Finish(bool succeeded) {
++    if (!callback_) {
++      return;
++    }
++    scoped_refptr<CookieWriteOperation> keep_alive(this);
++    timeout_.Stop();
++    manager_.reset();
++    if (summary_ && profile_) {
++      summary_.Run(imported_, skipped_);
++    }
++    std::move(callback_).Run(succeeded && CanContinue());
++  }
++  base::WeakPtr<Profile> profile_;
++  std::vector<net::CanonicalCookie> cookies_;
++  size_t index_ = 0;
++  uint32_t imported_ = 0;
++  uint32_t skipped_;
++  std::set<net::UniqueCookieKey> existing_;
++  base::RepeatingCallback<bool()> can_continue_;
++  base::RepeatingCallback<void(uint32_t, uint32_t)> summary_;
++  base::OnceCallback<void(bool)> callback_;
++  mojo::Remote<network::mojom::CookieManager> manager_;
++  base::OneShotTimer timeout_;
++};
++}  // namespace
++
++void WriteImportedCookies(
++    base::WeakPtr<Profile> profile,
++    const content::StoragePartitionConfig& config,
++    const std::vector<net::CanonicalCookie>& cookies,
++    uint32_t skipped,
++    base::RepeatingCallback<bool()> can_continue,
++    base::RepeatingCallback<void(uint32_t, uint32_t)> summary,
++    base::OnceCallback<void(bool)> callback) {
++  auto operation = base::MakeRefCounted<CookieWriteOperation>(
++      profile, cookies, skipped, std::move(can_continue), std::move(summary),
++      std::move(callback));
++  operation->Start(config);
++}
++}  // namespace noventra
+diff --git a/chrome/browser/importer/noventra_cookie_profile_writer.h b/chrome/browser/importer/noventra_cookie_profile_writer.h
+new file mode 100644
+--- /dev/null
++++ b/chrome/browser/importer/noventra_cookie_profile_writer.h
+@@ -0,0 +1,23 @@
++// Copyright 2026 Noventra contributors
++// SPDX-License-Identifier: GPL-3.0-only
++#ifndef CHROME_BROWSER_IMPORTER_NOVENTRA_COOKIE_PROFILE_WRITER_H_
++#define CHROME_BROWSER_IMPORTER_NOVENTRA_COOKIE_PROFILE_WRITER_H_
++#include <cstdint>
++#include <vector>
++
++#include "base/functional/callback.h"
++#include "base/memory/weak_ptr.h"
++#include "content/public/browser/storage_partition_config.h"
++#include "net/cookies/canonical_cookie.h"
++class Profile;
++namespace noventra {
++void WriteImportedCookies(
++    base::WeakPtr<Profile> profile,
++    const content::StoragePartitionConfig& config,
++    const std::vector<net::CanonicalCookie>& cookies,
++    uint32_t skipped,
++    base::RepeatingCallback<bool()> can_continue,
++    base::RepeatingCallback<void(uint32_t, uint32_t)> summary,
++    base::OnceCallback<void(bool)> callback);
++}
++#endif
+diff --git a/chrome/browser/importer/profile_writer.cc b/chrome/browser/importer/profile_writer.cc
+--- a/chrome/browser/importer/profile_writer.cc
++++ b/chrome/browser/importer/profile_writer.cc
+@@ -19,6 +19,7 @@
+ #include "chrome/browser/favicon/favicon_service_factory.h"
+ #include "chrome/browser/first_run/first_run.h"
+ #include "chrome/browser/history/history_service_factory.h"
++#include "chrome/browser/importer/noventra_cookie_profile_writer.h"
+ #include "chrome/browser/password_manager/factories/profile_password_store_factory.h"
+ #include "chrome/browser/profiles/profile.h"
+ #include "chrome/browser/search_engines/template_url_service_factory.h"
+@@ -53,20 +54,23 @@
+   // Build a set containing the bookmark bar folder names.
+   std::set<std::u16string> existing_folder_names;
+   for (const auto& node : parent->children()) {
+-    if (node->is_folder())
++    if (node->is_folder()) {
+       existing_folder_names.insert(node->GetTitle());
++    }
+   }
+ 
+   // If the given name is unique, use it.
+-  if (existing_folder_names.find(folder_name) == existing_folder_names.end())
++  if (existing_folder_names.find(folder_name) == existing_folder_names.end()) {
+     return folder_name;
++  }
+ 
+   // Otherwise iterate until we find a unique name.
+   for (size_t i = 1; i <= existing_folder_names.size(); ++i) {
+     std::u16string name =
+         folder_name + u" (" + base::NumberToString16(i) + u")";
+-    if (existing_folder_names.find(name) == existing_folder_names.end())
++    if (existing_folder_names.find(name) == existing_folder_names.end()) {
+       return name;
++    }
+   }
+ 
+   NOTREACHED();
+@@ -79,7 +83,29 @@
+ 
+ }  // namespace
+ 
+-ProfileWriter::ProfileWriter(Profile* profile) : profile_(profile) {}
++ProfileWriter::ProfileWriter(Profile* profile)
++    : profile_(profile), cookie_profile_(profile->GetWeakPtr()) {}
++
++void ProfileWriter::ConfigureCookieImport(
++    const content::StoragePartitionConfig& config,
++    base::RepeatingCallback<void(uint32_t, uint32_t)> summary) {
++  cookie_partition_ = config;
++  cookie_summary_ = std::move(summary);
++}
++
++void ProfileWriter::WriteCookies(
++    const std::vector<net::CanonicalCookie>& cookies,
++    uint32_t skipped,
++    base::RepeatingCallback<bool()> can_continue,
++    base::OnceCallback<void(bool)> callback) {
++  if (!cookie_profile_ || !cookie_partition_) {
++    std::move(callback).Run(false);
++    return;
++  }
++  noventra::WriteImportedCookies(cookie_profile_, *cookie_partition_, cookies,
++                                 skipped, std::move(can_continue),
++                                 cookie_summary_, std::move(callback));
++}
+ 
+ bool ProfileWriter::BookmarkModelIsLoaded() const {
+   return BookmarkModelFactory::GetForBrowserContext(profile_)->loaded();
+@@ -124,8 +150,9 @@
+ void ProfileWriter::AddBookmarks(
+     const std::vector<user_data_importer::ImportedBookmarkEntry>& bookmarks,
+     const std::u16string& top_level_folder_name) {
+-  if (bookmarks.empty())
++  if (bookmarks.empty()) {
+     return;
++  }
+ 
+   BookmarkModel* model = BookmarkModelFactory::GetForBrowserContext(profile_);
+   DCHECK(model->loaded());
+@@ -141,10 +168,11 @@
+   std::vector<user_data_importer::ImportedBookmarkEntry> toolbar_bookmarks;
+   std::vector<user_data_importer::ImportedBookmarkEntry> reordered_bookmarks;
+   for (auto it = bookmarks.begin(); it != bookmarks.end(); ++it) {
+-    if (it->in_toolbar)
++    if (it->in_toolbar) {
+       toolbar_bookmarks.push_back(*it);
+-    else
++    } else {
+       reordered_bookmarks.push_back(*it);
++    }
+   }
+   reordered_bookmarks.insert(reordered_bookmarks.begin(),
+                              toolbar_bookmarks.begin(),
+@@ -164,8 +192,9 @@
+            bookmark = reordered_bookmarks.begin();
+        bookmark != reordered_bookmarks.end(); ++bookmark) {
+     // Disregard any bookmarks with invalid urls.
+-    if (!bookmark->is_folder && !bookmark->url.is_valid())
++    if (!bookmark->is_folder && !bookmark->url.is_valid()) {
+       continue;
++    }
+ 
+     const BookmarkNode* parent = nullptr;
+     if (import_to_top_level && (add_all_to_top_level || bookmark->in_toolbar)) {
+@@ -234,7 +263,8 @@
+           visibility->IsUserModifiable()) {
+         pref_service->SetInteger(
+             bookmarks::prefs::kBookmarkBarVisibilityState,
+-            static_cast<int>(bookmarks::BookmarkBarVisibilityState::kAlwaysHide));
++            static_cast<int>(
++                bookmarks::BookmarkBarVisibilityState::kAlwaysHide));
+       }
+     } else {
+       // Preserve the other layouts' existing toolbar-import behavior.
+@@ -274,8 +304,9 @@
+ static std::string BuildHostPathKey(const TemplateURL* t_url,
+                                     const SearchTermsData& search_terms_data,
+                                     bool try_url_if_invalid) {
+-  if (try_url_if_invalid && !t_url->url_ref().IsValid(search_terms_data))
++  if (try_url_if_invalid && !t_url->url_ref().IsValid(search_terms_data)) {
+     return HostPathKeyForURL(GURL(t_url->url()));
++  }
+ 
+   if (t_url->url_ref().SupportsReplacement(search_terms_data)) {
+     return HostPathKeyForURL(GURL(t_url->url_ref().ReplaceSearchTerms(
+@@ -291,8 +322,8 @@
+   TemplateURLService::TemplateURLVector template_urls =
+       model->GetTemplateURLs();
+   for (size_t i = 0; i < template_urls.size(); ++i) {
+-    const std::string host_path = BuildHostPathKey(
+-        template_urls[i], model->search_terms_data(), false);
++    const std::string host_path =
++        BuildHostPathKey(template_urls[i], model->search_terms_data(), false);
+     if (!host_path.empty()) {
+       const TemplateURL* existing_turl = (*host_path_map)[host_path];
+       TemplateURL* t_url = template_urls[i];
+@@ -315,20 +346,23 @@
+   TemplateURLService* model =
+       TemplateURLServiceFactory::GetForProfile(profile_);
+   HostPathMap host_path_map;
+-  if (unique_on_host_and_path)
++  if (unique_on_host_and_path) {
+     BuildHostPathMap(model, &host_path_map);
++  }
+ 
+   for (auto& turl : template_urls) {
+     // TemplateURLService requires keywords to be unique. If there is already a
+     // TemplateURL with this keyword, don't import it again.
+-    if (model->GetTemplateURLForKeyword(turl->keyword()) != nullptr)
++    if (model->GetTemplateURLForKeyword(turl->keyword()) != nullptr) {
+       continue;
++    }
+ 
+     // The omnibox doesn't properly handle search keywords with whitespace,
+     // so skip importing them.
+     if (turl->keyword().find_first_of(base::kWhitespaceUTF16) !=
+-        std::u16string::npos)
++        std::u16string::npos) {
+       continue;
++    }
+ 
+     // For search engines if there is already a keyword with the same
+     // host+path, we don't import it. This is done to avoid both duplicate
+@@ -337,12 +371,14 @@
+     // imported browser.
+     if (unique_on_host_and_path && (host_path_map.find(BuildHostPathKey(
+                                         turl.get(), model->search_terms_data(),
+-                                        true)) != host_path_map.end()))
++                                        true)) != host_path_map.end())) {
+       continue;
++    }
+ 
+     // Only add valid TemplateURLs to the model.
+-    if (turl->url_ref().IsValid(model->search_terms_data()))
++    if (turl->url_ref().IsValid(model->search_terms_data())) {
+       model->Add(std::move(turl));
++    }
+   }
+ }
+ 
+@@ -351,8 +387,9 @@
+   scoped_refptr<autofill::AutofillWebDataService> web_data_service =
+       WebDataServiceFactory::GetAutofillWebDataForProfile(
+           profile_, ServiceAccessType::EXPLICIT_ACCESS);
+-  if (web_data_service.get())
++  if (web_data_service.get()) {
+     web_data_service->UpdateAutocompleteEntries(autocomplete_entries);
++  }
+ }
+ 
+ ProfileWriter::~ProfileWriter() = default;
+diff --git a/chrome/browser/importer/profile_writer.h b/chrome/browser/importer/profile_writer.h
+--- a/chrome/browser/importer/profile_writer.h
++++ b/chrome/browser/importer/profile_writer.h
+@@ -5,15 +5,20 @@
+ #ifndef CHROME_BROWSER_IMPORTER_PROFILE_WRITER_H_
+ #define CHROME_BROWSER_IMPORTER_PROFILE_WRITER_H_
+ 
++#include <optional>
+ #include <string>
+ #include <vector>
+ 
++#include "base/functional/callback.h"
+ #include "base/memory/raw_ptr.h"
+ #include "base/memory/ref_counted.h"
++#include "base/memory/weak_ptr.h"
+ #include "build/build_config.h"
+ #include "components/favicon_base/favicon_usage_data.h"
+ #include "components/history/core/browser/history_types.h"
+ #include "components/search_engines/template_url_service.h"
++#include "content/public/browser/storage_partition_config.h"
++#include "net/cookies/canonical_cookie.h"
+ #include "url/gurl.h"
+ 
+ class Profile;
+@@ -44,6 +49,14 @@
+   // completed.
+   virtual bool BookmarkModelIsLoaded() const;
+   virtual bool TemplateURLServiceIsLoaded() const;
++
++  void ConfigureCookieImport(
++      const content::StoragePartitionConfig& config,
++      base::RepeatingCallback<void(uint32_t, uint32_t)> summary);
++  void WriteCookies(const std::vector<net::CanonicalCookie>& cookies,
++                    uint32_t skipped,
++                    base::RepeatingCallback<bool()> can_continue,
++                    base::OnceCallback<void(bool)> callback);
+ 
+   // Helper methods for adding data to local stores.
+   virtual void AddPasswordForm(const password_manager::PasswordForm& form);
+@@ -99,6 +112,9 @@
+ 
+  private:
+   const raw_ptr<Profile> profile_;
++  base::WeakPtr<Profile> cookie_profile_;
++  std::optional<content::StoragePartitionConfig> cookie_partition_;
++  base::RepeatingCallback<void(uint32_t, uint32_t)> cookie_summary_;
+ };
+ 
+ #endif  // CHROME_BROWSER_IMPORTER_PROFILE_WRITER_H_
+diff --git a/chrome/browser/resources/settings/people_page/import_data_browser_proxy.ts b/chrome/browser/resources/settings/people_page/import_data_browser_proxy.ts
+--- a/chrome/browser/resources/settings/people_page/import_data_browser_proxy.ts
++++ b/chrome/browser/resources/settings/people_page/import_data_browser_proxy.ts
+@@ -17,6 +17,7 @@
+   history: boolean;
+   favorites: boolean;
+   passwords: boolean;
++  cookies?: boolean;
+   search: boolean;
+   autofillFormData: boolean;
+   extensions: boolean;
+diff --git a/chrome/browser/resources/settings/people_page/import_data_dialog.html.ts b/chrome/browser/resources/settings/people_page/import_data_dialog.html.ts
+--- a/chrome/browser/resources/settings/people_page/import_data_dialog.html.ts
++++ b/chrome/browser/resources/settings/people_page/import_data_dialog.html.ts
+@@ -36,6 +36,9 @@
+             `)}
+           </select>
+           <div class="description">$i18n{importDescription}</div>
++          <p role="alert" ?hidden="${!this.hasImportStatus_(ImportDataStatus.FAILED)}">
++            Import did not finish. Close the source browser and unlock its credential store, then try again.
++          </p>
+ 
+           <!--
+             A parent div is needed here to prevent bugs caused by elements
+@@ -55,6 +58,15 @@
+                 pref-key="import_dialog_bookmarks"
+                 label="$i18n{importFavorites}" no-set-pref>
+             </settings-checkbox>
++            <cr-checkbox id="importDialogCookies"
++                ?hidden="${!this.selected_.cookies}"
++                .checked="${this.importCookies_}"
++                @checked-changed="${this.onCookiesCheckedChanged_}">
++              Cookies and signed-in sessions
++            </cr-checkbox>
++            <div class="description" ?hidden="${!this.selected_.cookies}">
++              Optional. Cookies already in this Space are kept. Some sites may ask you to sign in again.
++            </div>
+             <settings-checkbox id="importDialogSavedPasswords"
+                 ?hidden="${!this.selected_.passwords}"
+                 pref-key="import_dialog_saved_passwords"
+@@ -78,6 +90,9 @@
+           </div>
+         </div>
+       </div>
++      <p id="importCookiesResult" slot="body" role="status" ?hidden="${!this.cookieSummary_}">
++        ${this.cookieSummary_}
++      </p>
+       <div slot="button-container">
+         <div class="spinner"
+             ?hidden="${!this.hasImportStatus_(ImportDataStatus.IN_PROGRESS)}">
+diff --git a/chrome/browser/resources/settings/people_page/import_data_dialog.ts b/chrome/browser/resources/settings/people_page/import_data_dialog.ts
+--- a/chrome/browser/resources/settings/people_page/import_data_dialog.ts
++++ b/chrome/browser/resources/settings/people_page/import_data_dialog.ts
+@@ -11,6 +11,7 @@
+ import 'chrome://resources/cr_elements/cr_icon/cr_icon.js';
+ import 'chrome://resources/cr_elements/icons.html.js';
+ import '../controls/settings_checkbox.js';
++import 'chrome://resources/cr_elements/cr_checkbox/cr_checkbox.js';
+ import '../controls/settings_toggle_button.js';
+ import '../i18n_setup.js';
+ 
+@@ -63,6 +64,8 @@
+       selected_: {type: Object},
+       noImportDataTypeSelected_: {type: Boolean},
+       importStatus_: {type: String},
++      importCookies_: {type: Boolean},
++      cookieSummary_: {type: String},
+     };
+   }
+ 
+@@ -76,12 +79,17 @@
+     history: false,
+     favorites: false,
+     passwords: false,
++    cookies: false,
+     search: false,
+     autofillFormData: false,
+     extensions: false,
+   };
+   protected accessor noImportDataTypeSelected_: boolean = false;
+   protected accessor importStatus_: ImportDataStatus = ImportDataStatus.INITIAL;
++  protected accessor importCookies_: boolean = false;
++  protected accessor cookieSummary_: string = '';
++  private cookieImported_: number = 0;
++  private cookieSkipped_: number = 0;
+   private browserProxy_: ImportDataBrowserProxy =
+       ImportDataBrowserProxyImpl.getInstance();
+ 
+@@ -111,13 +119,26 @@
+       this.$.dialog.showModal();
+     });
+ 
++    this.addWebUiListener('import-cookies-result', (result: {imported: number, skipped: number}) => {
++      if (!this.importCookies_ || this.importStatus_ !== ImportDataStatus.IN_PROGRESS ||
++          !Number.isSafeInteger(result.imported) || result.imported < 0 ||
++          !Number.isSafeInteger(result.skipped) || result.skipped < 0) return;
++      this.cookieImported_ += result.imported;
++      this.cookieSkipped_ += result.skipped;
++      this.cookieSummary_ = `${this.cookieImported_} cookies imported. ${this.cookieSkipped_} skipped. Some sites may ask you to sign in again.`;
++    });
+     this.addWebUiListener(
+         'import-data-status-changed', (importStatus: ImportDataStatus) => {
+           this.importStatus_ = importStatus;
+-          if (this.hasImportStatus_(ImportDataStatus.FAILED)) {
++          if (this.hasImportStatus_(ImportDataStatus.FAILED) && !this.importCookies_) {
+             this.$.dialog.close();
+           }
+         });
++  }
++
++  protected onCookiesCheckedChanged_(event: CustomEvent<{value: boolean}>) {
++    this.importCookies_ = event.detail.value;
++    this.updateImportDataTypesSelected_();
+   }
+ 
+   override firstUpdated(changedProperties: PropertyValues<this>) {
+@@ -145,7 +166,8 @@
+   protected updateImportDataTypesSelected_() {
+     const checkboxes = this.shadowRoot.querySelectorAll(
+         'settings-checkbox[checked]:not([hidden])');
+-    this.noImportDataTypeSelected_ = checkboxes.length === 0;
++    this.noImportDataTypeSelected_ = checkboxes.length === 0 &&
++        !(this.importCookies_ && this.selected_.cookies);
+   }
+ 
+   /**
+@@ -167,6 +189,8 @@
+   }
+ 
+   protected onBrowserProfileSelectionChange_() {
++    this.importCookies_ = false;
++    this.cookieSummary_ = '';
+     this.selected_ = this.browserProfiles_[this.$.browserSelect.selectedIndex];
+   }
+ 
+@@ -179,6 +203,9 @@
+       checkboxes.forEach(checkbox => {
+         types[checkbox.pref!.key] = checkbox.checked && !checkbox.hidden;
+       });
++      types['import_dialog_cookies'] = this.importCookies_ && !!this.selected_.cookies;
++      this.cookieImported_ = this.cookieSkipped_ = 0;
++      this.cookieSummary_ = '';
+       this.browserProxy_.importData(this.$.browserSelect.selectedIndex, types);
+     }
+     checkboxes.forEach(checkbox => checkbox.sendPrefChange());
+diff --git a/chrome/browser/ui/webui/settings/brave_import_data_handler.cc b/chrome/browser/ui/webui/settings/brave_import_data_handler.cc
+--- a/chrome/browser/ui/webui/settings/brave_import_data_handler.cc
++++ b/chrome/browser/ui/webui/settings/brave_import_data_handler.cc
+@@ -22,6 +22,7 @@
+ #include "chrome/browser/importer/brave_external_process_importer_host.h"
+ #include "chrome/browser/importer/importer_list.h"
+ #include "chrome/browser/importer/profile_writer.h"
++#include "chrome/browser/profiles/noventra_account_spaces.h"
+ #include "chrome/browser/profiles/profile.h"
+ #include "components/bookmarks/browser/base_bookmark_model_observer.h"
+ #include "components/bookmarks/browser/bookmark_model.h"
+@@ -37,8 +38,8 @@
+ #include "base/files/file_util.h"
+ #include "base/task/thread_pool.h"
+ #include "chrome/browser/ui/browser_window/public/global_browser_collection.h"
++#include "chrome/browser/ui/tab_modal_confirm_dialog.h"
+ #include "chrome/browser/ui/webui/settings/brave_full_disk_access_confirm_dialog_delegate.h"
+-#include "chrome/browser/ui/tab_modal_confirm_dialog.h"
+ #endif  // BUILDFLAG(IS_MAC)
+ 
+ namespace {
+@@ -144,7 +145,20 @@
+   if (!imported_items) {
+     return;
+   }
++  if (pending_password_writer_) {
++    return;
++  }
+   Profile* profile = Profile::FromWebUI(web_ui());
++  cookie_partition_.reset();
++  if (imported_items & user_data_importer::COOKIES) {
++    if (profile->IsOffTheRecord()) {
++      FireWebUIListener("import-data-status-changed",
++                        base::Value(kImportStatusFailed));
++      return;
++    }
++    cookie_partition_ = noventra::SpaceConfig(
++        profile, noventra::SpaceId(web_ui()->GetWebContents()));
++  }
+ #if BUILDFLAG(IS_MAC)
+   CheckDiskAccess(imported_items, source_profile.source_path,
+                   source_profile.importer_type,
+@@ -239,6 +253,18 @@
+   } else if (!profile_writer) {
+     profile_writer = new ProfileWriter(profile);
+   }
++  if (imported_items & user_data_importer::COOKIES) {
++    if (!cookie_partition_) {
++      import_observers_.erase(source_profile.source_path);
++      FireWebUIListener("import-data-status-changed",
++                        base::Value(kImportStatusFailed));
++      return;
++    }
++    profile_writer->ConfigureCookieImport(
++        *cookie_partition_,
++        base::BindRepeating(&ImportDataHandler::OnCookieImportResult,
++                            cookie_weak_factory_.GetWeakPtr()));
++  }
+   importer_host->StartImportSettings(source_profile, profile, imported_items,
+                                      profile_writer.get());
+ }
+@@ -255,7 +281,8 @@
+     import_did_succeed_ = false;
+   } else if (*event == "ImportItemEnded") {
+     if (source_profile.importer_type !=
+-        user_data_importer::TYPE_BOOKMARKS_FILE && !import_failed_) {
++            user_data_importer::TYPE_BOOKMARKS_FILE &&
++        !import_failed_) {
+       import_did_succeed_ = true;
+     }
+   } else if (*event == "ImportEnded") {
+@@ -273,8 +300,9 @@
+     const user_data_importer::SourceProfile& source_profile) {
+   import_observers_.erase(source_profile.source_path);
+   FireWebUIListener("import-data-status-changed",
+-                    base::Value(import_did_succeed_ && !import_failed_ ? kImportStatusSucceeded
+-                                                    : kImportStatusFailed));
++                    base::Value(import_did_succeed_ && !import_failed_
++                                    ? kImportStatusSucceeded
++                                    : kImportStatusFailed));
+ }
+ 
+ void BraveImportDataHandler::OnJavascriptDisallowed() {
+diff --git a/chrome/browser/ui/webui/settings/brave_import_data_handler.h b/chrome/browser/ui/webui/settings/brave_import_data_handler.h
+--- a/chrome/browser/ui/webui/settings/brave_import_data_handler.h
++++ b/chrome/browser/ui/webui/settings/brave_import_data_handler.h
+@@ -7,13 +7,15 @@
+ #define BRAVE_BROWSER_UI_WEBUI_SETTINGS_BRAVE_IMPORT_DATA_HANDLER_H_
+ 
+ #include <memory>
++#include <optional>
+ #include <unordered_map>
+ 
+ #include "base/memory/weak_ptr.h"
++#include "build/build_config.h"
+ #include "chrome/browser/importer/noventra_password_profile_writer.h"
+ #include "chrome/browser/ui/webui/settings/brave_importer_observer.h"
+-#include "build/build_config.h"
+ #include "chrome/browser/ui/webui/settings/import_data_handler.h"
++#include "content/public/browser/storage_partition_config.h"
+ #include "content/public/browser/web_contents_observer.h"
+ 
+ namespace settings {
+@@ -31,7 +33,7 @@
+ // The reason why native tab modal dialog is used here is to avoid modifying
+ // upstream import html/js source code.
+ class BraveImportDataHandler : public ImportDataHandler,
+-                                      content::WebContentsObserver {
++                               content::WebContentsObserver {
+  public:
+   BraveImportDataHandler();
+   ~BraveImportDataHandler() override;
+@@ -87,6 +89,7 @@
+   bool guide_dialog_is_requested_ = false;
+ #endif
+  private:
++  std::optional<content::StoragePartitionConfig> cookie_partition_;
+   std::unique_ptr<noventra::PasswordProfileWriterPreparation>
+       pending_password_writer_;
+   std::unordered_map<base::FilePath, std::unique_ptr<BraveImporterObserver>>
+diff --git a/chrome/browser/ui/webui/settings/brave_importer_observer.cc b/chrome/browser/ui/webui/settings/brave_importer_observer.cc
+--- a/chrome/browser/ui/webui/settings/brave_importer_observer.cc
++++ b/chrome/browser/ui/webui/settings/brave_importer_observer.cc
+@@ -24,14 +24,19 @@
+ }
+ 
+ BraveImporterObserver::~BraveImporterObserver() {
+-  if (importer_host_)
++  if (importer_host_) {
+     importer_host_->set_observer(nullptr);
++    if (imported_items_ & user_data_importer::COOKIES) {
++      importer_host_->Cancel();
++    }
++  }
+ }
+ 
+ // user_data_importer::ImporterProgressObserver:
+ void BraveImporterObserver::ImportStarted() {
+-  if (import_started_called_)
++  if (import_started_called_) {
+     return;
++  }
+   import_started_called_ = true;
+   base::DictValue data;
+   data.Set("importer_name", source_profile_.importer_name);
+@@ -71,8 +76,9 @@
+   data.Set("event", "ImportEnded");
+ 
+   DCHECK(importer_host_);
+-  if (importer_host_)
++  if (importer_host_) {
+     importer_host_->set_observer(nullptr);
++  }
+ 
+   importer_host_ = nullptr;
+ 
+diff --git a/chrome/browser/ui/webui/settings/import_data_handler.cc b/chrome/browser/ui/webui/settings/import_data_handler.cc
+--- a/chrome/browser/ui/webui/settings/import_data_handler.cc
++++ b/chrome/browser/ui/webui/settings/import_data_handler.cc
+@@ -26,6 +26,7 @@
+ #include "chrome/browser/importer/external_process_importer_host.h"
+ #include "chrome/browser/importer/importer_list.h"
+ #include "chrome/browser/importer/importer_uma.h"
++#include "chrome/browser/profiles/noventra_account_spaces.h"
+ #include "chrome/browser/profiles/profile.h"
+ #include "chrome/browser/ui/browser_window.h"
+ #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+@@ -33,6 +34,7 @@
+ #include "chrome/browser/ui/select_file_policy/chrome_select_file_policy.h"
+ #include "chrome/common/pref_names.h"
+ #include "content/public/browser/browser_thread.h"
++#include "content/public/browser/web_contents.h"
+ #include "content/public/browser/web_ui.h"
+ #include "crypto/hash.h"
+ #include "ui/shell_dialogs/selected_file_info.h"
+@@ -68,6 +70,9 @@
+ 
+   if (importer_host_) {
+     importer_host_->set_observer(nullptr);
++    if (importing_cookies_) {
++      importer_host_->Cancel();
++    }
+   }
+ 
+   if (select_file_dialog_.get()) {
+@@ -92,6 +97,7 @@
+ }
+ 
+ void ImportDataHandler::OnJavascriptDisallowed() {
++  cookie_weak_factory_.InvalidateWeakPtrs();
+   // Cancels outstanding profile list detections.
+   importer_list_.reset();
+ 
+@@ -100,8 +106,12 @@
+   // also clear our pointer, as otherwise this can lead to a use-after-free
+   // in the destructor. https://crbug.com/40058962.
+   if (importer_host_) {
+-    importer_host_->set_observer(nullptr);
++    auto* host = importer_host_.get();
++    host->set_observer(nullptr);
+     importer_host_ = nullptr;
++    if (importing_cookies_) {
++      host->Cancel();
++    }
+   }
+ }
+ 
+@@ -132,8 +142,17 @@
+       web_ui()->GetWebContents()->GetTopLevelNativeWindow());
+   importer_host_->set_parent_view(web_ui()->GetWebContents()->GetNativeView());
+ 
++  scoped_refptr<ProfileWriter> writer = new ProfileWriter(profile);
++  importing_cookies_ = (imported_items & user_data_importer::COOKIES) != 0;
++  if (importing_cookies_) {
++    writer->ConfigureCookieImport(
++        noventra::SpaceConfig(profile,
++                              noventra::SpaceId(web_ui()->GetWebContents())),
++        base::BindRepeating(&ImportDataHandler::OnCookieImportResult,
++                            cookie_weak_factory_.GetWeakPtr()));
++  }
+   importer_host_->StartImportSettings(source_profile, profile, imported_items,
+-                                      new ProfileWriter(profile));
++                                      writer.get());
+ 
+   importer::LogImporterUseToMetrics("ImportDataHandler",
+                                     source_profile.importer_type);
+@@ -156,6 +175,12 @@
+   }
+ 
+   const base::DictValue& type_dict = types.GetDict();
++  if (type_dict.FindBool("import_dialog_cookies").value_or(false) &&
++      Profile::FromWebUI(web_ui())->IsOffTheRecord()) {
++    FireWebUIListener("import-data-status-changed",
++                      base::Value(kImportStatusFailed));
++    return;
++  }
+   uint16_t selected_items = user_data_importer::NONE;
+   if (*type_dict.FindBool(prefs::kImportDialogAutofillFormData)) {
+     selected_items |= user_data_importer::AUTOFILL_FORM_DATA;
+@@ -178,7 +203,16 @@
+ 
+   const user_data_importer::SourceProfile& source_profile =
+       importer_list_->GetSourceProfileAt(browser_index);
++  if (type_dict.FindBool("import_dialog_cookies").value_or(false)) {
++    selected_items |= user_data_importer::COOKIES;
++  }
+   uint16_t supported_items = source_profile.services_supported;
++  if ((selected_items & user_data_importer::COOKIES) &&
++      !(supported_items & user_data_importer::COOKIES)) {
++    FireWebUIListener("import-data-status-changed",
++                      base::Value(kImportStatusFailed));
++    return;
++  }
+ 
+   uint16_t imported_items = (selected_items & supported_items);
+   if (imported_items) {
+@@ -234,6 +268,17 @@
+       browser->GetWindow()->GetNativeWindow(), nullptr);
+ }
+ 
++void ImportDataHandler::OnCookieImportResult(uint32_t imported,
++                                             uint32_t skipped) {
++  if (!IsJavascriptAllowed()) {
++    return;
++  }
++  base::DictValue result;
++  result.Set("imported", static_cast<int>(imported));
++  result.Set("skipped", static_cast<int>(skipped));
++  FireWebUIListener("import-cookies-result", result);
++}
++
+ void ImportDataHandler::SendBrowserProfileData(const std::string& callback_id) {
+   DCHECK_CURRENTLY_ON(BrowserThread::UI);
+   importer_list_loaded_ = true;
+@@ -249,6 +294,8 @@
+     browser_profile.Set("name", source_profile.importer_name);
+     browser_profile.Set("index", static_cast<int>(i));
+     browser_profile.Set("profileName", source_profile.profile);
++    browser_profile.Set("cookies",
++                        (browser_services & user_data_importer::COOKIES) != 0);
+     browser_profile.Set("history",
+                         (browser_services & user_data_importer::HISTORY) != 0);
+     browser_profile.Set(
+@@ -260,8 +307,8 @@
+     browser_profile.Set(
+         "autofillFormData",
+         (browser_services & user_data_importer::AUTOFILL_FORM_DATA) != 0);
+-    browser_profile.Set("extensions",
+-                        (browser_services & user_data_importer::EXTENSIONS) != 0);
++    browser_profile.Set(
++        "extensions", (browser_services & user_data_importer::EXTENSIONS) != 0);
+ 
+     browser_profiles.Append(std::move(browser_profile));
+   }
+@@ -293,8 +340,9 @@
+   importer_host_ = nullptr;
+ 
+   FireWebUIListener("import-data-status-changed",
+-                    base::Value(import_did_succeed_ && !import_failed_ ? kImportStatusSucceeded
+-                                                    : kImportStatusFailed));
++                    base::Value(import_did_succeed_ && !import_failed_
++                                    ? kImportStatusSucceeded
++                                    : kImportStatusFailed));
+ }
+ 
+ void ImportDataHandler::FileSelected(const ui::SelectedFileInfo& file,
+diff --git a/chrome/browser/ui/webui/settings/import_data_handler.h b/chrome/browser/ui/webui/settings/import_data_handler.h
+--- a/chrome/browser/ui/webui/settings/import_data_handler.h
++++ b/chrome/browser/ui/webui/settings/import_data_handler.h
+@@ -10,6 +10,7 @@
+ #include <memory>
+ 
+ #include "base/memory/raw_ptr.h"
++#include "base/memory/weak_ptr.h"
+ #include "chrome/browser/importer/importer_progress_observer.h"
+ #include "chrome/browser/ui/webui/settings/settings_page_ui_handler.h"
+ #include "components/user_data_importer/common/importer_data_types.h"
+@@ -37,9 +38,11 @@
+   void OnJavascriptAllowed() override {}
+   void OnJavascriptDisallowed() override;
+   friend class BraveImportDataHandler;
++
+  private:
+-  virtual void StartImport(const user_data_importer::SourceProfile& source_profile,
+-                   uint16_t imported_items);
++  virtual void StartImport(
++      const user_data_importer::SourceProfile& source_profile,
++      uint16_t imported_items);
+ 
+   // Handler for the "importData" message. First argument is the selected
+   // browser index, and second argument is the types of data to import.
+@@ -54,6 +57,7 @@
+   void HandleImportFromBookmarksFile(const base::ListValue& args);
+ 
+   void SendBrowserProfileData(const std::string& callback_id);
++  void OnCookieImportResult(uint32_t imported, uint32_t skipped);
+ 
+   // importer::ImporterProgressObserver:
+   void ImportStarted() override;
+@@ -77,6 +81,8 @@
+   bool importer_list_loaded_{false};
+ 
+   scoped_refptr<ui::SelectFileDialog> select_file_dialog_;
++  bool importing_cookies_ = false;
++  base::WeakPtrFactory<ImportDataHandler> cookie_weak_factory_{this};
+ };
+ 
+ }  // namespace settings
+diff --git a/chrome/common/importer/BUILD.gn b/chrome/common/importer/BUILD.gn
+--- a/chrome/common/importer/BUILD.gn
++++ b/chrome/common/importer/BUILD.gn
+@@ -17,6 +17,7 @@
+     "//components/user_data_importer/mojom",
+     "//mojo/public/mojom/base",
+     "//sandbox/policy/mojom",
++    "//services/network/public/mojom:cookies_mojom",
+     "//url/mojom:url_mojom_gurl",
+   ]
+ 
+@@ -84,6 +85,7 @@
+ }
+ 
+ source_set("importer") {
++  public_deps = [ "//net" ]
+   sources = [
+     "firefox_importer_utils.cc",
+     "firefox_importer_utils.h",
+diff --git a/chrome/common/importer/chrome_importer_utils.cc b/chrome/common/importer/chrome_importer_utils.cc
+--- a/chrome/common/importer/chrome_importer_utils.cc
++++ b/chrome/common/importer/chrome_importer_utils.cc
+@@ -38,15 +38,15 @@
+ 
+ std::optional<base::DictValue> GetChromeExtensionsListFromFile(
+     const base::FilePath& preference_path) {
+-  if (!base::PathExists(preference_path))
++  if (!base::PathExists(preference_path)) {
+     return std::nullopt;
++  }
+ 
+   std::string preference_content;
+   base::ReadFileToString(preference_path, &preference_content);
+ 
+-  std::optional<base::DictValue> preference =
+-      base::JSONReader::ReadDict(preference_content,
+-                                 base::JSON_PARSE_CHROMIUM_EXTENSIONS);
++  std::optional<base::DictValue> preference = base::JSONReader::ReadDict(
++      preference_content, base::JSON_PARSE_CHROMIUM_EXTENSIONS);
+   if (!preference) {
+     return std::nullopt;
+   }
+@@ -71,8 +71,9 @@
+     const base::DictValue& dict = value.GetDict();
+     // Only import if type is extension, it's came from webstore and it's not
+     // installed by default.
+-    if (dict.FindBool("was_installed_by_default").value_or(true))
++    if (dict.FindBool("was_installed_by_default").value_or(true)) {
+       continue;
++    }
+ 
+     const auto state = dict.FindInt("state");
+     if (state.has_value()) {
+@@ -109,8 +110,9 @@
+ 
+   auto list_from_preferences = GetChromeExtensionsListFromFile(
+       profile_path.AppendASCII(kChromePreferencesFile));
+-  if (!list_from_secure_preference.has_value())
++  if (!list_from_secure_preference.has_value()) {
+     return list_from_preferences;
++  }
+ 
+   if (list_from_secure_preference.has_value() &&
+       list_from_preferences.has_value()) {
+@@ -163,8 +165,9 @@
+             continue;
+           }
+           const auto* profile = value.second.GetIfDict();
+-          if (!profile)
++          if (!profile) {
+             continue;
++          }
+ 
+           auto* name = profile->FindString("name");
+           if (!name) {
+@@ -173,9 +176,10 @@
+           base::DictValue entry;
+           entry.Set("id", value.first);
+           entry.Set("name", *name);
+-          if (last_active_profiles)
++          if (last_active_profiles) {
+             entry.Set("last_active",
+                       IsLastActiveProfile(value.first, *last_active_profiles));
++          }
+ 
+           auto* avatar_icon = profile->FindString("avatar_icon");
+           if (avatar_icon) {
+@@ -214,7 +218,8 @@
+       entry.Set("name", "Default");
+       profiles.Append(std::move(entry));
+     }
+-    base::FileEnumerator children(root, false, base::FileEnumerator::DIRECTORIES);
++    base::FileEnumerator children(root, false,
++                                  base::FileEnumerator::DIRECTORIES);
+     for (auto path = children.Next(); !path.empty(); path = children.Next()) {
+       const std::string id = path.BaseName().AsUTF8Unsafe();
+       if ((id != "Default" && !id.starts_with("Profile ")) || !has_data(path) ||
+@@ -259,6 +264,13 @@
+   }
+ 
+ #if BUILDFLAG(IS_LINUX) && BUILDFLAG(USE_DBUS)
++  if ((type == user_data_importer::TYPE_CHROME ||
++       type == user_data_importer::TYPE_BRAVE) &&
++      (base::PathExists(
++           profile.AppendASCII("Network").AppendASCII("Cookies")) ||
++       base::PathExists(profile.AppendASCII("Cookies")))) {
++    *services_supported |= user_data_importer::COOKIES;
++  }
+   // The native reader supports these Chrome/Chromium and Brave keys.
+   // Other platforms and brands retain their existing import capabilities.
+   if ((type == user_data_importer::TYPE_CHROME ||
+@@ -270,8 +282,9 @@
+ #endif
+ 
+ #if BUILDFLAG(ENABLE_EXTENSIONS)
+-  if (HasImportableExtensions(profile))
++  if (HasImportableExtensions(profile)) {
+     *services_supported |= user_data_importer::EXTENSIONS;
++  }
+ #endif
+ 
+   return *services_supported != user_data_importer::NONE;
+diff --git a/chrome/common/importer/importer_bridge.h b/chrome/common/importer/importer_bridge.h
+--- a/chrome/common/importer/importer_bridge.h
++++ b/chrome/common/importer/importer_bridge.h
+@@ -8,11 +8,13 @@
+ #include <string>
+ #include <vector>
+ 
++#include "base/functional/callback.h"
+ #include "base/memory/ref_counted.h"
+ #include "build/build_config.h"
+ #include "components/favicon_base/favicon_usage_data.h"
+ #include "components/user_data_importer/common/importer_data_types.h"
+ #include "components/user_data_importer/common/importer_url_row.h"
++#include "net/cookies/canonical_cookie.h"
+ 
+ class GURL;
+ struct ImporterAutofillFormDataEntry;
+@@ -48,6 +50,12 @@
+   virtual void SetPasswordForm(
+       const user_data_importer::ImportedPasswordForm& form) = 0;
+ 
++  virtual bool SetCookies(const std::vector<net::CanonicalCookie>&,
++                          uint32_t,
++                          base::RepeatingCallback<bool()>) {
++    return false;
++  }
++
+   virtual void SetAutofillFormData(
+       const std::vector<ImporterAutofillFormDataEntry>& entries) = 0;
+ 
+diff --git a/chrome/common/importer/profile_import.mojom b/chrome/common/importer/profile_import.mojom
+--- a/chrome/common/importer/profile_import.mojom
++++ b/chrome/common/importer/profile_import.mojom
+@@ -7,6 +7,7 @@
+ import "components/user_data_importer/mojom/bookmark_html_parser.mojom";
+ import "mojo/public/mojom/base/string16.mojom";
+ import "sandbox/policy/mojom/sandbox.mojom";
++import "services/network/public/mojom/cookie_manager.mojom";
+ import "url/mojom/url.mojom";
+ 
+ [Native]
+@@ -77,6 +78,8 @@
+   OnFaviconsImportStart(uint32 total_favicons_count);
+   OnFaviconsImportGroup(FaviconUsageDataList favicons_group);
+   OnPasswordFormImportReady(ImportedPasswordForm form);
++  OnCookiesImportReady(array<network.mojom.CanonicalCookie> cookies,
++                       uint32 skipped_count) => (bool succeeded);
+   OnKeywordsImportReady(
+       array<SearchEngineInfo> search_engines,
+       bool unique_on_host_and_path);
+diff --git a/chrome/utility/BUILD.gn b/chrome/utility/BUILD.gn
+--- a/chrome/utility/BUILD.gn
++++ b/chrome/utility/BUILD.gn
+@@ -333,10 +333,13 @@
+     sources = [
+       "importer/chrome_password_importer.cc",
+       "importer/chrome_password_importer.h",
++      "importer/noventra_cookie_importer.cc",
++      "importer/noventra_cookie_importer.h",
+     ]
+     public_deps = [
+       "//base",
+       "//components/os_crypt/async/common",
++      "//net",
+       "//components/user_data_importer/common",
+     ]
+     deps = [
+diff --git a/chrome/utility/importer/chrome_importer.cc b/chrome/utility/importer/chrome_importer.cc
+--- a/chrome/utility/importer/chrome_importer.cc
++++ b/chrome/utility/importer/chrome_importer.cc
+@@ -30,6 +30,7 @@
+ #if BUILDFLAG(USE_DBUS)
+ #include "base/functional/bind.h"
+ #include "chrome/utility/importer/chrome_password_importer.h"
++#include "chrome/utility/importer/noventra_cookie_importer.h"
+ #endif
+ #endif
+ 
+@@ -49,6 +50,23 @@
+   bridge_->NotifyStarted();
+ 
+ #if BUILDFLAG(IS_LINUX) && BUILDFLAG(USE_DBUS)
++  std::optional<noventra::CookieImportBatch> cookies;
++  if ((items & user_data_importer::COOKIES) && !cancelled()) {
++    bridge_->NotifyItemStarted(user_data_importer::COOKIES);
++    auto is_cancelled = base::BindRepeating(
++        [](ChromeImporter* importer) { return importer->cancelled(); },
++        base::Unretained(this));
++    auto result = noventra::ReadChromeCookies(
++        source_path_,
++        base::BindOnce(&noventra::ReadChromePasswordKey, importer_name_,
++                       is_cancelled),
++        is_cancelled);
++    if (!result.has_value()) {
++      bridge_->NotifyFailed(noventra::CookieImportErrorMessage(result.error()));
++      return;
++    }
++    cookies = std::move(result.value());
++  }
+   std::vector<user_data_importer::ImportedPasswordForm> passwords;
+   if ((items & user_data_importer::PASSWORDS) && !cancelled()) {
+     bridge_->NotifyItemStarted(user_data_importer::PASSWORDS);
+@@ -111,6 +129,21 @@
+   }
+ #endif
+ 
++#if BUILDFLAG(IS_LINUX) && BUILDFLAG(USE_DBUS)
++  if (cookies) {
++    auto is_cancelled = base::BindRepeating(
++        [](ChromeImporter* importer) { return importer->cancelled(); },
++        base::Unretained(this));
++    if (!bridge_->SetCookies(cookies->cookies, cookies->skipped,
++                             is_cancelled)) {
++      bridge_->NotifyFailed(
++          "Cookie import did not finish. Some cookies may already have been "
++          "copied.");
++      return;
++    }
++    bridge_->NotifyItemEnded(user_data_importer::COOKIES);
++  }
++#endif
+   bridge_->NotifyEnded();
+ }
+ 
+diff --git a/chrome/utility/importer/chrome_password_importer.cc b/chrome/utility/importer/chrome_password_importer.cc
+--- a/chrome/utility/importer/chrome_password_importer.cc
++++ b/chrome/utility/importer/chrome_password_importer.cc
+@@ -97,6 +97,11 @@
+ }
+ 
+ }  // namespace
++
++bool SnapshotBrowserDatabase(const base::FilePath& source,
++                             const base::FilePath& destination) {
++  return SnapshotDatabase(source, destination);
++}
+ 
+ std::optional<os_crypt_async::Encryptor::Key> ReadChromePasswordKey(
+     const std::u16string& importer_name,
+diff --git a/chrome/utility/importer/chrome_password_importer.h b/chrome/utility/importer/chrome_password_importer.h
+--- a/chrome/utility/importer/chrome_password_importer.h
++++ b/chrome/utility/importer/chrome_password_importer.h
+@@ -39,6 +39,9 @@
+     SourcePasswordKeyLookup source_key,
+     base::RepeatingCallback<bool()> cancelled);
+ 
++bool SnapshotBrowserDatabase(const base::FilePath& source,
++                             const base::FilePath& destination);
++
+ // Known branding selects one existing key identity, never trial keys. Missing
+ // credentials stay missing. This may display the normal desktop unlock prompt.
+ std::optional<os_crypt_async::Encryptor::Key> ReadChromePasswordKey(
+diff --git a/chrome/utility/importer/external_process_importer_bridge.cc b/chrome/utility/importer/external_process_importer_bridge.cc
+--- a/chrome/utility/importer/external_process_importer_bridge.cc
++++ b/chrome/utility/importer/external_process_importer_bridge.cc
+@@ -10,9 +10,12 @@
+ #include "base/check_op.h"
+ #include "base/debug/dump_without_crashing.h"
+ #include "base/functional/bind.h"
++#include "base/memory/weak_ptr.h"
++#include "base/run_loop.h"
+ #include "base/strings/string_number_conversions.h"
+ #include "base/strings/utf_string_conversions.h"
+ #include "base/task/task_runner.h"
++#include "base/timer/timer.h"
+ #include "build/build_config.h"
+ #include "chrome/common/importer/importer_autofill_form_data_entry.h"
+ #include "components/user_data_importer/common/imported_bookmark_entry.h"
+@@ -27,6 +30,21 @@
+ const int kNumHistoryRowsToSend = 100;
+ const int kNumFaviconsToSend = 100;
+ const int kNumAutofillFormDataToSend = 100;
++
++class CookieWriteReply {
++ public:
++  void Done(bool value) {
++    succeeded = value;
++    completed = true;
++    if (quit) {
++      std::move(quit).Run();
++    }
++  }
++  bool completed = false;
++  bool succeeded = false;
++  base::OnceClosure quit;
++  base::WeakPtrFactory<CookieWriteReply> weak_factory{this};
++};
+ 
+ }  // namespace
+ 
+@@ -111,6 +129,48 @@
+ void ExternalProcessImporterBridge::SetPasswordForm(
+     const user_data_importer::ImportedPasswordForm& form) {
+   observer_->OnPasswordFormImportReady(form);
++}
++
++bool ExternalProcessImporterBridge::SetCookies(
++    const std::vector<net::CanonicalCookie>& cookies,
++    uint32_t skipped,
++    base::RepeatingCallback<bool()> cancelled) {
++  for (size_t offset = 0; offset < cookies.size() || offset == 0;
++       offset += 100) {
++    if (cancelled.Run()) {
++      return false;
++    }
++    const size_t end = std::min(offset + 100, cookies.size());
++    std::vector<net::CanonicalCookie> group(cookies.begin() + offset,
++                                            cookies.begin() + end);
++    base::RunLoop loop(base::RunLoop::Type::kNestableTasksAllowed);
++    CookieWriteReply reply;
++    reply.quit = loop.QuitClosure();
++    observer_->OnCookiesImportReady(
++        group, offset == 0 ? skipped : 0,
++        base::BindOnce(&CookieWriteReply::Done,
++                       reply.weak_factory.GetWeakPtr()));
++    base::OneShotTimer timeout;
++    timeout.Start(FROM_HERE, base::Seconds(45), loop.QuitClosure());
++    base::RepeatingTimer cancellation;
++    cancellation.Start(
++        FROM_HERE, base::Milliseconds(100),
++        base::BindRepeating(
++            [](base::RepeatingCallback<bool()> cancelled, base::RunLoop* loop) {
++              if (cancelled.Run()) {
++                loop->Quit();
++              }
++            },
++            cancelled, &loop));
++    loop.Run();
++    if (!reply.completed || !reply.succeeded || cancelled.Run()) {
++      return false;
++    }
++    if (end == cookies.size()) {
++      break;
++    }
++  }
++  return true;
+ }
+ 
+ void ExternalProcessImporterBridge::SetAutofillFormData(
+diff --git a/chrome/utility/importer/external_process_importer_bridge.h b/chrome/utility/importer/external_process_importer_bridge.h
+--- a/chrome/utility/importer/external_process_importer_bridge.h
++++ b/chrome/utility/importer/external_process_importer_bridge.h
+@@ -62,6 +62,10 @@
+   void SetPasswordForm(
+       const user_data_importer::ImportedPasswordForm& form) override;
+ 
++  bool SetCookies(const std::vector<net::CanonicalCookie>& cookies,
++                  uint32_t skipped,
++                  base::RepeatingCallback<bool()> cancelled) override;
++
+   void SetAutofillFormData(
+       const std::vector<ImporterAutofillFormDataEntry>& entries) override;
+ 
+diff --git a/chrome/utility/importer/firefox_importer.cc b/chrome/utility/importer/firefox_importer.cc
+--- a/chrome/utility/importer/firefox_importer.cc
++++ b/chrome/utility/importer/firefox_importer.cc
+@@ -10,6 +10,7 @@
+ 
+ #include "base/files/file_enumerator.h"
+ #include "base/files/file_util.h"
++#include "base/functional/bind.h"
+ #include "base/json/json_file_value_serializer.h"
+ #include "base/strings/string_util.h"
+ #include "base/strings/utf_string_conversions.h"
+@@ -55,14 +56,16 @@
+ // filter out the URL with a unsupported scheme.
+ bool CanImportURL(const GURL& url) {
+   // The URL is not valid.
+-  if (!url.is_valid())
+-    return false;
++  if (!url.is_valid()) {
++    return false;
++  }
+ 
+   // Filter out the URLs with unsupported schemes.
+   const char* const kInvalidSchemes[] = {"wyciwyg", "place", "about", "chrome"};
+   for (const auto* scheme : kInvalidSchemes) {
+-    if (url.SchemeIs(scheme))
++    if (url.SchemeIs(scheme)) {
+       return false;
++    }
+   }
+ 
+   return true;
+@@ -134,6 +137,22 @@
+         "A private copy of browser data could not be created.");
+     return;
+   }
++#if BUILDFLAG(IS_LINUX) && BUILDFLAG(USE_DBUS)
++  imported_cookies_.reset();
++  if ((items & user_data_importer::COOKIES) && !cancelled()) {
++    bridge_->NotifyItemStarted(user_data_importer::COOKIES);
++    auto result = noventra::ReadFirefoxCookies(
++        source_path_,
++        base::BindRepeating(
++            [](FirefoxImporter* importer) { return importer->cancelled(); },
++            base::Unretained(this)));
++    if (!result.has_value()) {
++      bridge_->NotifyFailed(noventra::CookieImportErrorMessage(result.error()));
++      return;
++    }
++    imported_cookies_ = std::move(result.value());
++  }
++#endif
+   if ((items & user_data_importer::HOME_PAGE) && !cancelled()) {
+     bridge_->NotifyItemStarted(user_data_importer::HOME_PAGE);
+     ImportHomepage();  // Doesn't have a UI item.
+@@ -164,6 +183,22 @@
+ }
+ 
+ void FirefoxImporter::ImportRemainingItems() {
++#if BUILDFLAG(IS_LINUX) && BUILDFLAG(USE_DBUS)
++  if (imported_cookies_) {
++    auto is_cancelled = base::BindRepeating(
++        [](FirefoxImporter* importer) { return importer->cancelled(); },
++        base::Unretained(this));
++    if (!bridge_->SetCookies(imported_cookies_->cookies,
++                             imported_cookies_->skipped, is_cancelled)) {
++      bridge_->NotifyFailed(
++          "Cookie import did not finish. Some cookies may already have been "
++          "copied.");
++      return;
++    }
++    imported_cookies_.reset();
++    bridge_->NotifyItemEnded(user_data_importer::COOKIES);
++  }
++#endif
+ #if !BUILDFLAG(IS_MAC)
+   if ((items_ & user_data_importer::PASSWORDS) && !cancelled()) {
+     bridge_->NotifyItemStarted(user_data_importer::PASSWORDS);
+@@ -182,12 +217,14 @@
+ 
+ bool FirefoxImporter::ImportHistory() {
+   base::FilePath file = GetCopiedSourcePath("places.sqlite");
+-  if (!base::PathExists(file))
+-    return false;
++  if (!base::PathExists(file)) {
++    return false;
++  }
+ 
+   sql::Database db(kDatabaseTag);
+-  if (!db.Open(file))
+-    return false;
++  if (!db.Open(file)) {
++    return false;
++  }
+ 
+   // |visit_type| represent the transition type of URLs (typed, click,
+   // redirect, bookmark, etc.) We eliminate some URLs like sub-frames and
+@@ -236,7 +273,7 @@
+     row.visit_count = s.ColumnInt(2);
+     row.hidden = s.ColumnInt(3) == 1;
+     row.typed_count = s.ColumnInt(4);
+-    row.last_visit = base::Time::FromTimeT(s.ColumnInt64(5)/1000000);
++    row.last_visit = base::Time::FromTimeT(s.ColumnInt64(5) / 1000000);
+ 
+     rows.push_back(row);
+   }
+@@ -509,8 +546,9 @@
+ 
+   // Since Firefox 32, passwords are in logins.json.
+   base::FilePath json_file = source_path_.AppendASCII("logins.json");
+-  if (!base::PathExists(json_file))
+-    return;
++  if (!base::PathExists(json_file)) {
++    return;
++  }
+ 
+   std::vector<user_data_importer::ImportedPasswordForm> forms;
+   decryptor.ReadAndParseLogins(json_file, &forms);
+@@ -535,12 +573,14 @@
+ 
+ void FirefoxImporter::ImportAutofillFormData() {
+   base::FilePath file = GetCopiedSourcePath("formhistory.sqlite");
+-  if (!base::PathExists(file))
+-    return;
++  if (!base::PathExists(file)) {
++    return;
++  }
+ 
+   sql::Database db(kDatabaseTag);
+-  if (!db.Open(file))
+-    return;
++  if (!db.Open(file)) {
++    return;
++  }
+ 
+   const char query[] =
+       "SELECT fieldname, value, timesUsed, firstUsed, lastUsed FROM "
+@@ -561,14 +601,16 @@
+     form_entry.last_used = base::Time::FromTimeT(s.ColumnInt64(4) / 1000000);
+ 
+     // Don't import search bar history.
+-    if (base::UTF16ToUTF8(form_entry.name) == "searchbar-history")
++    if (base::UTF16ToUTF8(form_entry.name) == "searchbar-history") {
+       continue;
++    }
+ 
+     form_entries.push_back(form_entry);
+   }
+ 
+-  if (!form_entries.empty() && !cancelled())
++  if (!form_entries.empty() && !cancelled()) {
+     bridge_->SetAutofillFormData(form_entries);
++  }
+ }
+ 
+ int FirefoxImporter::LoadNodeIDByGUID(sql::Database* db,
+@@ -584,8 +626,9 @@
+ 
+   s.BindString(0, GUID);
+ 
+-  if (!s.Step())
++  if (!s.Step()) {
+     return -1;
++  }
+   return s.ColumnInt(0);
+ }
+ 
+@@ -606,8 +649,9 @@
+ 
+   s.BindString(0, kFeedAnnotation);
+ 
+-  while (s.Step() && !cancelled())
++  while (s.Step() && !cancelled()) {
+     livemark->insert(s.ColumnInt(0));
++  }
+ }
+ 
+ bool FirefoxImporter::GetTopBookmarkFolder(sql::Database* db,
+@@ -653,8 +697,9 @@
+   std::string query =
+       "SELECT b.id, h.url, COALESCE(b.title, h.title), "
+       "b.type, k.keyword, b.dateAdded ";
+-  if (favicons_location == FaviconsLocation::kPlacesDatabase)
++  if (favicons_location == FaviconsLocation::kPlacesDatabase) {
+     query += ", h.favicon_id ";
++  }
+   query +=
+       "FROM moz_bookmarks b "
+       "LEFT JOIN moz_places h ON b.fk = h.id "
+@@ -684,8 +729,9 @@
+     item->empty_folder = true;
+ 
+     temp_list.push_back(std::move(item));
+-    if (empty_folder)
++    if (empty_folder) {
+       *empty_folder = false;
++    }
+   }
+ 
+   if (cancelled() || !s.Succeeded()) {
+@@ -713,8 +759,9 @@
+   const char query[] = "SELECT url, data FROM moz_favicons WHERE id=?";
+   sql::Statement s(db->GetUniqueStatement(query));
+ 
+-  if (!s.is_valid())
+-    return;
++  if (!s.is_valid()) {
++    return;
++  }
+ 
+   for (const auto& i : favicon_map) {
+     s.BindInt64(0, i.first);
+@@ -737,12 +784,14 @@
+     const std::vector<user_data_importer::ImportedBookmarkEntry>& bookmarks,
+     favicon_base::FaviconUsageDataList* favicons) {
+   base::FilePath file = GetCopiedSourcePath("favicons.sqlite");
+-  if (!base::PathExists(file))
+-    return;
++  if (!base::PathExists(file)) {
++    return;
++  }
+ 
+   sql::Database db(kDatabaseTag);
+-  if (!db.Open(file))
+-    return;
++  if (!db.Open(file)) {
++    return;
++  }
+ 
+   sql::Statement s(db.GetUniqueStatement(
+       "SELECT moz_icons.id, moz_icons.icon_url, moz_icons.data "
+@@ -752,8 +801,9 @@
+       "INNER JOIN moz_pages_w_icons "
+       "ON moz_pages_w_icons.id = moz_icons_to_pages.page_id "
+       "WHERE moz_pages_w_icons.page_url = ?"));
+-  if (!s.is_valid())
+-    return;
++  if (!s.is_valid()) {
++    return;
++  }
+ 
+   // A map from icon id to the corresponding index in the |favicons| vector.
+   std::map<uint64_t, size_t> icon_cache;
+@@ -789,8 +839,9 @@
+ base::FilePath FirefoxImporter::GetCopiedSourcePath(
+     std::string_view base_file_name) {
+   const base::FilePath file = source_path_.AppendASCII(base_file_name);
+-  if (!base::PathExists(file))
++  if (!base::PathExists(file)) {
+     return {};
++  }
+   if (base_file_name.ends_with(".sqlite")) {
+     for (const auto& copy : source_database_copies_) {
+       if (copy->copied_file_path().BaseName() == file.BaseName()) {
+@@ -810,7 +861,8 @@
+   DCHECK(source_path_copy_.IsValid());
+   const base::FilePath destination =
+       source_path_copy_.GetPath().AppendASCII(base_file_name);
+-  if (!base::CopyFile(file, destination))
++  if (!base::CopyFile(file, destination)) {
+     return {};
++  }
+   return destination;
+ }
+diff --git a/chrome/utility/importer/firefox_importer.h b/chrome/utility/importer/firefox_importer.h
+--- a/chrome/utility/importer/firefox_importer.h
++++ b/chrome/utility/importer/firefox_importer.h
+@@ -20,6 +20,10 @@
+ #include "base/gtest_prod_util.h"
+ #include "base/memory/weak_ptr.h"
+ #include "build/build_config.h"
++#include "build/config/linux/dbus/buildflags.h"
++#if BUILDFLAG(IS_LINUX) && BUILDFLAG(USE_DBUS)
++#include "chrome/utility/importer/noventra_cookie_importer.h"
++#endif
+ #include "chrome/utility/importer/importer.h"
+ #include "components/favicon_base/favicon_usage_data.h"
+ #include "components/user_data_importer/common/imported_bookmark_entry.h"
+@@ -71,6 +75,9 @@
+   using FaviconMap = std::map<int64_t, std::set<GURL>>;
+ 
+   ~FirefoxImporter() override;
++#if BUILDFLAG(IS_LINUX) && BUILDFLAG(USE_DBUS)
++  std::optional<noventra::CookieImportBatch> imported_cookies_;
++#endif
+ 
+   FRIEND_TEST_ALL_PREFIXES(FirefoxImporterTest, ImportBookmarksV25);
+ 
+diff --git a/chrome/utility/importer/noventra_cookie_importer.cc b/chrome/utility/importer/noventra_cookie_importer.cc
+new file mode 100644
+--- /dev/null
++++ b/chrome/utility/importer/noventra_cookie_importer.cc
+@@ -0,0 +1,387 @@
++// Copyright 2026 Noventra contributors
++// SPDX-License-Identifier: GPL-3.0-only
++#include "chrome/utility/importer/noventra_cookie_importer.h"
++
++#include <algorithm>
++#include <array>
++#include <optional>
++#include <string>
++#include <string_view>
++#include <utility>
++
++#include "base/containers/span.h"
++#include "base/files/file_util.h"
++#include "base/files/scoped_temp_dir.h"
++#include "base/strings/cstring_view.h"
++#include "base/strings/string_number_conversions.h"
++#include "base/strings/string_util.h"
++#include "base/time/time.h"
++#include "components/os_crypt/async/common/algorithm.mojom.h"
++#include "crypto/hash.h"
++#include "crypto/secure_util.h"
++#include "net/cookies/cookie_util.h"
++#include "sql/database.h"
++#include "sql/statement.h"
++
++namespace noventra {
++namespace {
++constexpr size_t kMaximumRows = 100000;
++constexpr size_t kMaximumCookies = 10000;
++constexpr size_t kMaximumDecodedBytes = 64 * 1024 * 1024;
++constexpr int64_t kMaximumWindowsMicroseconds = 265046774399999999;
++constexpr int64_t kMaximumUnixMicroseconds = 253402300799999999;
++constexpr auto kV10Key =
++    std::to_array<uint8_t>({0xfd, 0x62, 0x1f, 0xe5, 0xa2, 0xb4, 0x02, 0x53,
++                            0x9d, 0xfa, 0x14, 0x7c, 0xa9, 0x27, 0x27, 0x78});
++
++bool IntegerColumns(sql::Statement& row, std::initializer_list<int> columns) {
++  return std::ranges::all_of(columns, [&](int column) {
++    return row.GetColumnType(column) == sql::ColumnType::kInteger;
++  });
++}
++bool BooleanColumn(sql::Statement& row, int column) {
++  return row.GetColumnType(column) == sql::ColumnType::kInteger &&
++         (row.ColumnInt(column) == 0 || row.ColumnInt(column) == 1);
++}
++
++bool TextColumns(sql::Statement& row, std::initializer_list<int> columns) {
++  return std::ranges::all_of(columns, [&](int column) {
++    return row.GetColumnType(column) == sql::ColumnType::kText;
++  });
++}
++bool HasColumns(sql::Database& db,
++                base::cstring_view table,
++                std::initializer_list<base::cstring_view> names) {
++  return std::ranges::all_of(names, [&](base::cstring_view name) {
++    return db.DoesColumnExist(table, name);
++  });
++}
++std::string Column(sql::Database& db,
++                   base::cstring_view table,
++                   base::cstring_view name,
++                   base::cstring_view fallback) {
++  return std::string(db.DoesColumnExist(table, name) ? name : fallback);
++}
++std::optional<base::Time> WindowsTime(int64_t value) {
++  if (value < 0 || value > kMaximumWindowsMicroseconds) {
++    return std::nullopt;
++  }
++  return value == 0 ? base::Time()
++                    : base::Time::FromDeltaSinceWindowsEpoch(
++                          base::Microseconds(value));
++}
++std::optional<base::Time> UnixTime(int64_t value, int64_t multiplier) {
++  if (value < 0 || value > kMaximumUnixMicroseconds / multiplier) {
++    return std::nullopt;
++  }
++  return base::Time::UnixEpoch() + base::Microseconds(value * multiplier);
++}
++std::unique_ptr<net::CanonicalCookie> MakeCookie(const std::string& host,
++                                                 const std::string& name,
++                                                 const std::string& value,
++                                                 const std::string& path,
++                                                 base::Time creation,
++                                                 base::Time expiration,
++                                                 base::Time access,
++                                                 bool secure,
++                                                 bool http_only,
++                                                 int same_site,
++                                                 int priority,
++                                                 int source_scheme,
++                                                 int source_port) {
++  if (host.empty() || host.size() > 254 || path.size() > 4096 ||
++      !base::IsStringUTF8AllowingNoncharacters(name) ||
++      !base::IsStringUTF8AllowingNoncharacters(value) ||
++      !base::IsStringUTF8AllowingNoncharacters(host) ||
++      !base::IsStringUTF8AllowingNoncharacters(path) ||
++      name.size() + value.size() > 4096 || path.empty() || path[0] != '/' ||
++      creation.is_null() || same_site < -1 || same_site > 2 ||
++      (same_site == 0 && !secure) || priority < 0 || priority > 2 ||
++      source_scheme < 0 || source_scheme > 2 || source_port < -1 ||
++      source_port > 65535) {
++    return nullptr;
++  }
++  const GURL url = net::cookie_util::CookieDomainAndPathToURL(
++      host, path, secure || source_scheme == 2);
++  if (!url.is_valid() || !url.SchemeIsHTTPOrHTTPS()) {
++    return nullptr;
++  }
++  auto cookie = net::CanonicalCookie::CreateSanitizedCookie(
++      url, name, value, host[0] == '.' ? host : std::string(), path, creation,
++      expiration, access, secure, http_only,
++      static_cast<net::CookieSameSite>(same_site),
++      static_cast<net::CookiePriority>(priority), std::nullopt, nullptr);
++  if (!cookie || cookie->Domain() != host || cookie->Path() != path ||
++      cookie->ExpiryDate() != expiration) {
++    return nullptr;
++  }
++  cookie->SetSourceScheme(static_cast<net::CookieSourceScheme>(source_scheme));
++  cookie->SetSourcePort(source_port);
++  if (!cookie->IsCanonical()) {
++    return nullptr;
++  }
++  return cookie;
++}
++bool Append(CookieImportBatch& batch,
++            size_t& bytes,
++            std::unique_ptr<net::CanonicalCookie> cookie) {
++  if (!cookie || (!cookie->ExpiryDate().is_null() &&
++                  cookie->ExpiryDate() <= base::Time::Now())) {
++    ++batch.skipped;
++    return true;
++  }
++  bytes += cookie->Name().size() + cookie->Value().size() +
++           cookie->Domain().size() + cookie->Path().size();
++  if (batch.cookies.size() >= kMaximumCookies || bytes > kMaximumDecodedBytes) {
++    return false;
++  }
++  batch.cookies.push_back(std::move(*cookie));
++  return true;
++}
++}  // namespace
++
++CookieImportResult ReadChromeCookies(
++    const base::FilePath& profile,
++    SourcePasswordKeyLookup source_key,
++    base::RepeatingCallback<bool()> cancelled) {
++  const auto modern = profile.AppendASCII("Network").AppendASCII("Cookies");
++  const auto source =
++      base::PathExists(modern) ? modern : profile.AppendASCII("Cookies");
++  base::ScopedTempDir temporary;
++  if (!temporary.CreateUniqueTempDir() ||
++      !SnapshotBrowserDatabase(source,
++                               temporary.GetPath().AppendASCII("Cookies"))) {
++    return base::unexpected(CookieImportError::kReadFailed);
++  }
++  sql::Database db(sql::Database::Tag("Cookie"));
++  if (!db.Open(temporary.GetPath().AppendASCII("Cookies")) ||
++      !db.DoesTableExist("cookies") || !db.DoesTableExist("meta") ||
++      !HasColumns(
++          db, "cookies",
++          {"creation_utc", "host_key", "name", "value", "path", "expires_utc",
++           "is_secure", "is_httponly", "last_access_utc", "encrypted_value"})) {
++    return base::unexpected(CookieImportError::kReadFailed);
++  }
++  sql::Statement version(
++      db.GetUniqueStatement("SELECT value FROM meta WHERE key='version'"));
++  if (!version.Step()) {
++    return base::unexpected(CookieImportError::kUnsupportedSchema);
++  }
++  const int schema = version.ColumnInt(0);
++  if (schema < 10 || schema > 24 ||
++      version.ColumnString(0) != base::NumberToString(schema)) {
++    return base::unexpected(CookieImportError::kUnsupportedSchema);
++  }
++  std::string query =
++      "SELECT creation_utc,host_key,name,value,path,expires_utc,is_secure,"
++      "is_httponly,last_access_utc,encrypted_value," +
++      Column(db, "cookies", "samesite", "-1") + "," +
++      Column(db, "cookies", "priority", "1") + "," +
++      Column(db, "cookies", "top_frame_site_key", "''") + "," +
++      Column(db, "cookies", "source_scheme", "0") + "," +
++      Column(db, "cookies", "source_port", "-1") + "," +
++      Column(db, "cookies", "has_expires", "1") + " FROM cookies";
++  sql::Statement rows(db.GetUniqueStatement(query));
++  if (!rows.is_valid()) {
++    return base::unexpected(CookieImportError::kReadFailed);
++  }
++  CookieImportBatch result;
++  size_t count = 0, bytes = 0;
++  os_crypt_async::Encryptor::Key legacy_key(
++      kV10Key, os_crypt_async::mojom::Algorithm::kAES128CBC);
++  std::optional<os_crypt_async::Encryptor::Key> system_key;
++  bool key_requested = false;
++  while (rows.Step()) {
++    if (cancelled.Run()) {
++      return base::unexpected(CookieImportError::kCancelled);
++    }
++    if (++count > kMaximumRows) {
++      return base::unexpected(CookieImportError::kTooLarge);
++    }
++    if (!TextColumns(rows, {1, 2, 3, 4, 12}) ||
++        !IntegerColumns(rows, {0, 5, 6, 7, 8, 10, 11, 13, 14, 15}) ||
++        !BooleanColumn(rows, 6) || !BooleanColumn(rows, 7) ||
++        !BooleanColumn(rows, 15)) {
++      ++result.skipped;
++      continue;
++    }
++    if (!rows.ColumnString(12).empty()) {
++      ++result.skipped;
++      continue;
++    }
++    const std::string host = rows.ColumnString(1);
++    std::string value = rows.ColumnString(3);
++    const auto cipher = rows.ColumnBlob(9);
++    if (cipher.size() > 8192) {
++      return base::unexpected(CookieImportError::kTooLarge);
++    }
++    if (!cipher.empty()) {
++      if (cipher.size() < 3) {
++        return base::unexpected(CookieImportError::kUnsupportedEncryption);
++      }
++      const std::string_view tag(reinterpret_cast<const char*>(cipher.data()),
++                                 3);
++      const os_crypt_async::Encryptor::Key* key = nullptr;
++      if (tag == "v10") {
++        key = &legacy_key;
++      } else if (tag == "v11") {
++        if (!key_requested) {
++          key_requested = true;
++          if (source_key) {
++            system_key = std::move(source_key).Run();
++          }
++        }
++        if (cancelled.Run()) {
++          return base::unexpected(CookieImportError::kCancelled);
++        }
++        if (!system_key) {
++          return base::unexpected(CookieImportError::kUnlockFailed);
++        }
++        key = &*system_key;
++      } else {
++        return base::unexpected(CookieImportError::kUnsupportedEncryption);
++      }
++      auto plaintext = key->DecryptForImport(cipher.subspan(3u));
++      if (!plaintext) {
++        return base::unexpected(CookieImportError::kDecryptFailed);
++      }
++      size_t offset = 0;
++      if (schema >= 24) {
++        const auto digest = crypto::hash::Sha256(host);
++        if (plaintext->size() < digest.size() ||
++            !std::equal(digest.begin(), digest.end(), plaintext->begin())) {
++          crypto::SecureZeroBuffer(*plaintext);
++          return base::unexpected(CookieImportError::kDecryptFailed);
++        }
++        offset = digest.size();
++      }
++      value.assign(reinterpret_cast<const char*>(plaintext->data()) + offset,
++                   plaintext->size() - offset);
++      crypto::SecureZeroBuffer(*plaintext);
++    }
++    const auto creation = WindowsTime(rows.ColumnInt64(0));
++    const auto expiration =
++        WindowsTime(rows.ColumnBool(15) ? rows.ColumnInt64(5) : 0);
++    const auto access = WindowsTime(rows.ColumnInt64(8));
++    std::unique_ptr<net::CanonicalCookie> cookie;
++    if (creation && expiration && access) {
++      cookie =
++          MakeCookie(host, rows.ColumnString(2), value, rows.ColumnString(4),
++                     *creation, *expiration, *access, rows.ColumnBool(6),
++                     rows.ColumnBool(7), rows.ColumnInt(10), rows.ColumnInt(11),
++                     rows.ColumnInt(13), rows.ColumnInt(14));
++    }
++    crypto::SecureZeroBuffer(base::as_writable_byte_span(value));
++    if (!Append(result, bytes, std::move(cookie))) {
++      return base::unexpected(CookieImportError::kTooLarge);
++    }
++  }
++  if (!rows.Succeeded()) {
++    return base::unexpected(CookieImportError::kReadFailed);
++  }
++  return result;
++}
++
++CookieImportResult ReadFirefoxCookies(
++    const base::FilePath& profile,
++    base::RepeatingCallback<bool()> cancelled) {
++  base::ScopedTempDir temporary;
++  if (!temporary.CreateUniqueTempDir() ||
++      !SnapshotBrowserDatabase(
++          profile.AppendASCII("cookies.sqlite"),
++          temporary.GetPath().AppendASCII("cookies.sqlite"))) {
++    return base::unexpected(CookieImportError::kReadFailed);
++  }
++  sql::Database db(sql::Database::Tag("FirefoxImporter"));
++  if (!db.Open(temporary.GetPath().AppendASCII("cookies.sqlite")) ||
++      !db.DoesTableExist("moz_cookies") ||
++      !HasColumns(db, "moz_cookies",
++                  {"host", "name", "value", "path", "expiry", "creationTime",
++                   "lastAccessed", "isSecure", "isHttpOnly", "sameSite",
++                   "originAttributes"})) {
++    return base::unexpected(CookieImportError::kReadFailed);
++  }
++  sql::Statement version(db.GetUniqueStatement("PRAGMA user_version"));
++  if (!version.Step()) {
++    return base::unexpected(CookieImportError::kUnsupportedSchema);
++  }
++  const int schema = version.ColumnInt(0);
++  if (schema != 15 && schema != 16) {
++    return base::unexpected(CookieImportError::kUnsupportedSchema);
++  }
++  std::string query =
++      "SELECT host,name,value,path,expiry,creationTime,lastAccessed,"
++      "isSecure,isHttpOnly,sameSite,originAttributes," +
++      Column(db, "moz_cookies", "isPartitionedAttributeSet", "0") +
++      " FROM moz_cookies";
++  sql::Statement rows(db.GetUniqueStatement(query));
++  if (!rows.is_valid()) {
++    return base::unexpected(CookieImportError::kReadFailed);
++  }
++  CookieImportBatch result;
++  size_t count = 0, bytes = 0;
++  while (rows.Step()) {
++    if (cancelled.Run()) {
++      return base::unexpected(CookieImportError::kCancelled);
++    }
++    if (++count > kMaximumRows) {
++      return base::unexpected(CookieImportError::kTooLarge);
++    }
++    if (!TextColumns(rows, {0, 1, 2, 3, 10}) ||
++        !IntegerColumns(rows, {4, 5, 6, 7, 8, 9, 11}) ||
++        !BooleanColumn(rows, 7) || !BooleanColumn(rows, 8) ||
++        !BooleanColumn(rows, 11)) {
++      ++result.skipped;
++      continue;
++    }
++    if (!rows.ColumnString(10).empty() || rows.ColumnBool(11)) {
++      ++result.skipped;
++      continue;
++    }
++    const auto creation = UnixTime(rows.ColumnInt64(5), 1);
++    const auto expiration =
++        UnixTime(rows.ColumnInt64(4), schema == 16 ? 1000 : 1000000);
++    const auto access = UnixTime(rows.ColumnInt64(6), 1);
++    const int same_site = rows.ColumnInt(9) == 256 ? -1 : rows.ColumnInt(9);
++    std::unique_ptr<net::CanonicalCookie> cookie;
++    if (creation && expiration && access) {
++      cookie = MakeCookie(rows.ColumnString(0), rows.ColumnString(1),
++                          rows.ColumnString(2), rows.ColumnString(3), *creation,
++                          *expiration, *access, rows.ColumnBool(7),
++                          rows.ColumnBool(8), same_site, 1,
++                          rows.ColumnBool(7) ? 2 : 1, -1);
++    }
++    if (!Append(result, bytes, std::move(cookie))) {
++      return base::unexpected(CookieImportError::kTooLarge);
++    }
++  }
++  if (!rows.Succeeded()) {
++    return base::unexpected(CookieImportError::kReadFailed);
++  }
++  return result;
++}
++
++const char* CookieImportErrorMessage(CookieImportError error) {
++  switch (error) {
++    case CookieImportError::kReadFailed:
++      return "Cookies could not be read safely. Close the source browser and "
++             "try again.";
++    case CookieImportError::kUnsupportedSchema:
++      return "This browser's cookie format is not supported yet.";
++    case CookieImportError::kUnlockFailed:
++      return "Unlock the source browser's credential store and try cookie "
++             "import again.";
++    case CookieImportError::kUnsupportedEncryption:
++      return "The source browser uses unsupported cookie protection. Sign in "
++             "to those sites in Noventra.";
++    case CookieImportError::kDecryptFailed:
++      return "The source browser's cookies could not be authenticated. No "
++             "cookies were imported.";
++    case CookieImportError::kCancelled:
++      return "Cookie import was cancelled. Some cookies may already have been "
++             "copied.";
++    case CookieImportError::kTooLarge:
++      return "The source cookie database is too large to import safely.";
++  }
++}
++}  // namespace noventra
+diff --git a/chrome/utility/importer/noventra_cookie_importer.h b/chrome/utility/importer/noventra_cookie_importer.h
+new file mode 100644
+--- /dev/null
++++ b/chrome/utility/importer/noventra_cookie_importer.h
+@@ -0,0 +1,37 @@
++// Copyright 2026 Noventra contributors
++// SPDX-License-Identifier: GPL-3.0-only
++#ifndef CHROME_UTILITY_IMPORTER_NOVENTRA_COOKIE_IMPORTER_H_
++#define CHROME_UTILITY_IMPORTER_NOVENTRA_COOKIE_IMPORTER_H_
++
++#include <cstdint>
++#include <vector>
++
++#include "base/functional/callback.h"
++#include "base/types/expected.h"
++#include "chrome/utility/importer/chrome_password_importer.h"
++#include "net/cookies/canonical_cookie.h"
++
++namespace noventra {
++enum class CookieImportError {
++  kReadFailed,
++  kUnsupportedSchema,
++  kUnlockFailed,
++  kUnsupportedEncryption,
++  kDecryptFailed,
++  kCancelled,
++  kTooLarge,
++};
++struct CookieImportBatch {
++  std::vector<net::CanonicalCookie> cookies;
++  uint32_t skipped = 0;
++};
++using CookieImportResult = base::expected<CookieImportBatch, CookieImportError>;
++CookieImportResult ReadChromeCookies(const base::FilePath& profile,
++                                     SourcePasswordKeyLookup source_key,
++                                     base::RepeatingCallback<bool()> cancelled);
++CookieImportResult ReadFirefoxCookies(
++    const base::FilePath& profile,
++    base::RepeatingCallback<bool()> cancelled);
++const char* CookieImportErrorMessage(CookieImportError error);
++}  // namespace noventra
++#endif
+diff --git a/components/helium_onboarding/src/NoventraOnboarding.svelte b/components/helium_onboarding/src/NoventraOnboarding.svelte
+--- a/components/helium_onboarding/src/NoventraOnboarding.svelte
++++ b/components/helium_onboarding/src/NoventraOnboarding.svelte
+@@ -22,16 +22,16 @@
+     const defaultProxy = DefaultBrowserBrowserProxyImpl.getInstance();
+     const choiceKey = 'noventra.setup.imports.v2';
+     const legacyChoiceKey = 'noventra.setup.imports.v1';
+-    type DataKind = 'bookmarks' | 'history' | 'passwords';
++    type DataKind = 'bookmarks' | 'history' | 'passwords' | 'cookies';
+     type Choices = Record<DataKind, boolean>;
+     type Completed = Record<number, DataKind[]>;
+-    const kinds: DataKind[] = ['bookmarks', 'history', 'passwords'];
+-    const kindLabels: Record<DataKind, string> = { bookmarks: 'Bookmarks', history: 'History', passwords: 'Passwords' };
++    const kinds: DataKind[] = ['bookmarks', 'history', 'passwords', 'cookies'];
++    const kindLabels: Record<DataKind, string> = { bookmarks: 'Bookmarks', history: 'History', passwords: 'Passwords', cookies: 'Cookies and signed-in sessions' };
+     const validId = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+     const validCount = (value: unknown): number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : 0;
+ 
+     function restoreChoices(): { id?: number; data: Choices; completed: Completed; bookmarks: number; history: number; passwords: number; interrupted: boolean; csv: boolean; restorable: boolean; version: number; searchId?: number; searchChanged: boolean; makeDefault: boolean } {
+-        const empty = { data: { bookmarks: true, history: true, passwords: true }, completed: {} as Completed, bookmarks: 0, history: 0, passwords: 0, interrupted: false, csv: false, restorable: false, version: 0, searchId: undefined as number | undefined, searchChanged: false, makeDefault: false };
++        const empty = { data: { bookmarks: true, history: true, passwords: true, cookies: false }, completed: {} as Completed, bookmarks: 0, history: 0, passwords: 0, interrupted: false, csv: false, restorable: false, version: 0, searchId: undefined as number | undefined, searchChanged: false, makeDefault: false };
+         try {
+             const value = JSON.parse(sessionStorage.getItem(choiceKey) ?? sessionStorage.getItem(legacyChoiceKey) ?? 'null');
+             if (!value || ![1, 2].includes(value.version)) return empty;
+@@ -42,7 +42,7 @@
+                 }
+             }
+             return { id: validId(value.id) ? value.id : undefined,
+-                data: Object.fromEntries(kinds.map(kind => [kind, value.data?.[kind] === true])) as Choices,
++                data: Object.fromEntries(kinds.map(kind => [kind, kind !== 'cookies' && value.data?.[kind] === true])) as Choices,
+                 completed, bookmarks: validCount(value.bookmarks), history: validCount(value.history), passwords: validCount(value.passwords),
+                 interrupted: value.inFlight === true || value.interrupted === true, csv: value.csv === true, restorable: true,
+                 version: value.version, searchId: value.version === 2 && validId(value.searchId) ? value.searchId : undefined,
+@@ -66,6 +66,9 @@
+     let bookmarkImports = $state(restored.bookmarks);
+     let historyImports = $state(restored.history);
+     let passwordImports = $state(restored.passwords);
++    let cookieImports = $state(0);
++    let cookieSkipped = $state(0);
++    let cookieResult = $state('');
+     let passwordOpened = $state(restored.csv);
+     let interruptedImport = $state(restored.interrupted);
+     let importInFlight = $state(false);
+@@ -120,18 +123,19 @@
+ 
+     function availableData(profile: BrowserProfile): DataKind[] {
+         return [...(profile.favorites ? ['bookmarks' as const] : []), ...(profile.history ? ['history' as const] : []),
+-            ...(canImportBrowserPasswords && profile.passwords ? ['passwords' as const] : [])];
++            ...(canImportBrowserPasswords && profile.passwords ? ['passwords' as const] : []),
++            ...(profile.cookies ? ['cookies' as const] : [])];
+     }
+ 
+     function dataComplete(profile: BrowserProfile) {
+-        const available = availableData(profile);
++        const available = availableData(profile).filter(kind => kind !== 'cookies' || importedProfileData[profile.id]?.includes(kind));
+         return available.length > 0 && available.every(kind => importedProfileData[profile.id]?.includes(kind));
+     }
+ 
+     function selectData(profile: BrowserProfile) {
+         status = 'idle';
+         importError = '';
+-        selectedData = Object.fromEntries(kinds.map(kind => [kind, availableData(profile).includes(kind) && !importedProfileData[profile.id]?.includes(kind)])) as Choices;
++        selectedData = Object.fromEntries(kinds.map(kind => [kind, kind !== 'cookies' && availableData(profile).includes(kind) && !importedProfileData[profile.id]?.includes(kind)])) as Choices;
+     }
+ 
+     async function refreshManagerExtensions() {
+@@ -283,6 +287,10 @@
+     async function importJob(profile: BrowserProfile, selected: DataKind[]) {
+         importingProfileId = profile.id;
+         importingKinds = selected;
++        if (selected.includes('cookies')) {
++            cookieImports = cookieSkipped = 0;
++            cookieResult = '';
++        }
+         importProgress = `Importing ${selected.map(kind => kindLabels[kind].toLowerCase()).join(' and ')} from ${profile.name}…`;
+         status = 'importing';
+         importInFlight = true;
+@@ -291,6 +299,7 @@
+             const types = {
+                 import_dialog_bookmarks: selected.includes('bookmarks'), import_dialog_history: selected.includes('history'),
+                 import_dialog_saved_passwords: selected.includes('passwords'), import_dialog_search_engine: false,
++                import_dialog_cookies: selected.includes('cookies'),
+                 import_dialog_autofill_form_data: false, import_dialog_extensions: false,
+             };
+             importer.importData(profile.index, types);
+@@ -324,6 +333,7 @@
+                     if (!await importJob(profile, job)) {
+                         importError = job.includes('passwords')
+                             ? 'Passwords couldn’t be copied. Close the source browser and unlock its credential store, then retry. Completed imports are kept.'
++                            : job.includes('cookies') ? 'Cookies could not be copied. Close the source browser and unlock its credential store, then retry. Some sites may require a new sign-in.'
+                             : 'Browser data couldn’t be copied. Some data may already have been copied. Close the source browser, then retry.';
+                         return;
+                     }
+@@ -367,6 +377,14 @@
+         if (step >= 3) void loadDefaults();
+         const extensionListener = addWebUiListener('extension-state-changed', (diff: ExtensionStatus) => { managerExtensions = { ...managerExtensions, ...diff }; });
+         void refreshManagerExtensions().catch(() => {});
++        const cookieListener = addWebUiListener('import-cookies-result', (result: { imported: number; skipped: number }) => {
++            if (status !== 'importing' || !importingKinds.includes('cookies') ||
++                !Number.isSafeInteger(result.imported) || result.imported < 0 ||
++                !Number.isSafeInteger(result.skipped) || result.skipped < 0) return;
++            cookieImports += result.imported;
++            cookieSkipped += result.skipped;
++            cookieResult = `${cookieImports} cookies imported. ${cookieSkipped} skipped. Some sites may ask you to sign in again.`;
++        });
+         const listener = addWebUiListener('import-data-status-changed', (value: ImportDataStatus) => {
+             if (value === ImportDataStatus.IN_PROGRESS) status = 'importing';
+             if (value === ImportDataStatus.SUCCEEDED && status === 'importing') {
+@@ -391,7 +409,7 @@
+             searchLoadError = false;
+         });
+         const defaultListener = addWebUiListener('browser-default-state-changed', (state: DefaultBrowserInfo) => { defaultBrowserInfo = state; });
+-        return () => { removeWebUiListener(listener); removeWebUiListener(extensionListener); removeWebUiListener(defaultListener); removeWebUiListener(searchListener); };
++        return () => { removeWebUiListener(listener); removeWebUiListener(extensionListener); removeWebUiListener(defaultListener); removeWebUiListener(searchListener); removeWebUiListener(cookieListener); };
+     });
+ </script>
+ 
+@@ -440,6 +458,8 @@
+                                 </label>
+                             {/each}
+                         </fieldset>
++                        {#if chosenProfile?.cookies}<p class="privacy-hint">Cookie import is optional. Cookies already in this Space are kept. Some sites may ask you to sign in again.</p>{/if}
++                        {#if cookieResult}<p id="importCookiesResult" class="import-message" role="status">{cookieResult}</p>{/if}
+                     {/if}
+                     <div class="discovery-actions">{#if selectedId !== undefined}<button id="clear-import-selection" class="quiet" disabled={busy} onclick={() => { selectedId = undefined; importError = ''; }}>Clear selection</button>{/if}<button id={discovery === 'initial' ? 'find-import-profiles' : 'refresh-import-profiles'} class="quiet" disabled={busy || discoveryBusy} onclick={refreshBrowserProfiles}>{discovery === 'initial' ? 'Find browsers' : discovery === 'loading' ? 'Looking…' : discovery === 'error' ? 'Try again' : 'Refresh browsers'}</button></div>
+                     {#if discovery === 'error' && profiles.length > 0}<p class="error" role="alert">Refresh before choosing a profile, or use a file.</p>{/if}
+@@ -487,6 +507,7 @@
+                     <div class="finish-symbol" aria-hidden="true"><NoventraLogo height="42px" /></div>
+                     <h1 id="step-title" tabindex="-1" bind:this={title}>You’re ready to browse.</h1>
+                     <p class="intro">Finish setup to copy your selected data.</p>
++                    {#if cookieResult}<p id="finish-cookies-result" class="import-message" role="status">{cookieResult}</p>{/if}
+                     <div class="summary-row" id="data-import-summary"><div><strong>Browser data</strong><p>{stagedKinds.length ? `${sourceLabel}: ${stagedDescription}.` : bookmarkImports || historyImports || passwordImports ? 'Selected browser imports finished.' : 'Import later in Settings.'}</p></div><span class="summary-tag">{importError ? 'Check needed' : stagedKinds.length ? 'Queued' : bookmarkImports || historyImports || passwordImports ? 'Finished' : 'Optional'}</span></div>
+                     {#if passwordOpened}<div class="summary-row" id="password-import-summary"><div><strong>Password CSV</strong><p>Check the results in your password manager tab.</p></div><span class="summary-tag">Opened</span></div>{/if}
+                     <div class="summary-row"><div><strong>Password manager</strong><p role="status">{managerLoading ? 'Checking extensions…' : managerCheckFailed ? 'Couldn’t check extensions. Go back to retry.' : enabledManagers.length ? `${enabledManagers.join(', ')} installed. Sign in through the extension.` : 'Add an extension later.'}</p></div><span class="summary-tag">{managerLoading ? 'Checking' : managerCheckFailed ? 'Check needed' : enabledManagers.length ? 'Installed' : 'Optional'}</span></div>
+diff --git a/components/helium_onboarding/src/lib/cr/import_data_browser_proxy.ts b/components/helium_onboarding/src/lib/cr/import_data_browser_proxy.ts
+--- a/components/helium_onboarding/src/lib/cr/import_data_browser_proxy.ts
++++ b/components/helium_onboarding/src/lib/cr/import_data_browser_proxy.ts
+@@ -18,6 +18,7 @@
+   history: boolean;
+   favorites: boolean;
+   passwords: boolean;
++  cookies?: boolean;
+   search: boolean;
+   autofillFormData: boolean;
+   extensions: boolean;
+diff --git a/components/user_data_importer/common/importer_data_types.h b/components/user_data_importer/common/importer_data_types.h
+--- a/components/user_data_importer/common/importer_data_types.h
++++ b/components/user_data_importer/common/importer_data_types.h
+@@ -24,7 +24,7 @@
+   NONE = 0,
+   HISTORY = 1 << 0,
+   FAVORITES = 1 << 1,
+-  COOKIES = 1 << 2,  // Not supported yet.
++  COOKIES = 1 << 2,
+   PASSWORDS = 1 << 3,
+   SEARCH_ENGINES = 1 << 4,
+   HOME_PAGE = 1 << 5,

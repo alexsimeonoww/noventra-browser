@@ -1,0 +1,255 @@
+diff --git a/chrome/browser/ui/navigator/browser_navigator.cc b/chrome/browser/ui/navigator/browser_navigator.cc
+--- a/chrome/browser/ui/navigator/browser_navigator.cc
++++ b/chrome/browser/ui/navigator/browser_navigator.cc
+@@ -35,7 +35,6 @@
+ #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+ #include "chrome/browser/ui/browser_window/public/create_browser_window.h"
+ #include "chrome/browser/ui/browser_window/public/profile_browser_collection.h"
+-#include "chrome/browser/ui/helium/helium_layout_state_controller.h"
+ #include "chrome/browser/ui/incognito_allowed_url.h"
+ #include "chrome/browser/ui/location_bar/location_bar.h"
+ #include "chrome/browser/ui/navigator/browser_navigator_params.h"
+@@ -49,9 +48,6 @@
+ #include "chrome/browser/ui/tabs/tab_enums.h"
+ #include "chrome/browser/ui/tabs/tab_strip_model.h"
+ #include "chrome/browser/ui/tabs/tab_strip_user_gesture_details.h"
+-#include "chrome/browser/ui/toasts/api/toast_id.h"
+-#include "chrome/browser/ui/toasts/toast_controller.h"
+-#include "chrome/browser/ui/views/frame/browser_view.h"
+ #include "chrome/browser/ui/web_applications/app_browser_controller.h"
+ #include "chrome/browser/ui/web_applications/navigation_capturing_process.h"
+ #include "chrome/browser/ui/web_applications/web_app_launch_navigation_handle_user_data.h"
+@@ -203,68 +199,6 @@
+ }
+ #endif  // BUILDFLAG(IS_CHROMEOS)
+ 
+-bool IsTabChromeRevealedInZenMode(
+-    const HeliumLayoutStateController& layout_controller,
+-    const NavigateParams& params) {
+-  BrowserView* const browser_view =
+-      BrowserView::GetBrowserViewForBrowser(params.browser);
+-  if (!browser_view) {
+-    return false;
+-  }
+-
+-  // In vertical layout, tabs are in side chrome. In all other layouts,
+-  // tabs are in top chrome.
+-  if (layout_controller.IsVerticalLayout()) {
+-    return browser_view->GetSideChromeRevealRatio() > 0.0f;
+-  }
+-  return browser_view->GetTopChromeRevealRatio() > 0.0f;
+-}
+-
+-bool ShouldShowNewTabToastInZenMode(const NavigateParams& params) {
+-  // Only show the toast when a new browser tab is created.
+-  if (params.disposition != WindowOpenDisposition::NEW_FOREGROUND_TAB &&
+-      params.disposition != WindowOpenDisposition::NEW_BACKGROUND_TAB) {
+-    return false;
+-  }
+-
+-  // Show the toast for omnibox navigations that open a background tab.
+-  const bool is_background_omnibox_navigation =
+-      params.disposition == WindowOpenDisposition::NEW_BACKGROUND_TAB &&
+-      (params.transition & ui::PAGE_TRANSITION_FROM_ADDRESS_BAR);
+-  if (!ui::PageTransitionCoreTypeIs(params.transition,
+-                                    ui::PAGE_TRANSITION_LINK) &&
+-      !ui::PageTransitionCoreTypeIs(params.transition,
+-                                    ui::PAGE_TRANSITION_AUTO_BOOKMARK) &&
+-      !is_background_omnibox_navigation) {
+-    return false;
+-  }
+-
+-  // Zen Mode state is tracked per browser window.
+-  if (!params.browser) {
+-    return false;
+-  }
+-
+-  // Don't show the toast if zen mode is disabled or if chrome with tabs
+-  // is revealed. The user can already see the tab strip update in either
+-  // of those cases.
+-  auto* layout_controller = HeliumLayoutStateController::From(params.browser);
+-  return layout_controller && layout_controller->IsZenModeEnabled() &&
+-         !IsTabChromeRevealedInZenMode(*layout_controller, params);
+-}
+-
+-void MaybeShowZenModeNewTabCreatedToast(const NavigateParams& params) {
+-  if (!ShouldShowNewTabToastInZenMode(params)) {
+-    return;
+-  }
+-
+-  ToastController* const toast_controller =
+-      ToastController::From(params.browser);
+-  if (toast_controller) {
+-    toast_controller->MaybeShowToast(
+-        ToastParams(ToastId::kZenModeNewTabCreated));
+-  }
+-}
+-
+ // Change some of the navigation parameters based on the particular URL.
+ // Returns true on success. Otherwise, if changing params leads the browser
+ // into an erroneous state, returns false.
+@@ -1205,7 +1139,6 @@
+         routed_space.has_value() ? ui::PAGE_TRANSITION_AUTO_TOPLEVEL
+                                  : params->transition,
+         params->tabstrip_add_types, group);
+-    MaybeShowZenModeNewTabCreatedToast(*params);
+ 
+     // For NEW_SPLIT_VIEW, pair the new tab with the active tab. The
+     // "already split" case is handled in
+diff --git a/chrome/browser/ui/views/noventra_link_preview.cc b/chrome/browser/ui/views/noventra_link_preview.cc
+--- a/chrome/browser/ui/views/noventra_link_preview.cc
++++ b/chrome/browser/ui/views/noventra_link_preview.cc
+@@ -8,6 +8,7 @@
+ #include "base/functional/callback.h"
+ #include "base/strings/utf_string_conversions.h"
+ #include "base/task/single_thread_task_runner.h"
++#include "build/build_config.h"
+ #include "chrome/app/vector_icons/vector_icons.h"
+ #include "chrome/browser/profiles/profile.h"
+ #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+@@ -38,19 +39,21 @@
+ #include "ui/base/mojom/dialog_button.mojom.h"
+ #include "ui/base/mojom/menu_source_type.mojom.h"
+ #include "ui/gfx/geometry/point_conversions.h"
+-#include "ui/base/models/image_model.h"
+ #include "ui/color/color_id.h"
+ #include "ui/views/background.h"
+ #include "ui/views/border.h"
+ #include "ui/views/controls/button/image_button.h"
+ #include "ui/views/controls/button/image_button_factory.h"
+-#include "ui/views/controls/button/md_text_button.h"
+ #include "ui/views/controls/label.h"
+ #include "ui/views/style/typography.h"
+ #include "ui/views/controls/webview/webview.h"
+ #include "ui/views/layout/box_layout.h"
+ #include "ui/views/widget/widget.h"
+ #include "ui/views/window/dialog_delegate.h"
++
++#if BUILDFLAG(IS_OZONE)
++#include "ui/ozone/public/ozone_platform.h"
++#endif
+ 
+ namespace {
+ const char kPreviewContentsKey = 0;
+@@ -163,13 +166,13 @@
+              const GURL& url,
+              const content::Referrer& referrer)
+       : source_(source->GetWeakPtr()) {
+-    SetLayoutManager(std::make_unique<views::BoxLayout>(
++    auto* layout = SetLayoutManager(std::make_unique<views::BoxLayout>(
+         views::BoxLayout::Orientation::kVertical));
+     SetBackground(views::CreateSolidBackground(ui::kColorDialogBackground));
+     SetBorder(views::CreateSolidBorder(1, ui::kColorSeparator));
+     auto* header = AddChildView(std::make_unique<views::View>());
+     auto* row = header->SetLayoutManager(std::make_unique<views::BoxLayout>(
+-        views::BoxLayout::Orientation::kHorizontal, gfx::Insets::VH(10, 12), 6));
++        views::BoxLayout::Orientation::kHorizontal, gfx::Insets::VH(6, 8), 4));
+     row->set_cross_axis_alignment(views::BoxLayout::CrossAxisAlignment::kCenter);
+     header->SetBorder(views::CreateSolidSidedBorder(
+         gfx::Insets::TLBR(0, 0, 1, 0), ui::kColorSeparator));
+@@ -194,7 +197,7 @@
+     auto* identity = header->AddChildView(std::make_unique<views::View>());
+     // Page-controlled titles must not change the header's intrinsic size.
+     // Flex supplies the available width; keep action positions stable on updates.
+-    identity->SetPreferredSize(gfx::Size(1, 44));
++    identity->SetPreferredSize(gfx::Size(1, 36));
+     identity->SetLayoutManager(std::make_unique<views::BoxLayout>(
+         views::BoxLayout::Orientation::kVertical, gfx::Insets::VH(0, 8), 2));
+     title_ = identity->AddChildView(std::make_unique<views::Label>(
+@@ -211,13 +214,9 @@
+     location_->SetSelectable(true);
+     location_->SetTooltipText(base::UTF8ToUTF16(url.spec()));
+     row->SetFlexForView(identity, 1);
+-    auto* open = header->AddChildView(std::make_unique<views::MdTextButton>(
+-        base::BindRepeating(&PreviewTab::PromoteAndClose, base::Unretained(this)),
+-        u"Open in tab"));
+-    open->SetCornerRadius(6);
+-    open->SetImageModel(views::Button::STATE_NORMAL,
+-        ui::ImageModel::FromVectorIcon(kOpenInNewIcon, ui::kColorIcon, 16));
+-    open->SetTooltipText(u"Continue in a full tab without reloading");
++    add_icon(base::BindRepeating(&PreviewTab::PromoteAndClose,
++                                base::Unretained(this)),
++             kOpenInNewIcon, u"Open in tab without reloading");
+     split_ = add_icon(
+         base::BindRepeating(&PreviewTab::SplitAndClose, base::Unretained(this)),
+         kSplitSceneIcon, u"Open in split without reloading");
+@@ -234,10 +233,9 @@
+     view_ = AddChildView(std::make_unique<views::WebView>(profile));
+     view_->SetWebContents(contents_.get());
+     contents_->SetDelegate(this);
+-    const auto bounds = source->GetViewBounds();
+-    view_->SetPreferredSize(
+-        gfx::Size(std::max(240, std::min(1040, bounds.width() - 80)),
+-                  std::max(160, std::min(740, bounds.height() - 180))));
++    // TabDialogManager supplies viewport-relative bounds, including on resize.
++    // Let the page fill the space left by the compact header.
++    layout->SetFlexForView(view_, 1);
+     contents_->GetController().LoadURL(url, referrer, ui::PAGE_TRANSITION_LINK,
+                                        std::string());
+     UpdateSplitButton();
+@@ -686,10 +684,42 @@
+       },
+       weak_factory_.GetWeakPtr()));
+   preview_delegate_ = std::move(delegate);
+-  preview_widget_ =
+-      tab->GetTabFeatures()->tab_dialog_manager()->CreateAndShowDialog(
+-          preview_delegate_.get(),
+-          std::make_unique<tabs::TabDialogManager::Params>());
++  auto* manager = tab->GetTabFeatures()->tab_dialog_manager();
++  preview_widget_ = manager->CreateTabScopedDialog(preview_delegate_.get());
++  auto params = std::make_unique<tabs::TabDialogManager::Params>();
++  params->get_dialog_bounds = base::BindRepeating(
++      &NoventraLinkPreview::GetPreviewBounds, base::Unretained(this));
++  manager->ShowDialog(preview_widget_.get(), std::move(params));
++}
++gfx::Rect NoventraLinkPreview::GetPreviewBounds() const {
++  CHECK(web_contents());
++  CHECK(preview_widget_);
++  auto* tab = tabs::TabInterface::MaybeGetFromContents(web_contents());
++  auto* host = tab->GetTabFeatures()->tab_dialog_manager()->GetHostWidget();
++  gfx::Rect bounds = web_contents()->GetViewBounds();
++  // Zen's Glance uses 80% of the page width and its full available height.
++  // Keep a small outside-click gutter; on narrow windows use the available
++  // width rather than squeezing the page and its controls into an 80% column.
++  const int margin =
++      std::min(12, std::min(bounds.width(), bounds.height()) / 20);
++  bounds.Inset(margin);
++  const int width =
++      std::min(bounds.width(), std::max(640, bounds.width() * 4 / 5));
++  bounds.set_x(bounds.x() + (bounds.width() - width) / 2);
++  bounds.set_width(width);
++  // Child widgets use parent-client coordinates. Desktop modal widgets use
++  // global coordinates only on platforms that support them, matching
++  // TabDialogManager's default positioning path.
++  bool screen_coordinates = preview_widget_->is_top_level();
++#if BUILDFLAG(IS_OZONE)
++  screen_coordinates &= ui::OzonePlatform::GetInstance()
++                            ->GetPlatformProperties()
++                            .supports_global_screen_coordinates;
++#endif
++  if (host && !screen_coordinates) {
++    bounds.Offset(-host->GetClientAreaBoundsInScreen().OffsetFromOrigin());
++  }
++  return bounds;
+ }
+ void NoventraLinkPreview::ClosePreview() {
+   preview_.reset();
+diff --git a/chrome/browser/ui/views/noventra_link_preview.h b/chrome/browser/ui/views/noventra_link_preview.h
+--- a/chrome/browser/ui/views/noventra_link_preview.h
++++ b/chrome/browser/ui/views/noventra_link_preview.h
+@@ -11,6 +11,7 @@
+ #include "content/public/browser/web_contents_observer.h"
+ #include "content/public/browser/web_contents_user_data.h"
+ #include "content/public/common/referrer.h"
++#include "ui/gfx/geometry/rect.h"
+ 
+ namespace content {
+ struct ContextMenuParams;
+@@ -61,6 +62,7 @@
+                         const GURL& source_url,
+                         const GURL& url);
+   void ShowPreview(const GURL& url, const content::Referrer& referrer);
++  gfx::Rect GetPreviewBounds() const;
+   void ClosePreview();
+   void OnPreviewClosed();
+   std::map<content::RenderWidgetHost*,

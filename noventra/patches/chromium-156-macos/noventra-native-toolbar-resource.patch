@@ -1,0 +1,12 @@
+diff --git a/chrome/browser/ui/views/toolbar/toolbar_view.cc b/chrome/browser/ui/views/toolbar/toolbar_view.cc
+--- a/chrome/browser/ui/views/toolbar/toolbar_view.cc
++++ b/chrome/browser/ui/views/toolbar/toolbar_view.cc
+@@ -663,7 +663,7 @@
+     auto search_button = std::make_unique<ToolbarButton>(
+         base::BindRepeating(callback, browser_, IDC_FOCUS_LOCATION));
+     search_button->SetTooltipText(
+-        l10n_util::GetStringUTF16(IDS_OMNIBOX_EMPTY_HINT));
++        l10n_util::GetStringUTF16(IDS_ACCNAME_LOCATION));
+     search_button->GetViewAccessibility().SetName(
+         l10n_util::GetStringUTF16(IDS_ACCNAME_LOCATION));
+     search_button->SetVectorIcon(vector_icons::kSearchIcon);

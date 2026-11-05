@@ -1,0 +1,1804 @@
+diff --git a/chrome/browser/ui/views/frame/contents_container_view.cc b/chrome/browser/ui/views/frame/contents_container_view.cc
+--- a/chrome/browser/ui/views/frame/contents_container_view.cc
++++ b/chrome/browser/ui/views/frame/contents_container_view.cc
+@@ -8,7 +8,10 @@
+ #include <optional>
+ #include <utility>
+ 
++#include "base/functional/bind.h"
+ #include "base/i18n/rtl.h"
++#include "base/task/single_thread_task_runner.h"
++#include "chrome/app/vector_icons/vector_icons.h"
+ #include "chrome/browser/actor/ui/actor_overlay_web_view.h"
+ #include "chrome/browser/devtools/devtools_contents_resizing_strategy.h"
+ #include "chrome/browser/enterprise/data_protection/data_protection_overlay_view.h"
+@@ -18,6 +21,7 @@
+ #include "chrome/browser/ui/ai_overlay_dialog/ai_overlay_dialog_controller.h"
+ #include "chrome/browser/ui/browser_element_identifiers.h"
+ #include "chrome/browser/ui/read_anything/read_anything_immersive_overlay_view.h"
++#include "chrome/browser/ui/tabs/tab_strip_model.h"
+ #include "chrome/browser/ui/ui_features.h"
+ #include "chrome/browser/ui/view_ids.h"
+ #include "chrome/browser/ui/views/frame/browser_view.h"
+@@ -33,14 +37,21 @@
+ #include "chrome/browser/ui/views/new_tab_footer/footer_web_view.h"
+ #include "chrome/common/chrome_features.h"
+ #include "components/search/ntp_features.h"
++#include "components/tabs/public/tab_interface.h"
+ #include "content/public/browser/web_contents.h"
+ #include "ui/accessibility/accessibility_features.h"
+ #include "ui/base/metadata/metadata_impl_macros.h"
++#include "ui/color/color_id.h"
+ #include "ui/compositor/layer.h"
+ #include "ui/gfx/geometry/insets.h"
+ #include "ui/gfx/geometry/rect.h"
+ #include "ui/gfx/geometry/rounded_corners_f.h"
++#include "ui/views/accessibility/view_accessibility.h"
++#include "ui/views/background.h"
+ #include "ui/views/border.h"
++#include "ui/views/controls/button/image_button.h"
++#include "ui/views/controls/button/image_button_factory.h"
++#include "ui/views/layout/box_layout.h"
+ #include "ui/views/layout/delegating_layout_manager.h"
+ #include "ui/views/layout/fill_layout.h"
+ #include "ui/views/layout/proposed_layout.h"
+@@ -57,6 +68,7 @@
+ constexpr int kSplitViewContentPadding = 2;
+ constexpr int kNewTabFooterSeparatorHeight = 1;
+ constexpr int kNewTabFooterHeight = 56;
++constexpr int kSplitControlsHeight = 28;
+ }  // namespace
+ 
+ ContentsContainerView::ContentsContainerView(BrowserView* browser_view)
+@@ -159,6 +171,33 @@
+             .Build());
+   }
+ 
++  split_controls_ = AddChildView(std::make_unique<views::View>());
++  split_controls_->SetPaintToLayer();
++  split_controls_->layer()->SetFillsBoundsOpaquely(false);
++  split_controls_->SetBackground(
++      views::CreateSolidBackground(ui::kColorDialogBackground));
++  split_controls_->GetViewAccessibility().SetRole(ax::mojom::Role::kToolbar);
++  split_controls_->GetViewAccessibility().SetName(u"Split pane controls");
++  auto* controls_layout =
++      split_controls_->SetLayoutManager(std::make_unique<views::BoxLayout>(
++          views::BoxLayout::Orientation::kHorizontal, gfx::Insets::VH(2, 4),
++          2));
++  controls_layout->set_main_axis_alignment(
++      views::BoxLayout::MainAxisAlignment::kEnd);
++  auto button = [&](const gfx::VectorIcon& icon, const std::u16string& name,
++                    bool close) {
++    auto* control = split_controls_->AddChildView(
++        views::CreateVectorImageButtonWithNativeTheme(
++            base::BindRepeating(&ContentsContainerView::OnSplitAction,
++                                base::Unretained(this), close),
++            icon, 16));
++    control->SetPreferredSize(gfx::Size(24, 24));
++    control->SetTooltipText(name);
++  };
++  button(kOpenInNewIcon, u"Unsplit tabs", false);
++  button(kCloseIcon, u"Close split pane", true);
++  split_controls_->SetVisible(false);
++
+   container_outline_ =
+       AddChildView(std::make_unique<ContentsContainerOutline>(nullptr));
+ 
+@@ -181,6 +220,8 @@
+ 
+ std::vector<views::View*> ContentsContainerView::GetAccessiblePanes() {
+   std::vector<views::View*> accessible_panes;
++  if (split_controls_->GetVisible())
++    accessible_panes.push_back(split_controls_);
+   if (contents_view_->GetVisible()) {
+     accessible_panes.push_back(contents_view_);
+   }
+@@ -210,6 +251,7 @@
+       round_bottom_left_window_corner_ != round_bottom_left ||
+       round_bottom_right_window_corner_ != round_bottom_right;
+   is_in_split_ = is_in_split;
++  split_controls_->SetVisible(is_in_split);
+   should_round_contents_ = should_round_contents;
+   round_top_left_window_corner_ = round_top_left;
+   round_top_right_window_corner_ = round_top_right;
+@@ -258,6 +300,38 @@
+     GetWidget()->non_client_view()->frame_view()->UpdateWindowRoundedCorners();
+   }
+ #endif  //  BUILDFLAG(IS_CHROMEOS)
++}
++
++void ContentsContainerView::OnSplitAction(bool close_pane) {
++  auto* contents = contents_view_->web_contents();
++  auto* tab =
++      contents ? tabs::TabInterface::MaybeGetFromContents(contents) : nullptr;
++  if (!tab || !tab->IsSplit())
++    return;
++  // Model mutations can replace/destroy this pane. Resolve weak identities on
++  // the next task instead of carrying a raw view through a close callback.
++  base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
++      FROM_HERE,
++      base::BindOnce(
++          [](base::WeakPtr<BrowserView> browser,
++             base::WeakPtr<tabs::TabInterface> tab, bool close) {
++            if (!browser || !tab || !tab->IsSplit())
++              return;
++            auto* model = browser->browser()->GetTabStripModel();
++            const int index = model->GetIndexOfTab(tab.get());
++            if (!model->ContainsIndex(index))
++              return;
++            if (close) {
++              model->CloseWebContentsAt(
++                  index, CLOSE_USER_GESTURE | CLOSE_CREATE_HISTORICAL_TAB);
++              return;
++            }
++            model->ActivateTabAt(index);
++            if (browser && tab && tab->GetSplit())
++              browser->browser()->GetTabStripModel()->RemoveSplit(
++                  *tab->GetSplit());
++          },
++          browser_view_->GetAsWeakPtr(), tab->GetWeakPtr(), close_pane));
+ }
+ 
+ void ContentsContainerView::SetBorderRoundedCornersFrom(
+@@ -531,6 +605,16 @@
+   }
+ 
+   gfx::Rect full_contents_bounds = GetContentsBounds();
++  // Split actions have a small dedicated top edge; they never obscure a site's
++  // own header/buttons, and every pane keeps independent close/unsplit access.
++  const gfx::Rect controls_bounds(
++      full_contents_bounds.x(), full_contents_bounds.y(),
++      full_contents_bounds.width(), kSplitControlsHeight);
++  layouts.child_layouts.emplace_back(split_controls_.get(), is_in_split_,
++                                     controls_bounds);
++  if (is_in_split_)
++    full_contents_bounds.Inset(
++        gfx::Insets::TLBR(kSplitControlsHeight, 0, 0, 0));
+   gfx::Rect devtools_bounds;
+   // The area contents excluding devtools is drawn (ie |contents_view_|,
+   // |new_tab_footer_view_|, etc).
+diff --git a/chrome/browser/ui/views/frame/contents_container_view.h b/chrome/browser/ui/views/frame/contents_container_view.h
+--- a/chrome/browser/ui/views/frame/contents_container_view.h
++++ b/chrome/browser/ui/views/frame/contents_container_view.h
+@@ -147,6 +147,7 @@
+ 
+  private:
+   void UpdateContentsClip();
++  void OnSplitAction(bool close_pane);
+ 
+   // Updates the DevTools docked placement. It infers the docked placement from
+   // the bounds of contents_webview relative to the local bounds of the
+@@ -176,6 +177,7 @@
+   bool round_bottom_right_window_corner_ = false;
+ 
+   raw_ptr<BrowserView> browser_view_ = nullptr;
++  raw_ptr<views::View> split_controls_ = nullptr;
+ 
+   // An invisible view used to anchor tab toasts to the top of the contents
+   // view, while being before the contents view in the focus order.
+diff --git a/chrome/browser/ui/views/frame/multi_contents_view.cc b/chrome/browser/ui/views/frame/multi_contents_view.cc
+--- a/chrome/browser/ui/views/frame/multi_contents_view.cc
++++ b/chrome/browser/ui/views/frame/multi_contents_view.cc
+@@ -47,14 +47,22 @@
+ #include "content/public/common/url_constants.h"
+ #include "ui/base/metadata/metadata_impl_macros.h"
+ #include "ui/base/ozone_buildflags.h"
++#include "ui/color/color_id.h"
++#include "ui/color/color_provider.h"
+ #include "ui/compositor/layer.h"
+ #include "ui/gfx/geometry/outsets.h"
+ #include "ui/gfx/geometry/rect.h"
+ #include "ui/gfx/geometry/rounded_corners_f.h"
++#include "ui/views/accessibility/view_accessibility.h"
++#include "ui/views/background.h"
++#include "ui/views/border.h"
++#include "ui/views/controls/label.h"
+ #include "ui/views/layout/flex_layout_types.h"
+ #include "ui/views/layout/layout_types.h"
+ #include "ui/views/layout/proposed_layout.h"
+ #include "ui/views/view_class_properties.h"
++#include "ui/views/view_utils.h"
++#include "ui/views/widget/widget.h"
+ 
+ #if BUILDFLAG(IS_MAC)
+ #include "chrome/browser/ui/fullscreen_util_mac.h"
+@@ -214,6 +222,8 @@
+ }
+ 
+ MultiContentsView::~MultiContentsView() {
++  HideNoventraSplitDropPreview();
++  noventra_split_drop_preview_ = nullptr;
+   // Clear the map and vectors before `RemoveAllChildViews()` to avoid having
+   // dangling pointers.
+   container_focusable_map_.clear();
+@@ -285,6 +295,218 @@
+   }
+ 
+   return nullptr;
++}
++
++tabs::TabInterface* MultiContentsView::GetNoventraSplitDropTarget(
++    const gfx::Point& pointer) const {
++  for (const auto& pane : contents_container_views_) {
++    if (!pane->GetVisible() || !pane->GetBoundsInScreen().Contains(pointer))
++      continue;
++    auto* contents = pane->contents_view()->web_contents();
++    return contents ? tabs::TabInterface::MaybeGetFromContents(contents)
++                    : nullptr;
++  }
++  return nullptr;
++}
++
++gfx::Rect MultiContentsView::GetNoventraSplitDropBounds(
++    const tabs::TabInterface* source,
++    const tabs::TabInterface* target,
++    bool after,
++    bool stacked) const {
++  if (!source || !target || source == target) {
++    return gfx::Rect();
++  }
++  auto* model = browser_view_->browser()->GetTabStripModel();
++  if (!model->ContainsIndex(model->GetIndexOfTab(source)) ||
++      !model->ContainsIndex(model->GetIndexOfTab(target))) {
++    return gfx::Rect();
++  }
++  auto* target_split =
++      target->IsSplit() ? model->GetSplitData(*target->GetSplit()) : nullptr;
++  const auto visual = target_split ? *target_split->visual_data()
++                                   : split_tabs::SplitTabVisualData();
++  auto members = target_split ? target_split->ListTabs()
++                              : std::vector<tabs::TabInterface*>{
++                                    const_cast<tabs::TabInterface*>(target)};
++  const bool existing_member =
++      std::ranges::find(members, source) != members.end();
++  // Moving the first tab away (even temporarily in JoinNoventraSplit), or
++  // moving a tab before it, resets the multi-pane weights in
++  // SetWebContentsAtIndex.
++  const bool resets_weights = existing_member && (members.front() == source ||
++                                                  members.front() == target);
++  std::erase(members, source);
++  const auto position = std::ranges::find(members, target);
++  if (position == members.end() || members.size() >= 4) {
++    return gfx::Rect();
++  }
++  const int slot = position - members.begin() + (after ? 1 : 0);
++  const int count = members.size() + 1;
++  const auto layout =
++      stacked ? split_tabs::SplitTabLayout::kStacked : visual.split_layout();
++  auto* visible_contents =
++      contents_container_views_[0]->contents_view()->web_contents();
++  auto* visible_tab =
++      visible_contents
++          ? tabs::TabInterface::MaybeGetFromContents(visible_contents)
++          : nullptr;
++  const bool target_is_visible = IsInSplitView() && visible_tab &&
++                                 target->GetSplit() == visible_tab->GetSplit();
++  if (existing_member && target_is_visible && layout == visual.split_layout() &&
++      (count == 2 || layout == split_tabs::SplitTabLayout::kGrid ||
++       !resets_weights) &&
++      slot < split_count_) {
++    auto bounds = contents_container_views_[slot]->GetBoundsInScreen();
++    bounds.Inset(4);
++    return bounds;
++  }
++
++  // Match the future live layout, without changing selection or resizing its
++  // WebContents during capture. New groups reset three/four-pane weights; two
++  // panes retain the target split's ratio, including an orientation change.
++  gfx::Rect bounds = GetBoundsInScreen();
++  bounds.Inset(IsInSplitView() ? split_view_insets_
++                               : gfx::Insets(kSplitViewContentInset));
++  if (layout == split_tabs::SplitTabLayout::kGrid && count >= 3) {
++    constexpr int kGap = 8;
++    const auto axis_sizes = [](int length, double ratio) {
++      const int usable = std::max(0, length - kGap);
++      const int minimum = std::min(64, usable / 2);
++      const double fraction =
++          std::isfinite(ratio) ? std::clamp(ratio, 0.0, 1.0) : 0.5;
++      const int first =
++          std::clamp(static_cast<int>(std::round(usable * fraction)), minimum,
++                     usable - minimum);
++      return std::pair(first, usable - first);
++    };
++    const auto [left, right] = axis_sizes(bounds.width(), visual.split_ratio());
++    const auto [top, bottom] =
++        axis_sizes(bounds.height(), visual.grid_row_ratio());
++    if (slot < 2) {
++      bounds.set_x(bounds.x() + (slot == 1 ? left + kGap : 0));
++      bounds.set_width(slot == 0 ? left : right);
++      bounds.set_height(top);
++    } else {
++      bounds.set_y(bounds.y() + top + kGap);
++      bounds.set_height(bottom);
++      if (count == 4) {
++        bounds.set_x(bounds.x() + (slot == 3 ? left + kGap : 0));
++        bounds.set_width(slot == 2 ? left : right);
++      }
++    }
++  } else {
++    const bool horizontal = layout != split_tabs::SplitTabLayout::kStacked;
++    const int length = horizontal ? bounds.width() : bounds.height();
++    int start = 0;
++    int end = 0;
++    if (count == 2) {
++      constexpr int kGap = MultiContentsResizeArea::kHandleResizeAxisPadding +
++                           MultiContentsResizeArea::kHandleResizeAxisSize;
++      int first = std::round(visual.split_ratio() * (length - kGap));
++      int second = length - first - kGap;
++      const int min_percentage = kMinWebContentsSizePercentage * length;
++      const int minimum =
++          std::min(min_contents_size_for_testing_.value_or(kMinWebContentsSize),
++                   std::max(kConstrainedMinWebContentsSize, min_percentage));
++      if (first < minimum) {
++        second -= minimum - first;
++        first = minimum;
++      } else if (second < minimum) {
++        first -= minimum - second;
++        second = minimum;
++      }
++      start = slot == 0 ? 0 : first + kGap;
++      end = start + (slot == 0 ? first : second);
++    } else {
++      constexpr int kGap = 8;
++      const int usable = std::max(0, length - kGap * (count - 1));
++      // CalculateProposedLayout accumulates uniform double weights before
++      // converting to integer pixels; retain that rounding for each boundary.
++      double accumulated = 0;
++      for (int i = 0; i <= slot; ++i) {
++        accumulated += 1.0 / count;
++        const int boundary =
++            i == count - 1 ? length
++                           : static_cast<int>(usable * accumulated) + kGap * i;
++        if (i == slot) {
++          end = boundary;
++        } else {
++          start = boundary + kGap;
++        }
++      }
++    }
++    if (horizontal) {
++      bounds.set_x(bounds.x() + start);
++      bounds.set_width(std::max(0, end - start));
++    } else {
++      bounds.set_y(bounds.y() + start);
++      bounds.set_height(std::max(0, end - start));
++    }
++  }
++  bounds.Inset(4);
++  return bounds;
++}
++
++void MultiContentsView::ShowNoventraSplitDropPreview(
++    const gfx::Rect& screen_bounds,
++    const gfx::Point& pointer,
++    const std::u16string& label) {
++  if (!noventra_split_drop_preview_) {
++    auto overlay = std::make_unique<views::View>();
++    overlay->SetProperty(views::kViewIgnoredByLayoutKey, true);
++    overlay->SetCanProcessEventsWithinSubtree(false);
++    overlay->GetViewAccessibility().SetName(u"Split destination preview");
++    overlay->SetPaintToLayer();
++    overlay->layer()->SetFillsBoundsOpaquely(false);
++    overlay->layer()->SetRoundedCornerRadius(gfx::RoundedCornersF(8));
++    overlay->layer()->SetIsFastRoundedCorner(true);
++    noventra_split_drop_preview_ = AddChildView(std::move(overlay));
++  }
++  const SkColor accent = GetColorProvider()->GetColor(ui::kColorSysPrimary);
++  noventra_split_drop_preview_->GetViewAccessibility().SetDescription(label);
++  noventra_split_drop_preview_->SetBackground(
++      views::CreateSolidBackground(SkColorSetA(accent, 42)));
++  noventra_split_drop_preview_->SetBorder(views::CreateSolidBorder(2, accent));
++  gfx::Rect bounds = screen_bounds;
++  bounds.Offset(-GetBoundsInScreen().OffsetFromOrigin());
++  bounds.Intersect(GetLocalBounds());
++  noventra_split_drop_preview_->SetBoundsRect(bounds);
++  noventra_split_drop_preview_->SetVisible(!bounds.IsEmpty());
++  ReorderChildView(noventra_split_drop_preview_, children().size() - 1);
++  if (!noventra_tab_drag_ghost_) {
++    noventra_tab_drag_ghost_ = std::make_unique<views::Widget>();
++    views::Widget::InitParams params(
++        views::Widget::InitParams::CLIENT_OWNS_WIDGET,
++        views::Widget::InitParams::TYPE_TOOLTIP);
++    params.parent = GetWidget()->GetNativeView();
++    params.context = GetWidget()->GetNativeWindow();
++    params.accept_events = false;
++    params.opacity = views::Widget::InitParams::WindowOpacity::kTranslucent;
++    params.name = "NoventraTabDragGhost";
++    noventra_tab_drag_ghost_->Init(std::move(params));
++    auto* text = noventra_tab_drag_ghost_->SetContentsView(
++        std::make_unique<views::Label>());
++    text->SetBorder(views::CreateEmptyBorder(gfx::Insets::VH(6, 12)));
++    text->SetElideBehavior(gfx::ELIDE_TAIL);
++  }
++  auto* text = views::AsViewClass<views::Label>(
++      noventra_tab_drag_ghost_->GetContentsView());
++  text->SetText(label);
++  text->SetBackground(views::CreateRoundedRectBackground(
++      GetColorProvider()->GetColor(ui::kColorDialogBackground), 8));
++  text->SetEnabledColor(
++      GetColorProvider()->GetColor(ui::kColorLabelForeground));
++  gfx::Rect ghost(pointer.x() + 16, pointer.y() + 20, 300, 34);
++  ghost.AdjustToFit(browser_view_->GetBoundsInScreen());
++  noventra_tab_drag_ghost_->SetBounds(ghost);
++  noventra_tab_drag_ghost_->ShowInactive();
++}
++
++void MultiContentsView::HideNoventraSplitDropPreview() {
++  if (noventra_split_drop_preview_)
++    noventra_split_drop_preview_->SetVisible(false);
++  noventra_tab_drag_ghost_.reset();
+ }
+ 
+ bool MultiContentsView::IsInSplitView() const {
+diff --git a/chrome/browser/ui/views/frame/multi_contents_view.h b/chrome/browser/ui/views/frame/multi_contents_view.h
+--- a/chrome/browser/ui/views/frame/multi_contents_view.h
++++ b/chrome/browser/ui/views/frame/multi_contents_view.h
+@@ -7,6 +7,7 @@
+ 
+ #include <memory>
+ #include <optional>
++#include <string>
+ 
+ #include "base/callback_list.h"
+ #include "base/functional/callback_forward.h"
+@@ -33,6 +34,10 @@
+ class MultiContentsViewDelegate;
+ class MultiContentsViewDropTargetController;
+ 
++namespace tabs {
++class TabInterface;
++}
++
+ namespace content {
+ class WebContents;
+ }  // namespace content
+@@ -43,6 +48,7 @@
+ 
+ namespace views {
+ class WebView;
++class Widget;
+ }  // namespace views
+ 
+ // MultiContentsView lays out up to four live WebContents in columns, rows,
+@@ -91,6 +97,19 @@
+ 
+   void MaybeUpdateContentsBorderAndOverlay();
+   void MaybeUpdateBorderForZenReveal();
++
++  // Captured tab drags preview their final pane without changing selection or
++  // reflowing the live pages. Both tab layouts use this same surface.
++  tabs::TabInterface* GetNoventraSplitDropTarget(
++      const gfx::Point& pointer) const;
++  gfx::Rect GetNoventraSplitDropBounds(const tabs::TabInterface* source,
++                                       const tabs::TabInterface* target,
++                                       bool after,
++                                       bool stacked) const;
++  void ShowNoventraSplitDropPreview(const gfx::Rect& screen_bounds,
++                                    const gfx::Point& pointer,
++                                    const std::u16string& label);
++  void HideNoventraSplitDropPreview();
+ 
+   // Returns true if more than one WebContents is displayed.
+   bool IsInSplitView() const;
+@@ -337,6 +356,9 @@
+ 
+   // The views that are shown for entering split view. E.g., this is shown when
+   // the user drags a link to the edge of the contents view.
++  raw_ptr<views::View> noventra_split_drop_preview_ = nullptr;
++  std::unique_ptr<views::Widget> noventra_tab_drag_ghost_;
++
+   raw_ptr<MultiContentsDropTargetView> drop_target_view_ = nullptr;
+ 
+   // Holds subscriptions for when the attached contents to ContentsContainerView
+diff --git a/chrome/browser/ui/views/frame/noventra_dock_view.cc b/chrome/browser/ui/views/frame/noventra_dock_view.cc
+--- a/chrome/browser/ui/views/frame/noventra_dock_view.cc
++++ b/chrome/browser/ui/views/frame/noventra_dock_view.cc
+@@ -22,13 +22,15 @@
+ #include "third_party/skia/include/core/SkRegion.h"
+ #include "ui/accessibility/ax_enums.mojom.h"
+ #include "ui/base/metadata/metadata_impl_macros.h"
++#include "ui/color/color_id.h"
+ #include "ui/color/color_provider.h"
+-#include "ui/gfx/scoped_canvas.h"
+ #include "ui/compositor/layer.h"
++#include "ui/compositor/layer_solid_color.h"
+ #include "ui/gfx/canvas.h"
+ #include "ui/gfx/geometry/rect_f.h"
+ #include "ui/gfx/geometry/rounded_corners_f.h"
+ #include "ui/gfx/geometry/skia_conversions.h"
++#include "ui/gfx/scoped_canvas.h"
+ #include "ui/views/accessibility/view_accessibility.h"
+ #include "ui/views/background.h"
+ #include "ui/views/bubble/edge_anchor.h"
+@@ -47,6 +49,7 @@
+ DEFINE_UI_CLASS_PROPERTY_KEY(bool, kNoventraDockSharedFooter, false)
+ DEFINE_UI_CLASS_PROPERTY_KEY(bool, kNoventraDockUnifiedAddress, false)
+ DEFINE_UI_CLASS_PROPERTY_KEY(bool, kNoventraDockBookmarkPanel, false)
++DEFINE_UI_CLASS_PROPERTY_KEY(bool, kNoventraDockResizeActive, false)
+ 
+ namespace {
+ class DockMaterialBackground : public views::Background {
+@@ -473,7 +476,15 @@
+   SetEventTargeter(std::make_unique<views::ViewTargeter>(this));
+   GetViewAccessibility().SetRole(ax::mojom::Role::kToolbar);
+   GetViewAccessibility().SetName(u"Browser controls");
+-}
++  if (edge_ == noventra::DockEdge::kLeft ||
++      edge_ == noventra::DockEdge::kRight) {
++    resize_edge_layer_ = std::make_unique<ui::LayerSolidColor>();
++    resize_edge_layer_->SetName("NoventraSidebarResizeEdge");
++    layer()->Add(resize_edge_layer_.get());
++  }
++}
++
++NoventraDockView::~NoventraDockView() = default;
+ 
+ void NoventraDockView::SetCommandPopup(bool enabled) {
+   if (command_popup_ == enabled) {
+@@ -507,6 +518,7 @@
+ void NoventraDockView::OnThemeChanged() {
+   views::AccessiblePaneView::OnThemeChanged();
+   UpdateGlassBlur();
++  UpdateResizeEdge();
+   SchedulePaint();
+ }
+ 
+@@ -576,25 +588,44 @@
+   return foreground_overlap ? std::vector<gfx::Rect>() : shared;
+ }
+ 
+-void NoventraDockView::OnPaintBorder(gfx::Canvas* canvas) {
+-  views::AccessiblePaneView::OnPaintBorder(canvas);
+-  if (GetLocalBounds().IsEmpty() ||
+-      (edge_ != noventra::DockEdge::kLeft &&
+-       edge_ != noventra::DockEdge::kRight) ||
+-      !helium::ShouldUseNativeFrameMaterials(this)) {
++void NoventraDockView::UpdateResizeEdge() {
++  if (!resize_edge_layer_) {
+     return;
+   }
+-
+-  // Mark the physical content edge without taking space from tabs or controls.
+-  const int x = edge_ == noventra::DockEdge::kLeft ? width() - 1 : 0;
+-  canvas->FillRect(
+-      gfx::Rect(x, 0, 1, height()),
+-      SkColorSetA(GetColorProvider()->GetColor(kColorToolbarText), 56));
++  resize_edge_layer_->SetVisible(!GetLocalBounds().IsEmpty() &&
++                                 GetColorProvider());
++  if (!resize_edge_layer_->visible()) {
++    return;
++  }
++  if (resize_edge_layer_->parent() != layer()) {
++    layer()->Add(resize_edge_layer_.get());
++  }
++  // Tab rows paint in their own child layer. Keep the full-height boundary
++  // above them, while inheriting the dock's visibility, opacity and clipping.
++  bool resize_active = false;
++  for (views::View* child : children()) {
++    if (auto* region = views::AsViewClass<VerticalTabStripRegionView>(child)) {
++      if (auto* handle = region->GetNoventraResizeTarget()) {
++        resize_active = handle->GetProperty(kNoventraDockResizeActive) ||
++                        handle->HasFocus();
++      }
++    }
++  }
++  const int thickness = std::min(resize_active ? 3 : 1, width());
++  resize_edge_layer_->SetBounds(
++      gfx::Rect(edge_ == noventra::DockEdge::kLeft ? width() - thickness : 0, 0,
++                thickness, height()));
++  resize_edge_layer_->SetColor(SkColor4f::FromColor(
++      resize_active
++          ? GetColorProvider()->GetColor(ui::kColorSysPrimary)
++          : SkColorSetA(GetColorProvider()->GetColor(kColorToolbarText), 72)));
++  layer()->StackAtTop(resize_edge_layer_.get());
+ }
+ 
+ void NoventraDockView::OnBoundsChanged(const gfx::Rect& previous_bounds) {
+   views::AccessiblePaneView::OnBoundsChanged(previous_bounds);
+   UpdateGlassBlur();
++  UpdateResizeEdge();
+ }
+ 
+ void NoventraDockView::UpdateGlassBlur() {
+@@ -1086,6 +1117,7 @@
+         layout.horizontal_footer ? width() - extent : (width() - extent) / 2,
+         std::max(0, height() - 36), extent, 36);
+   }
++  UpdateResizeEdge();
+ }
+ BEGIN_METADATA(NoventraDockView)
+ END_METADATA
+diff --git a/chrome/browser/ui/views/frame/noventra_dock_view.h b/chrome/browser/ui/views/frame/noventra_dock_view.h
+--- a/chrome/browser/ui/views/frame/noventra_dock_view.h
++++ b/chrome/browser/ui/views/frame/noventra_dock_view.h
+@@ -18,11 +18,13 @@
+ extern const ui::ClassProperty<bool>* const kNoventraDockSharedFooter;
+ extern const ui::ClassProperty<bool>* const kNoventraDockUnifiedAddress;
+ extern const ui::ClassProperty<bool>* const kNoventraDockBookmarkPanel;
++extern const ui::ClassProperty<bool>* const kNoventraDockResizeActive;
+ #include "ui/base/metadata/metadata_header_macros.h"
+ #include "ui/gfx/geometry/insets.h"
+ #include "ui/views/view_targeter_delegate.h"
+ 
+ namespace ui {
++class LayerSolidColor;
+ class SimpleMenuModel;
+ }
+ 
+@@ -31,10 +33,11 @@
+   METADATA_HEADER(NoventraDockView, views::AccessiblePaneView)
+  public:
+   explicit NoventraDockView(noventra::DockEdge edge);
++  ~NoventraDockView() override;
+   noventra::DockEdge edge() const { return edge_; }
+   void Layout(PassKey) override;
+   void OnThemeChanged() override;
+-  void OnPaintBorder(gfx::Canvas* canvas) override;
++  void UpdateResizeEdge();
+   void OnBoundsChanged(const gfx::Rect& previous_bounds) override;
+   void SetFloatingGlass(bool floating);
+   void SetPaintGlassMaterial(bool paint);
+@@ -78,5 +81,6 @@
+   int vertical_content_inset_ = 0;
+   gfx::Rect leading_caption_clip_;
+   gfx::Rect trailing_caption_clip_;
++  std::unique_ptr<ui::LayerSolidColor> resize_edge_layer_;
+ };
+ #endif
+diff --git a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
+--- a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
++++ b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
+@@ -443,10 +443,12 @@
+     const int cell_height = vertical ? kSpaceRailRowHeight : kSpaceTargetSize;
+     const int cell_inset = (cell_height - kSpaceTargetSize) / 2;
+     const int extent = static_cast<int>(count) * cell_height;
++    // Keep the standalone menu in the same trailing slot as the shared
++    // sidebar menu, independently of the centered workspace dots.
++    const int menu_slot_width =
++        !vertical && !SharedMenu() ? kSpaceRailRowHeight : 0;
+     const int start = std::max(
+-        0, (width() - (vertical
+-                           ? kSpaceTargetSize
+-                           : extent + (SharedMenu() ? 0 : kSpaceTargetSize))) /
++        0, (width() - (vertical ? kSpaceTargetSize : extent + menu_slot_width)) /
+                2);
+     dots_->SetBounds(start, vertical ? 0 : kSpaceFooterPadding,
+                      vertical ? kSpaceTargetSize : extent,
+@@ -466,7 +468,11 @@
+     if (SharedMenu()) {
+       more_->SetBoundsRect(gfx::Rect());
+     } else {
+-      more_->SetBounds(vertical ? start : start + extent,
++      const int menu_inset = (kSpaceRailRowHeight - kSpaceTargetSize) / 2;
++      const int more_x =
++          vertical ? start
++                   : std::max(0, width() - menu_inset - kSpaceTargetSize);
++      more_->SetBounds(more_x,
+                        vertical ? extent + cell_inset : kSpaceFooterPadding,
+                        kSpaceTargetSize, kSpaceTargetSize);
+     }
+@@ -792,6 +798,85 @@
+ BEGIN_METADATA(AccountSpacesButton)
+ END_METADATA
+ 
++// The native resize target also serves the dock's full-height hit strip. Keep
++// its input behavior and geometry unchanged; only report hover/drag feedback to
++// the current ancestor dock, including after a layout reparents the tab strip.
++class NoventraSidebarResizeArea : public views::ResizeArea {
++  METADATA_HEADER(NoventraSidebarResizeArea, views::ResizeArea)
++
++ public:
++  explicit NoventraSidebarResizeArea(views::ResizeAreaDelegate* delegate)
++      : views::ResizeArea(delegate) {}
++
++  void OnMouseEntered(const ui::MouseEvent& event) override {
++    views::ResizeArea::OnMouseEntered(event);
++    hovered_ = true;
++    UpdateFeedback();
++  }
++  void OnMouseMoved(const ui::MouseEvent& event) override {
++    views::ResizeArea::OnMouseMoved(event);
++    hovered_ = true;
++    UpdateFeedback();
++  }
++  void OnMouseExited(const ui::MouseEvent& event) override {
++    views::ResizeArea::OnMouseExited(event);
++    hovered_ = false;
++    UpdateFeedback();
++  }
++  bool OnMousePressed(const ui::MouseEvent& event) override {
++    const bool handled = views::ResizeArea::OnMousePressed(event);
++    if (handled) {
++      pressed_ = true;
++      UpdateFeedback();
++    }
++    return handled;
++  }
++  void OnMouseReleased(const ui::MouseEvent& event) override {
++    views::ResizeArea::OnMouseReleased(event);
++    pressed_ = false;
++    UpdateFeedback();
++  }
++  void OnMouseCaptureLost() override {
++    views::ResizeArea::OnMouseCaptureLost();
++    hovered_ = false;
++    pressed_ = false;
++    UpdateFeedback();
++  }
++  void OnFocus() override {
++    views::ResizeArea::OnFocus();
++    RepaintDock();
++  }
++  void OnBlur() override {
++    views::ResizeArea::OnBlur();
++    RepaintDock();
++  }
++
++ private:
++  void UpdateFeedback() {
++    const bool active = hovered_ || pressed_;
++    if (GetProperty(kNoventraDockResizeActive) == active) {
++      return;
++    }
++    SetProperty(kNoventraDockResizeActive, active);
++    RepaintDock();
++  }
++  void RepaintDock() {
++    for (views::View* ancestor = parent(); ancestor;
++         ancestor = ancestor->parent()) {
++      if (auto* dock = views::AsViewClass<NoventraDockView>(ancestor)) {
++        dock->UpdateResizeEdge();
++        break;
++      }
++    }
++  }
++
++  bool hovered_ = false;
++  bool pressed_ = false;
++};
++
++BEGIN_METADATA(NoventraSidebarResizeArea)
++END_METADATA
++
+ constexpr int kResizeAreaWidth = 8;
+ constexpr int kCollapsedResizeAreaWidth = 2;
+ constexpr int kKeyboardResizeWidth = 50;
+@@ -905,7 +990,7 @@
+   // Views that go into the content area above
+   // --------------
+ 
+-  resize_area_ = AddChildView(std::make_unique<views::ResizeArea>(this));
++  resize_area_ = AddChildView(std::make_unique<NoventraSidebarResizeArea>(this));
+   resize_area_->SetProperty(views::kViewIgnoredByLayoutKey, true);
+   resize_area_->SetTooltipText(u"Drag to resize sidebar");
+   resize_area_->SetFocusBehavior(views::View::FocusBehavior::ACCESSIBLE_ONLY);
+@@ -1212,6 +1297,11 @@
+   if (drop_arrow()) {
+     drop_arrow()->SetIndex(drop_arrow()->index());
+   }
++
++  // Managed docks reparent this region away from BrowserView, whose normal
++  // post-layout clip refresh then no longer runs. Refresh after our own child
++  // layout so an old narrow clip cannot hide widened tabs or their controls.
++  UpdatePanelClips();
+ }
+ 
+ views::View* VerticalTabStripRegionView::GetDefaultFocusableChild() {
+diff --git a/chrome/browser/ui/views/noventra_link_preview.cc b/chrome/browser/ui/views/noventra_link_preview.cc
+--- a/chrome/browser/ui/views/noventra_link_preview.cc
++++ b/chrome/browser/ui/views/noventra_link_preview.cc
+@@ -1,6 +1,5 @@
+ // Copyright 2026 The Noventra Authors
+ #include "chrome/browser/ui/views/noventra_link_preview.h"
+-#include "chrome/browser/profiles/noventra_account_spaces.h"
+ 
+ #include <algorithm>
+ 
+@@ -10,6 +9,7 @@
+ #include "base/task/single_thread_task_runner.h"
+ #include "build/build_config.h"
+ #include "chrome/app/vector_icons/vector_icons.h"
++#include "chrome/browser/profiles/noventra_account_spaces.h"
+ #include "chrome/browser/profiles/profile.h"
+ #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+ #include "chrome/browser/ui/browser_window/public/global_browser_collection.h"
+@@ -22,8 +22,8 @@
+ #include "chrome/browser/ui/tabs/tab_strip_model.h"
+ #include "components/input/native_web_keyboard_event.h"
+ #include "components/prefs/pref_service.h"
++#include "components/tabs/public/split_tab_data.h"
+ #include "components/tabs/public/tab_interface.h"
+-#include "components/tabs/public/split_tab_data.h"
+ #include "content/public/browser/context_menu_params.h"
+ #include "content/public/browser/global_routing_id.h"
+ #include "content/public/browser/keyboard_event_processing_result.h"
+@@ -35,21 +35,27 @@
+ #include "content/public/browser/web_contents_delegate.h"
+ #include "net/base/registry_controlled_domains/registry_controlled_domain.h"
+ #include "third_party/blink/public/common/input/web_mouse_event.h"
++#include "ui/accessibility/ax_enums.mojom.h"
++#include "ui/base/hit_test.h"
+ #include "ui/base/metadata/metadata_impl_macros.h"
+ #include "ui/base/mojom/dialog_button.mojom.h"
+ #include "ui/base/mojom/menu_source_type.mojom.h"
++#include "ui/color/color_id.h"
++#include "ui/compositor/layer.h"
+ #include "ui/gfx/geometry/point_conversions.h"
+-#include "ui/color/color_id.h"
++#include "ui/gfx/geometry/rounded_corners_f.h"
++#include "ui/views/accessibility/view_accessibility.h"
+ #include "ui/views/background.h"
+ #include "ui/views/border.h"
+ #include "ui/views/controls/button/image_button.h"
+ #include "ui/views/controls/button/image_button_factory.h"
+-#include "ui/views/controls/label.h"
+-#include "ui/views/style/typography.h"
++#include "ui/views/controls/native/native_view_host.h"
+ #include "ui/views/controls/webview/webview.h"
+ #include "ui/views/layout/box_layout.h"
++#include "ui/views/layout/fill_layout.h"
+ #include "ui/views/widget/widget.h"
+ #include "ui/views/window/dialog_delegate.h"
++#include "ui/views/window/frame_view.h"
+ 
+ #if BUILDFLAG(IS_OZONE)
+ #include "ui/ozone/public/ozone_platform.h"
+@@ -58,6 +64,25 @@
+ namespace {
+ const char kPreviewContentsKey = 0;
+ const char kAutomaticPreviewTargetKey = 0;
++
++// The page and its floating action capsule paint their own rounded surfaces.
++// A normal dialog frame would add a full-width background and title insets.
++class PreviewFrameView : public views::FrameView {
++ public:
++  gfx::Rect GetBoundsForClientView() const override { return GetLocalBounds(); }
++  int NonClientHitTest(const gfx::Point& point) override {
++    return GetLocalBounds().Contains(point) ? HTCLIENT : HTNOWHERE;
++  }
++};
++
++// DialogDelegate's default custom-frame path bypasses WidgetDelegate's frame
++// factory. Override it while retaining translucent child-dialog init params.
++class PreviewDialogDelegate : public views::DialogDelegate {
++ public:
++  std::unique_ptr<views::FrameView> CreateFrameView(views::Widget*) override {
++    return std::make_unique<PreviewFrameView>();
++  }
++};
+ 
+ // Only this exact newly created, uncommitted destination may be closed when
+ // converting a target=_blank anchor navigation into a preview. Any subsequent
+@@ -166,22 +191,33 @@
+              const GURL& url,
+              const content::Referrer& referrer)
+       : source_(source->GetWeakPtr()) {
+-    auto* layout = SetLayoutManager(std::make_unique<views::BoxLayout>(
+-        views::BoxLayout::Orientation::kVertical));
+-    SetBackground(views::CreateSolidBackground(ui::kColorDialogBackground));
+-    SetBorder(views::CreateSolidBorder(1, ui::kColorSeparator));
+-    auto* header = AddChildView(std::make_unique<views::View>());
+-    auto* row = header->SetLayoutManager(std::make_unique<views::BoxLayout>(
+-        views::BoxLayout::Orientation::kHorizontal, gfx::Insets::VH(6, 8), 4));
+-    row->set_cross_axis_alignment(views::BoxLayout::CrossAxisAlignment::kCenter);
+-    header->SetBorder(views::CreateSolidSidedBorder(
+-        gfx::Insets::TLBR(0, 0, 1, 0), ui::kColorSeparator));
+-    auto add_icon = [header](views::Button::PressedCallback callback,
+-                             const gfx::VectorIcon& icon,
+-                             const std::u16string& tooltip) {
+-      auto* button = header->AddChildView(
+-          views::CreateVectorImageButtonWithNativeTheme(std::move(callback),
+-                                                        icon, 18));
++    page_ = AddChildView(std::make_unique<views::View>());
++    page_->GetViewAccessibility().SetRole(ax::mojom::Role::kPane);
++    page_->GetViewAccessibility().SetName(u"Preview page");
++    page_->SetLayoutManager(std::make_unique<views::FillLayout>());
++    page_->SetBackground(
++        views::CreateRoundedRectBackground(ui::kColorDialogBackground, 12));
++    page_->SetBorder(
++        views::CreateRoundedRectBorder(1, 12, ui::kColorSeparator));
++    page_->SetPaintToLayer();
++    page_->layer()->SetFillsBoundsOpaquely(false);
++    page_->layer()->SetRoundedCornerRadius(gfx::RoundedCornersF(12));
++    page_->layer()->SetIsFastRoundedCorner(true);
++    controls_ = AddChildView(std::make_unique<views::View>());
++    controls_->GetViewAccessibility().SetRole(ax::mojom::Role::kToolbar);
++    controls_->GetViewAccessibility().SetName(u"Preview controls");
++    controls_->SetLayoutManager(std::make_unique<views::BoxLayout>(
++        views::BoxLayout::Orientation::kVertical, gfx::Insets::VH(3, 3), 4));
++    controls_->SetBackground(
++        views::CreateRoundedRectBackground(ui::kColorDialogBackground, 12));
++    controls_->SetBorder(
++        views::CreateRoundedRectBorder(1, 12, ui::kColorSeparator));
++    auto add_icon = [this](views::Button::PressedCallback callback,
++                           const gfx::VectorIcon& icon,
++                           const std::u16string& tooltip) {
++      auto* button =
++          controls_->AddChildView(views::CreateVectorImageButtonWithNativeTheme(
++              std::move(callback), icon, 18));
+       button->SetPreferredSize(gfx::Size(32, 32));
+       button->SetTooltipText(tooltip);
+       return button;
+@@ -194,29 +230,11 @@
+                         kForwardArrowTouchOldIcon, u"Forward in preview");
+     back_->SetEnabled(false);
+     forward_->SetEnabled(false);
+-    auto* identity = header->AddChildView(std::make_unique<views::View>());
+-    // Page-controlled titles must not change the header's intrinsic size.
+-    // Flex supplies the available width; keep action positions stable on updates.
+-    identity->SetPreferredSize(gfx::Size(1, 36));
+-    identity->SetLayoutManager(std::make_unique<views::BoxLayout>(
+-        views::BoxLayout::Orientation::kVertical, gfx::Insets::VH(0, 8), 2));
+-    title_ = identity->AddChildView(std::make_unique<views::Label>(
+-        u"Link preview", views::style::CONTEXT_LABEL,
+-        views::style::STYLE_EMPHASIZED));
+-    title_->SetHorizontalAlignment(gfx::ALIGN_LEFT);
+-    title_->SetElideBehavior(gfx::ELIDE_TAIL);
+-    location_ = identity->AddChildView(std::make_unique<views::Label>(
+-        base::UTF8ToUTF16(url.spec()), views::style::CONTEXT_LABEL,
+-        views::style::STYLE_SECONDARY));
+-    location_->SetHorizontalAlignment(gfx::ALIGN_LEFT);
+-    location_->SetElideBehavior(gfx::ELIDE_MIDDLE);
+-    location_->SetFontList(location_->font_list().DeriveWithSizeDelta(-1));
+-    location_->SetSelectable(true);
+-    location_->SetTooltipText(base::UTF8ToUTF16(url.spec()));
+-    row->SetFlexForView(identity, 1);
+-    add_icon(base::BindRepeating(&PreviewTab::PromoteAndClose,
+-                                base::Unretained(this)),
+-             kOpenInNewIcon, u"Open in tab without reloading");
++    open_ = add_icon(base::BindRepeating(&PreviewTab::PromoteAndClose,
++                                         base::Unretained(this)),
++                     kOpenInNewIcon, u"Open in tab without reloading");
++    open_->GetViewAccessibility().SetName(u"Open in tab without reloading");
++    UpdateIdentity(u"Link preview", base::UTF8ToUTF16(url.spec()));
+     split_ = add_icon(
+         base::BindRepeating(&PreviewTab::SplitAndClose, base::Unretained(this)),
+         kSplitSceneIcon, u"Open in split without reloading");
+@@ -230,23 +248,34 @@
+     contents_->SetUserData(&kPreviewContentsKey,
+                            std::make_unique<base::SupportsUserData::Data>());
+     TabHelpers::AttachTabHelpers(contents_.get());
+-    view_ = AddChildView(std::make_unique<views::WebView>(profile));
++    view_ = page_->AddChildView(std::make_unique<views::WebView>(profile));
+     view_->SetWebContents(contents_.get());
+     contents_->SetDelegate(this);
+-    // TabDialogManager supplies viewport-relative bounds, including on resize.
+-    // Let the page fill the space left by the compact header.
+-    layout->SetFlexForView(view_, 1);
+     contents_->GetController().LoadURL(url, referrer, ui::PAGE_TRANSITION_LINK,
+                                        std::string());
+     UpdateSplitButton();
+   }
+   ~PreviewTab() override {
++    view_->holder()->SetNativeViewCornerRadii(gfx::RoundedCornersF());
+     view_->SetWebContents(nullptr);
+     if (contents_) {
+       contents_->SetDelegate(nullptr);
+     }
+   }
+   views::View* initial_focus() const { return view_; }
++  void Layout(PassKey) override {
++    constexpr int kControlsWidth = 40;
++    constexpr int kControlsGap = 8;
++    const int controls_width = std::min(kControlsWidth, width());
++    page_->SetBounds(0, 0, std::max(0, width() - controls_width - kControlsGap),
++                     height());
++    controls_->SetBounds(
++        width() - controls_width, 0, controls_width,
++        std::min(height(), controls_->GetPreferredSize().height()));
++    page_->DeprecatedLayoutImmediately();
++    controls_->DeprecatedLayoutImmediately();
++    view_->holder()->SetNativeViewCornerRadii(gfx::RoundedCornersF(11));
++  }
+   base::WeakPtr<PreviewTab> GetWeakPtr() { return weak_factory_.GetWeakPtr(); }
+   void Close() {
+     if (GetWidget()) {
+@@ -257,10 +286,7 @@
+                               content::InvalidateTypes) override {
+     const auto address = base::UTF8ToUTF16(source->GetVisibleURL().spec());
+     const auto title = source->GetTitle();
+-    title_->SetText(title.empty() ? u"Link preview" : title);
+-    title_->SetTooltipText(title);
+-    location_->SetText(address);
+-    location_->SetTooltipText(address);
++    UpdateIdentity(title.empty() ? u"Link preview" : title, address);
+     back_->SetEnabled(source->GetController().CanGoBack());
+     forward_->SetEnabled(source->GetController().CanGoForward());
+   }
+@@ -322,6 +348,15 @@
+   void Promote() { PromoteContents(false); }
+ 
+  private:
++  void UpdateIdentity(const std::u16string& title,
++                      const std::u16string& address) {
++    // Destination identity stays available in trusted browser UI without a
++    // title bar taking space from the page or clipping the address text.
++    open_->SetTooltipText(u"Open in tab without reloading\n" + title + u"\n" +
++                          address);
++    open_->GetViewAccessibility().SetName(u"Open in tab without reloading");
++    open_->GetViewAccessibility().SetDescription(title + u"\n" + address);
++  }
+   bool CanSplit() const {
+     if (!source_ || !contents_) {
+       return false;
+@@ -365,6 +400,7 @@
+     auto source = source_;
+     auto preview = contents_->GetWeakPtr();
+     const bool pinned = model->IsTabPinned(source_index);
++    view_->holder()->SetNativeViewCornerRadii(gfx::RoundedCornersF());
+     view_->SetWebContents(nullptr);
+     contents_->SetDelegate(nullptr);
+     contents_->RemoveUserData(&kPreviewContentsKey);
+@@ -401,8 +437,9 @@
+   base::WeakPtr<content::WebContents> source_;
+   std::unique_ptr<content::WebContents> contents_;
+   raw_ptr<views::WebView> view_ = nullptr;
+-  raw_ptr<views::Label> location_ = nullptr;
+-  raw_ptr<views::Label> title_ = nullptr;
++  raw_ptr<views::View> page_ = nullptr;
++  raw_ptr<views::View> controls_ = nullptr;
++  raw_ptr<views::ImageButton> open_ = nullptr;
+   raw_ptr<views::ImageButton> back_ = nullptr;
+   raw_ptr<views::ImageButton> forward_ = nullptr;
+   raw_ptr<views::ImageButton> split_ = nullptr;
+@@ -660,7 +697,7 @@
+     return;
+   }
+   ClosePreview();
+-  auto delegate = std::make_unique<views::DialogDelegate>();
++  auto delegate = std::make_unique<PreviewDialogDelegate>();
+   delegate->SetModalType(ui::mojom::ModalType::kChild);
+   delegate->SetOwnershipOfNewWidget(
+       views::Widget::InitParams::CLIENT_OWNS_WIDGET);
+diff --git a/chrome/browser/ui/views/tabs/common/tab_view.cc b/chrome/browser/ui/views/tabs/common/tab_view.cc
+--- a/chrome/browser/ui/views/tabs/common/tab_view.cc
++++ b/chrome/browser/ui/views/tabs/common/tab_view.cc
+@@ -599,6 +599,7 @@
+   CHECK(collection_node_);
+ 
+   if (event.key_code() == ui::VKEY_ESCAPE && noventra_drag_pending_) {
++    noventra_drag_cancelled_ = true;
+     ResetNoventraDrag();
+     collection_node_->GetController()->GetDragHandler().EndDrag(EndDragReason::kCancel);
+     return true;
+@@ -691,6 +692,7 @@
+   CHECK(collection_node_);
+ 
+   auto* controller = collection_node_->GetController();
++  noventra_drag_cancelled_ = false;
+   noventra_address_pressed_ =
+       CanEditNoventraAddress() && event.IsOnlyLeftMouseButton() &&
+       !event.IsShiftDown() && !IsSelectionModifierDown(event) &&
+@@ -698,8 +700,10 @@
+       ((title_->GetVisible() && title_->bounds().Contains(event.location())) ||
+        ((pinned_ || width() < VerticalTabStripRegionView::kWidthWithTabTitles) &&
+         HitTestPoint(event.location())));
+-  noventra_drag_pending_ = orientation_ == TabStripOrientation::kVertical && event.IsOnlyLeftMouseButton() &&
+-      !event.IsShiftDown() && !event.IsControlDown() && !event.IsAltDown();
++  noventra_drag_pending_ =
++      orientation_ == TabStripOrientation::kVertical &&
++      event.IsOnlyLeftMouseButton() && !event.IsShiftDown() &&
++      !IsSelectionModifierDown(event) && !event.IsAltDown();
+   noventra_drag_active_ = false;
+   noventra_press_screen_ = views::View::ConvertPointToScreen(this, event.location());
+   auto* model = GetTabInterface()->GetBrowserWindowInterface()->GetTabStripModel();
+@@ -744,21 +748,29 @@
+       if (!selected_) {
+         return false;
+       }
+-    } else if (!selected_) {
++    } else if (!selected_ && !noventra_drag_pending_) {
+       controller->SelectTab(GetTabInterface(), GetGestureDetail(event));
+       base::RecordAction(base::UserMetricsAction("SwitchTab_Click"));
+     }
+     // Potentially start the drag for the mouse press.
+     // Follow-up mouse-movement events will update the drag controller and
+     // eventually kick off the drag-loop.
+-    controller->GetDragHandler().InitializeDrag(
+-        *collection_node_, original_selection_model, event);
++    if (!noventra_drag_pending_) {
++      controller->GetDragHandler().InitializeDrag(
++          *collection_node_, original_selection_model, event);
++    }
+   }
+   return true;
+ }
+ 
+ void TabView::OnMouseReleased(const ui::MouseEvent& event) {
+   CHECK(collection_node_);
++  if (noventra_drag_cancelled_) {
++    noventra_drag_cancelled_ = false;
++    return;
++  }
++  const bool activate_on_release =
++      !noventra_drag_pending_ || HitTestPoint(event.location());
+ 
+   const bool edit_address =
+       noventra_address_pressed_ && !noventra_drag_active_ &&
+@@ -780,7 +792,7 @@
+     if (HitTestPoint(event.location())) {
+       controller->CloseTab(GetTabInterface(), CloseTabSource::kFromMouse);
+     }
+-  } else if (event.IsOnlyLeftMouseButton() &&
++  } else if (event.IsOnlyLeftMouseButton() && activate_on_release &&
+              !(event.IsShiftDown() || shift_pressed_on_mouse_down_) &&
+              !IsSelectionModifierDown(event)) {
+     controller->SelectTab(GetTabInterface(), GetGestureDetail(event));
+@@ -857,6 +869,20 @@
+     // Resetting the carried-row transform changes local coordinates. Preserve
+     // the actual pointer position when handing off to the native window drag.
+     ui::MouseEvent handoff(event);
++    // Only handing the gesture to native tear-off needs a selected source.
++    // Until then the visible destination page and selection remain unchanged.
++    const auto selection = controller->GetSelectionModel();
++    auto self = weak_ptr_factory_.GetWeakPtr();
++    controller->SelectTab(GetTabInterface(), GetGestureDetail(event));
++    if (!self || !collection_node_)
++      return true;
++    ui::MouseEvent press(
++        ui::EventType::kMousePressed,
++        views::View::ConvertPointFromScreen(this, noventra_press_screen_),
++        views::View::ConvertPointFromScreen(this, noventra_press_screen_),
++        event.time_stamp(), event.flags(), ui::EF_LEFT_MOUSE_BUTTON);
++    controller->GetDragHandler().InitializeDrag(*collection_node_, selection,
++                                                press);
+     handoff.set_location(views::View::ConvertPointFromScreen(this, screen_point));
+     return controller->GetDragHandler().ContinueDrag(*this, handoff);
+   }
+@@ -1626,7 +1652,10 @@
+         [](base::WeakPtr<BrowserView> view,
+            std::unique_ptr<NoventraDragKeyMonitor> key_monitor) {
+           key_monitor.reset();
+-          if (view) view->SetNoventraTabDragActive(false);
++          if (view) {
++            view->multi_contents_view()->HideNoventraSplitDropPreview();
++            view->SetNoventraTabDragActive(false);
++          }
+         }, browser->GetAsWeakPtr(), std::make_unique<NoventraDragKeyMonitor>(
+             GetWidget()->GetNativeWindow(), base::BindRepeating(
+                 [](base::WeakPtr<TabView> view, const ui::KeyEvent& event) {
+@@ -1708,10 +1737,26 @@
+       }
+     }
+   } else if (!in_sidebar && page.Contains(point) && noventra_page_target_ && noventra_page_target_.get() != source) {
+-    noventra_drop_target_ = noventra_page_target_;
++    auto* hovered =
++        browser->multi_contents_view()->GetNoventraSplitDropTarget(point);
++    noventra_drop_target_ = hovered && hovered != source
++                                ? hovered->GetWeakPtr()
++                                : noventra_page_target_;
+     noventra_drop_combine_ = noventra_drop_valid_ = true;
+     // The entire page accepts a split. Only the top/bottom bands choose rows.
+-    noventra_drop_stacked_ = point.y() < page.y() + 64 || point.y() > page.bottom() - 64;
++    target_bounds = page;
++    if (auto* pane =
++            browser->multi_contents_view()->GetContentsContainerViewFor(
++                noventra_drop_target_->GetContents());
++        pane && pane->GetBoundsInScreen().Contains(point)) {
++      target_bounds = pane->GetBoundsInScreen();
++    }
++    const int band = std::min(64, target_bounds.height() / 4);
++    noventra_drop_stacked_ = point.y() < target_bounds.y() + band ||
++                             point.y() > target_bounds.bottom() - band;
++    noventra_drop_after_ = noventra_drop_stacked_
++                               ? point.y() >= target_bounds.CenterPoint().y()
++                               : point.x() >= target_bounds.CenterPoint().x();
+     label = noventra_page_target_->IsSplit() ? u"Add tab to split" : u"Create split view";
+   }
+   if (!hover_candidate) {
+@@ -1755,28 +1800,39 @@
+     }
+     row.view->SetTransform(transform);
+   }
+-  if (!noventra_drop_valid_) {
+-    noventra_drag_hint_.reset();
+-    return;
+-  }
+-  if (!noventra_drag_hint_) {
+-    noventra_drag_hint_ = std::make_unique<views::Widget>();
+-    views::Widget::InitParams params(views::Widget::InitParams::CLIENT_OWNS_WIDGET, views::Widget::InitParams::TYPE_TOOLTIP);
+-    params.parent = GetWidget()->GetNativeView();
+-    params.context = GetWidget()->GetNativeWindow();
+-    params.accept_events = false;
+-    params.name = "NoventraSplitDropHint";
+-    noventra_drag_hint_->Init(std::move(params));
+-    auto* text = noventra_drag_hint_->SetContentsView(std::make_unique<views::Label>(label));
+-    text->SetBackground(views::CreateSolidBackground(SkColorSetRGB(38, 41, 48)));
+-    text->SetEnabledColor(SK_ColorWHITE);
+-  }
+-  views::AsViewClass<views::Label>(noventra_drag_hint_->GetContentsView())->SetText(label);
+-  noventra_drag_hint_->SetBounds(gfx::Rect(point.x() + 12, point.y() + 18, 300, 36));
+-  noventra_drag_hint_->ShowInactive();
++  const auto destination =
++      noventra_drop_valid_ && noventra_drop_combine_
++          ? browser->multi_contents_view()->GetNoventraSplitDropBounds(
++                source, noventra_drop_target_.get(), noventra_drop_after_,
++                noventra_drop_stacked_)
++          : gfx::Rect();
++  if (noventra_drop_valid_ && noventra_drop_combine_) {
++    auto layout = split_tabs::SplitTabLayout::kSideBySide;
++    if (noventra_drop_target_ && noventra_drop_target_->GetSplit()) {
++      layout = model->GetSplitData(*noventra_drop_target_->GetSplit())
++                   ->visual_data()
++                   ->split_layout();
++    }
++    if (noventra_drop_stacked_) {
++      layout = split_tabs::SplitTabLayout::kStacked;
++    }
++    if (in_sidebar && same_split) {
++      label = u"Reorder split tabs";
++    } else if (layout == split_tabs::SplitTabLayout::kGrid) {
++      label = u"Place in split";
++    } else {
++      label = layout == split_tabs::SplitTabLayout::kStacked
++                  ? (noventra_drop_after_ ? u"Split below" : u"Split above")
++                  : (noventra_drop_after_ ? u"Split right" : u"Split left");
++    }
++  }
++  browser->multi_contents_view()->ShowNoventraSplitDropPreview(
++      destination, point, label + u" · " + tab_data_.title);
+ }
+ 
+ void TabView::ResetNoventraDrag() {
++  // A closing tab may already be detached from its BrowserWindowInterface.
++  // The active drag's closure owns the weak browser reference for cleanup.
+   noventra_address_pressed_ = false;
+   noventra_drag_pending_ = noventra_drag_active_ = false;
+   noventra_combine_timer_.Stop();
+@@ -1784,7 +1840,6 @@
+   noventra_hover_armed_ = false;
+   for (const auto& row : noventra_drag_rows_) if (row.view) row.view->SetTransform(gfx::Transform());
+   noventra_drag_rows_.clear();
+-  noventra_drag_hint_.reset();
+   noventra_drag_reveal_.RunAndReset();
+ }
+ 
+@@ -1815,8 +1870,27 @@
+         if (combine) {
+           const bool same_split = target && source->IsSplit() && source->GetSplit() == target->GetSplit();
+           if (!same_split && !view->GetProfile()->GetPrefs()->GetBoolean(prefs::kSplitViewDragAndDropEnabled)) return;
+-          if (target && model->JoinNoventraSplit(model->GetIndexOfTab(source.get()), model->GetIndexOfTab(target.get())) && stacked && source->GetSplit())
+-            model->UpdateSplitLayout(source->GetSplit().value(), split_tabs::SplitTabLayout::kStacked);
++          if (target &&
++              model->JoinNoventraSplit(model->GetIndexOfTab(source.get()),
++                                       model->GetIndexOfTab(target.get()))) {
++            if (!view || !source || !target)
++              return;
++            model = view->browser()->GetTabStripModel();
++            const int source_index = model->GetIndexOfTab(source.get());
++            if (!model->ContainsIndex(source_index) ||
++                !model->ContainsIndex(model->GetIndexOfTab(target.get())))
++              return;
++            int destination =
++                model->GetIndexOfTab(target.get()) + (after ? 1 : 0);
++            if (source_index < destination)
++              --destination;
++            if (model->ContainsIndex(destination) &&
++                destination != source_index)
++              model->MoveWebContentsAt(source_index, destination, true);
++            if (view && source && stacked && source->GetSplit())
++              view->browser()->GetTabStripModel()->UpdateSplitLayout(
++                  *source->GetSplit(), split_tabs::SplitTabLayout::kStacked);
++          }
+         } else {
+           model->DetachNoventraSplitTab(model->GetIndexOfTab(source.get()));
+           const int source_index = model->GetIndexOfTab(source.get());
+@@ -1842,6 +1916,7 @@
+ }
+ 
+ void TabView::OnMouseCaptureLost() {
++  noventra_drag_cancelled_ = noventra_drag_pending_;
+   ResetNoventraDrag();
+   views::View::OnMouseCaptureLost();
+ }
+diff --git a/chrome/browser/ui/views/tabs/common/tab_view.h b/chrome/browser/ui/views/tabs/common/tab_view.h
+--- a/chrome/browser/ui/views/tabs/common/tab_view.h
++++ b/chrome/browser/ui/views/tabs/common/tab_view.h
+@@ -284,6 +284,7 @@
+   gfx::Point noventra_last_drag_point_;
+   bool noventra_hover_armed_ = false;
+   bool noventra_drag_pending_ = false;
++  bool noventra_drag_cancelled_ = false;
+   bool noventra_address_pressed_ = false;
+   bool noventra_address_title_ = false;
+   bool noventra_drag_active_ = false;
+@@ -294,7 +295,6 @@
+   gfx::Point noventra_press_screen_;
+   base::WeakPtr<tabs::TabInterface> noventra_page_target_;
+   base::WeakPtr<tabs::TabInterface> noventra_drop_target_;
+-  std::unique_ptr<views::Widget> noventra_drag_hint_;
+   bool UpdateNoventraDrag(const ui::MouseEvent& event);
+   void UpdateNoventraDrop(const gfx::Point& point);
+   bool CanEditNoventraAddress() const;
+diff --git a/chrome/browser/ui/views/tabs/tab.cc b/chrome/browser/ui/views/tabs/tab.cc
+--- a/chrome/browser/ui/views/tabs/tab.cc
++++ b/chrome/browser/ui/views/tabs/tab.cc
+@@ -7,6 +7,7 @@
+ #include <stddef.h>
+ 
+ #include <algorithm>
++#include <cstdlib>
+ #include <memory>
+ #include <optional>
+ #include <string_view>
+@@ -18,19 +19,19 @@
+ #include "base/metrics/user_metrics.h"
+ #include "base/numerics/safe_conversions.h"
+ #include "base/scoped_observation.h"
++#include "base/task/single_thread_task_runner.h"
+ #include "base/time/time.h"
+ #include "build/build_config.h"
+ #include "cc/paint/paint_flags.h"
++#include "chrome/app/chrome_command_ids.h"
+ #include "chrome/browser/dictation/dictation_keyed_service.h"
+ #include "chrome/browser/glic/browser_ui/tab_underline_controller.h"
+ #include "chrome/browser/glic/browser_ui/tab_underline_view.h"
+ #include "chrome/browser/glic/public/glic_enabling.h"
++#include "chrome/browser/profiles/noventra_account_spaces.h"
+ #include "chrome/browser/themes/theme_properties.h"
++#include "chrome/browser/ui/browser_commands.h"
+ #include "chrome/browser/ui/browser_element_identifiers.h"
+-#include "chrome/browser/ui/browser_commands.h"
+-#include "chrome/browser/ui/views/toolbar/toolbar_view.h"
+-#include "chrome/browser/ui/views/location_bar/location_bar_view.h"
+-#include "chrome/app/chrome_command_ids.h"
+ #include "chrome/browser/ui/browser_window/public/browser_window_features.h"
+ #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+ #include "chrome/browser/ui/layout_constants.h"
+@@ -47,6 +48,8 @@
+ #include "chrome/browser/ui/views/event_utils.h"
+ #include "chrome/browser/ui/views/frame/browser_frame_view.h"
+ #include "chrome/browser/ui/views/frame/browser_view.h"
++#include "chrome/browser/ui/views/frame/multi_contents_view.h"
++#include "chrome/browser/ui/views/location_bar/location_bar_view.h"
+ #include "chrome/browser/ui/views/tabs/browser_tab_strip_controller.h"
+ #include "chrome/browser/ui/views/tabs/dragging/tab_drag_controller.h"
+ #include "chrome/browser/ui/views/tabs/shared/tab_strip_types.h"
+@@ -60,11 +63,15 @@
+ #include "chrome/browser/ui/views/tabs/tab_slot_view.h"
+ #include "chrome/browser/ui/views/tabs/tab_strip.h"
+ #include "chrome/browser/ui/views/tabs/tab_style_views.h"
++#include "chrome/browser/ui/views/toolbar/toolbar_view.h"
+ #include "chrome/browser/ui/window_metadata/window_metadata_controller.h"
+ #include "chrome/common/chrome_features.h"
++#include "chrome/common/pref_names.h"
+ #include "chrome/grit/generated_resources.h"
+ #include "components/contextual_tasks/public/features.h"
++#include "components/prefs/pref_service.h"
+ #include "components/tab_groups/tab_group_id.h"
++#include "components/tabs/public/split_tab_data.h"
+ #include "components/tabs/public/tab_alert.h"
+ #include "components/tabs/public/tab_group.h"
+ #include "components/tabs/public/tab_interface.h"
+@@ -77,6 +84,7 @@
+ #include "ui/base/theme_provider.h"
+ #include "ui/compositor/clip_recorder.h"
+ #include "ui/compositor/compositor.h"
++#include "ui/events/event_observer.h"
+ #include "ui/gfx/animation/tween.h"
+ #include "ui/gfx/canvas.h"
+ #include "ui/gfx/favicon_size.h"
+@@ -87,8 +95,9 @@
+ #include "ui/views/border.h"
+ #include "ui/views/bubble/bubble_border.h"
+ #include "ui/views/controls/focus_ring.h"
++#include "ui/views/controls/highlight_path_generator.h"
++#include "ui/views/event_monitor.h"
+ #include "ui/views/focus/focus_manager.h"
+-#include "ui/views/controls/highlight_path_generator.h"
+ #include "ui/views/metadata/view_factory.h"
+ #include "ui/views/rect_based_targeting_utils.h"
+ #include "ui/views/view.h"
+@@ -111,6 +120,27 @@
+ 
+ using base::UserMetricsAction;
+ namespace {
++class NoventraHorizontalDragKeyMonitor : public ui::EventObserver {
++ public:
++  NoventraHorizontalDragKeyMonitor(
++      gfx::NativeWindow context,
++      base::RepeatingCallback<void(const ui::KeyEvent&)> callback)
++      : callback_(std::move(callback)) {
++    monitor_ = views::EventMonitor::CreateApplicationMonitor(
++        this, context, {ui::EventType::kKeyPressed});
++  }
++  void OnEvent(const ui::Event& event) override {
++    if (event.IsKeyEvent() &&
++        event.AsKeyEvent()->key_code() == ui::VKEY_ESCAPE) {
++      auto callback = callback_;
++      callback.Run(*event.AsKeyEvent());
++    }
++  }
++
++ private:
++  base::RepeatingCallback<void(const ui::KeyEvent&)> callback_;
++  std::unique_ptr<views::EventMonitor> monitor_;
++};
+ 
+ // When a non-pinned tab becomes a pinned tab the width of the tab animates. If
+ // the width of a pinned tab is at least kPinnedTabExtraWidthToRenderAsNormal
+@@ -452,6 +482,7 @@
+ }
+ 
+ Tab::~Tab() {
++  ResetNoventraSplitDrag();
+   // Observer must be unregistered before child views are destroyed.
+   tab_close_button_observer_.reset();
+   if (controller_->HoverCardIsShowing(this)) {
+@@ -661,6 +692,11 @@
+ }
+ 
+ bool Tab::OnKeyPressed(const ui::KeyEvent& event) {
++  if (event.key_code() == ui::VKEY_ESCAPE && noventra_split_drag_pending_) {
++    noventra_split_drag_cancelled_ = true;
++    ResetNoventraSplitDrag();
++    return true;
++  }
+ #if BUILDFLAG(IS_MAC)
+   if (event.key_code() == ui::VKEY_RETURN && event.IsControlDown()) {
+     ShowContextMenu(GetKeyboardContextMenuLocation(),
+@@ -753,6 +789,55 @@
+       (event.IsOnlyRightMouseButton() && event.flags() & ui::EF_FROM_TOUCH)) {
+     ui::ListSelectionModel original_selection =
+         controller_->GetSelectionModel();
++    auto* source = tab_handle_.Get();
++    auto* source_window =
++        source ? source->GetBrowserWindowInterface() : nullptr;
++    auto* model = source_window ? source_window->GetTabStripModel() : nullptr;
++    // Selecting a split selects all its members. That ordinary group selection
++    // must not turn a single pane's page drag into a native window drag.
++    const bool only_source_split_selected =
++        model && source->GetSplit() &&
++        original_selection.size() ==
++            model->GetSplitData(*source->GetSplit())->ListTabs().size() &&
++        std::ranges::all_of(
++            original_selection.selected_indices(), [&](size_t i) {
++              return i < static_cast<size_t>(model->count()) &&
++                     model->GetTabAtIndex(static_cast<int>(i))->GetSplit() ==
++                         source->GetSplit();
++            });
++    noventra_split_drag_cancelled_ = false;
++    noventra_split_drag_pending_ =
++        event.IsOnlyLeftMouseButton() && !event.IsShiftDown() &&
++        !IsSelectionModifierDown(event) && !event.IsAltDown() && model &&
++        (!IsSelected() || original_selection.size() == 1 ||
++         only_source_split_selected);
++    if (noventra_split_drag_pending_) {
++      noventra_split_press_screen_ =
++          views::View::ConvertPointToScreen(this, event.location());
++      noventra_split_press_event_ = std::make_unique<ui::MouseEvent>(event);
++      noventra_split_original_selection_ = original_selection;
++      noventra_split_page_target_ = model->GetActiveTab()->GetWeakPtr();
++      if (noventra_split_page_target_.get() == source) {
++        noventra_split_page_target_.reset();
++        const int index = model->GetIndexOfTab(source);
++        for (int distance = 1;
++             distance < model->count() && !noventra_split_page_target_;
++             ++distance) {
++          for (int candidate : {index - distance, index + distance}) {
++            if (!model->ContainsIndex(candidate))
++              continue;
++            auto* tab = model->GetTabAtIndex(candidate);
++            if (tab->IsPinned() == source->IsPinned() &&
++                noventra::SpaceId(tab->GetContents()) ==
++                    noventra::SpaceId(source->GetContents())) {
++              noventra_split_page_target_ = tab->GetWeakPtr();
++              break;
++            }
++          }
++        }
++      }
++    }
++
+     // Changing the selection may cause our bounds to change. If that happens
+     // the location of the event may no longer be valid. Create a copy of the
+     // event in the parents coordinate, which won't change, and recreate an
+@@ -773,14 +858,14 @@
+         // Don't allow dragging non-selected tabs.
+         return false;
+       }
+-    } else if (!IsSelected()) {
++    } else if (!IsSelected() && !noventra_split_drag_pending_) {
+       controller_->SelectTab(this, event);
+       base::RecordAction(UserMetricsAction("SwitchTab_Click"));
+     }
+     ui::MouseEvent cloned_event(event_in_parent, parent(),
+                                 views::AsViewClass<View>(this));
+ 
+-    if (!closing()) {
++    if (!closing() && !noventra_split_drag_pending_) {
+       controller_->MaybeStartDrag(this, cloned_event, original_selection);
+     }
+   }
+@@ -789,12 +874,48 @@
+ 
+ bool Tab::OnMouseDragged(const ui::MouseEvent& event) {
+   noventra_edit_on_release_ = false;
++  if (noventra_split_drag_pending_) {
++    const auto point =
++        views::View::ConvertPointToScreen(this, event.location());
++    if (UpdateNoventraSplitDrag(event))
++      return true;
++    // Reordering along the tab bar and tearing a tab out retain Chromium's
++    // native drag machinery. Initialize it from the original press only when
++    // the direction is known, never while previewing an in-page split.
++    ui::MouseEvent press(*noventra_split_press_event_);
++    const auto original = noventra_split_original_selection_;
++    const auto start = noventra_split_press_screen_;
++    ResetNoventraSplitDrag();
++    auto self = weak_ptr_factory_.GetWeakPtr();
++    controller_->SelectTab(this, event);
++    if (!self)
++      return true;
++    press.set_location(views::View::ConvertPointFromScreen(this, start));
++    controller_->MaybeStartDrag(this, press, original);
++    if (!self)
++      return true;
++    ui::MouseEvent moved(event);
++    moved.set_location(views::View::ConvertPointFromScreen(this, point));
++    std::ignore = controller_->ContinueDrag(this, moved);
++    return true;
++  }
+   // TODO: ensure ignoring return value is ok.
+   std::ignore = controller_->ContinueDrag(this, event);
+   return true;
+ }
+ 
+ void Tab::OnMouseReleased(const ui::MouseEvent& event) {
++  if (noventra_split_drag_cancelled_) {
++    noventra_split_drag_cancelled_ = false;
++    return;
++  }
++  if (noventra_split_drag_pending_ && noventra_split_drag_active_) {
++    FinishNoventraSplitDrag();
++    return;
++  }
++  const bool activate_on_release =
++      !noventra_split_drag_pending_ || HitTestPoint(event.location());
++  ResetNoventraSplitDrag();
+   base::WeakPtr<Tab> self = weak_ptr_factory_.GetWeakPtr();
+   controller_->OnMouseEventInTab(this, event);
+ 
+@@ -826,7 +947,7 @@
+         controller_->CloseTab(closest_tab, CloseTabSource::kFromMouse);
+       }
+     }
+-  } else if (event.IsOnlyLeftMouseButton() &&
++  } else if (event.IsOnlyLeftMouseButton() && activate_on_release &&
+              !(event.IsShiftDown() || shift_pressed_on_mouse_down_) &&
+              !IsSelectionModifierDown(event)) {
+     // If the tab was already selected mouse pressed doesn't change the
+@@ -852,6 +973,8 @@
+ }
+ 
+ void Tab::OnMouseCaptureLost() {
++  noventra_split_drag_cancelled_ = noventra_split_drag_pending_;
++  ResetNoventraSplitDrag();
+   noventra_edit_on_release_ = false;
+   controller_->EndDrag(EndDragReason::kCaptureLost);
+ }
+@@ -1708,3 +1831,184 @@
+ 
+ BEGIN_METADATA(Tab)
+ END_METADATA
++
++bool Tab::UpdateNoventraSplitDrag(const ui::MouseEvent& event) {
++  auto* source = tab_handle_.Get();
++  auto* browser = source ? BrowserView::GetBrowserViewForBrowser(
++                               source->GetBrowserWindowInterface())
++                         : nullptr;
++  if (!browser || !browser->multi_contents_view())
++    return false;
++  const auto point = views::View::ConvertPointToScreen(this, event.location());
++  const auto delta = point - noventra_split_press_screen_;
++  if (!browser->GetBoundsInScreen().Contains(point))
++    return false;
++  if (!noventra_split_drag_active_ && delta.LengthSquared() < 100)
++    return true;
++  const auto page = browser->multi_contents_view()->GetBoundsInScreen();
++  // Horizontal intent in the strip is ordinary native reordering. Downward
++  // intent stays captured, preserving the page that will receive the split.
++  if (!noventra_split_drag_active_ && !page.Contains(point) &&
++      std::abs(delta.x()) > std::abs(delta.y()))
++    return false;
++  if (!noventra_split_drag_active_) {
++    noventra_split_drag_active_ = true;
++    RequestFocus();
++    browser->SetNoventraTabDragActive(true);
++    noventra_split_drag_reveal_ = base::ScopedClosureRunner(base::BindOnce(
++        [](base::WeakPtr<BrowserView> view,
++           std::unique_ptr<NoventraHorizontalDragKeyMonitor> monitor) {
++          monitor.reset();
++          if (view) {
++            view->multi_contents_view()->HideNoventraSplitDropPreview();
++            view->SetNoventraTabDragActive(false);
++          }
++        },
++        browser->GetAsWeakPtr(),
++        std::make_unique<NoventraHorizontalDragKeyMonitor>(
++            GetWidget()->GetNativeWindow(),
++            base::BindRepeating(
++                [](base::WeakPtr<Tab> tab, const ui::KeyEvent& key) {
++                  if (tab)
++                    tab->OnKeyPressed(key);
++                },
++                weak_ptr_factory_.GetWeakPtr()))));
++  }
++  if (page.Contains(point)) {
++    auto* hovered =
++        browser->multi_contents_view()->GetNoventraSplitDropTarget(point);
++    if (hovered && hovered != source)
++      noventra_split_page_target_ = hovered->GetWeakPtr();
++  }
++  auto* target = noventra_split_page_target_.get();
++  auto* model = browser->browser()->GetTabStripModel();
++  noventra_split_drop_valid_ =
++      page.Contains(point) && target && target != source &&
++      model->ContainsIndex(model->GetIndexOfTab(target)) &&
++      source->IsPinned() == target->IsPinned() &&
++      noventra::SpaceId(source->GetContents()) ==
++          noventra::SpaceId(target->GetContents()) &&
++      browser->GetProfile()->GetPrefs()->GetBoolean(
++          prefs::kSplitViewDragAndDropEnabled);
++  std::u16string label = u"Drag into the page to split";
++  if (noventra_split_drop_valid_ && target->IsSplit() &&
++      target->GetSplit() != source->GetSplit() &&
++      model->GetSplitData(*target->GetSplit())->ListTabs().size() >= 4) {
++    noventra_split_drop_valid_ = false;
++    label = u"This split already has four tabs";
++  }
++  gfx::Rect target_bounds = page;
++  if (target) {
++    if (auto* pane =
++            browser->multi_contents_view()->GetContentsContainerViewFor(
++                target->GetContents());
++        pane && pane->GetBoundsInScreen().Contains(point)) {
++      target_bounds = pane->GetBoundsInScreen();
++    }
++  }
++  const int band = std::min(64, target_bounds.height() / 4);
++  noventra_split_drop_stacked_ = point.y() < target_bounds.y() + band ||
++                                 point.y() > target_bounds.bottom() - band;
++  noventra_split_drop_after_ =
++      noventra_split_drop_stacked_
++          ? point.y() >= target_bounds.CenterPoint().y()
++          : point.x() >= target_bounds.CenterPoint().x();
++  if (noventra_split_drop_valid_) {
++    auto layout = target->GetSplit() ? model->GetSplitData(*target->GetSplit())
++                                           ->visual_data()
++                                           ->split_layout()
++                                     : split_tabs::SplitTabLayout::kSideBySide;
++    if (noventra_split_drop_stacked_) {
++      layout = split_tabs::SplitTabLayout::kStacked;
++    }
++    if (layout == split_tabs::SplitTabLayout::kGrid) {
++      label = u"Place in split";
++    } else {
++      label =
++          layout == split_tabs::SplitTabLayout::kStacked
++              ? (noventra_split_drop_after_ ? u"Split below" : u"Split above")
++              : (noventra_split_drop_after_ ? u"Split right" : u"Split left");
++    }
++  }
++  const auto bounds =
++      noventra_split_drop_valid_
++          ? browser->multi_contents_view()->GetNoventraSplitDropBounds(
++                source, target, noventra_split_drop_after_,
++                noventra_split_drop_stacked_)
++          : gfx::Rect();
++  browser->multi_contents_view()->ShowNoventraSplitDropPreview(
++      bounds, point, label + u" · " + data().title);
++  return true;
++}
++
++void Tab::ResetNoventraSplitDrag() {
++  noventra_split_drag_reveal_.RunAndReset();
++  noventra_split_drag_pending_ = false;
++  noventra_split_drag_active_ = false;
++  noventra_split_drop_valid_ = false;
++  noventra_split_page_target_.reset();
++  noventra_split_press_event_.reset();
++  noventra_split_original_selection_.Clear();
++}
++
++void Tab::FinishNoventraSplitDrag() {
++  auto* source = tab_handle_.Get();
++  auto* browser = source ? BrowserView::GetBrowserViewForBrowser(
++                               source->GetBrowserWindowInterface())
++                         : nullptr;
++  if (!browser) {
++    ResetNoventraSplitDrag();
++    return;
++  }
++  auto* model = browser->browser()->GetTabStripModel();
++  const int source_index = model->GetIndexOfTab(source);
++  if (!model->ContainsIndex(source_index)) {
++    ResetNoventraSplitDrag();
++    return;
++  }
++  auto weak_source = source->GetWeakPtr();
++  const auto target = noventra_split_page_target_;
++  const bool valid = noventra_split_drop_valid_;
++  const bool after = noventra_split_drop_after_;
++  const bool stacked = noventra_split_drop_stacked_;
++  ResetNoventraSplitDrag();
++  base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
++      FROM_HERE,
++      base::BindOnce(
++          [](base::WeakPtr<BrowserView> view,
++             base::WeakPtr<tabs::TabInterface> source,
++             base::WeakPtr<tabs::TabInterface> target, bool valid, bool after,
++             bool stacked) {
++            if (!valid || !view || !source || !target ||
++                !view->GetProfile()->GetPrefs()->GetBoolean(
++                    prefs::kSplitViewDragAndDropEnabled))
++              return;
++            auto* model = view->browser()->GetTabStripModel();
++            if (!model->ContainsIndex(model->GetIndexOfTab(source.get())) ||
++                !model->ContainsIndex(model->GetIndexOfTab(target.get())))
++              return;
++            if (source->IsPinned() != target->IsPinned() ||
++                noventra::SpaceId(source->GetContents()) !=
++                    noventra::SpaceId(target->GetContents()))
++              return;
++            if (!model->JoinNoventraSplit(model->GetIndexOfTab(source.get()),
++                                          model->GetIndexOfTab(target.get())))
++              return;
++            if (!view || !source || !target)
++              return;
++            model = view->browser()->GetTabStripModel();
++            if (!model->ContainsIndex(model->GetIndexOfTab(source.get())) ||
++                !model->ContainsIndex(model->GetIndexOfTab(target.get())))
++              return;
++            const int from = model->GetIndexOfTab(source.get());
++            int to = model->GetIndexOfTab(target.get()) + (after ? 1 : 0);
++            if (from < to)
++              --to;
++            if (model->ContainsIndex(to) && from != to)
++              model->MoveWebContentsAt(from, to, true);
++            if (view && source && stacked && source->GetSplit())
++              view->browser()->GetTabStripModel()->UpdateSplitLayout(
++                  *source->GetSplit(), split_tabs::SplitTabLayout::kStacked);
++          },
++          browser->GetAsWeakPtr(), weak_source, target, valid, after, stacked));
++}
+diff --git a/chrome/browser/ui/views/tabs/tab.h b/chrome/browser/ui/views/tabs/tab.h
+--- a/chrome/browser/ui/views/tabs/tab.h
++++ b/chrome/browser/ui/views/tabs/tab.h
+@@ -9,6 +9,7 @@
+ #include <optional>
+ #include <string>
+ 
++#include "base/functional/callback_helpers.h"
+ #include "base/gtest_prod_util.h"
+ #include "base/memory/raw_ptr.h"
+ #include "chrome/browser/ui/tabs/tab_data.h"
+@@ -23,6 +24,7 @@
+ #include "components/tab_groups/tab_group_id.h"
+ #include "components/tabs/public/tab_interface.h"
+ #include "ui/base/metadata/metadata_header_macros.h"
++#include "ui/base/models/list_selection_model.h"
+ #include "ui/gfx/animation/animation_delegate.h"
+ #include "ui/gfx/animation/linear_animation.h"
+ #include "ui/gfx/geometry/point.h"
+@@ -357,6 +359,20 @@
+   // Whether the shift key was pressed at the start of the click. Used on mouse
+   // up.
+   bool shift_pressed_on_mouse_down_ = false;
++  bool noventra_split_drag_pending_ = false;
++  bool noventra_split_drag_active_ = false;
++  bool noventra_split_drag_cancelled_ = false;
++  bool noventra_split_drop_valid_ = false;
++  bool noventra_split_drop_stacked_ = false;
++  bool noventra_split_drop_after_ = true;
++  gfx::Point noventra_split_press_screen_;
++  std::unique_ptr<ui::MouseEvent> noventra_split_press_event_;
++  ui::ListSelectionModel noventra_split_original_selection_;
++  base::WeakPtr<tabs::TabInterface> noventra_split_page_target_;
++  base::ScopedClosureRunner noventra_split_drag_reveal_;
++  bool UpdateNoventraSplitDrag(const ui::MouseEvent& event);
++  void ResetNoventraSplitDrag();
++  void FinishNoventraSplitDrag();
+   bool noventra_edit_on_release_ = false;
+   bool should_fill_background_tab_color_ = false;
+ 

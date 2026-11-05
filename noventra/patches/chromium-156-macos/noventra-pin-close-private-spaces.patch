@@ -1,0 +1,231 @@
+diff --git a/chrome/browser/ui/tabs/tab_strip_model.cc b/chrome/browser/ui/tabs/tab_strip_model.cc
+--- a/chrome/browser/ui/tabs/tab_strip_model.cc
++++ b/chrome/browser/ui/tabs/tab_strip_model.cc
+@@ -53,6 +53,7 @@
+ #include "chrome/browser/reading_list/reading_list_model_factory.h"
+ #include "chrome/browser/resource_coordinator/lifecycle_unit_state.mojom.h"
+ #include "chrome/browser/resource_coordinator/tab_helper.h"
++#include "chrome/browser/resource_coordinator/tab_lifecycle_unit_external.h"
+ #include "chrome/browser/send_tab_to_self/send_tab_to_self_util.h"
+ #include "chrome/browser/ui/bookmarks/bookmark_utils.h"
+ #include "chrome/browser/ui/browser_command_controller.h"
+@@ -261,6 +262,50 @@
+   return page_node;
+ }
+ 
++void UnloadPinnedTab(base::WeakPtr<TabStripModel> model,
++                     base::WeakPtr<tabs::TabInterface> tab) {
++  if (!model || !tab || model->closing_all() || !tab->IsPinned() ||
++      model->GetIndexOfTab(tab.get()) == TabStripModel::kNoTab) {
++    return;
++  }
++
++  // Split partners must not keep a closed page visible or reload it. Work in
++  // identities because separation, selection and extensions may move tabs.
++  model->DetachNoventraSplitTab(model->GetIndexOfTab(tab.get()));
++  if (!model || !tab || !tab->IsPinned() ||
++      model->GetIndexOfTab(tab.get()) == TabStripModel::kNoTab) {
++    return;
++  }
++  if (tab->IsActivated()) {
++    const std::string space = noventra::SpaceId(tab->GetContents());
++    int next = TabStripModel::kNoTab;
++    for (int i = 0; i < model->count(); ++i) {
++      if (model->GetTabAtIndex(i) != tab.get() && !model->IsTabPinned(i) &&
++          noventra::SpaceId(model->GetWebContentsAt(i)) == space) {
++        next = i;
++        break;
++      }
++    }
++    if (next != TabStripModel::kNoTab) {
++      model->ActivateTabAt(next);
++    } else {
++      model->delegate()->AddTabAt(GURL(chrome::kChromeUINewTabURL), -1, true);
++    }
++  }
++  if (!model || !tab ||
++      model->GetIndexOfTab(tab.get()) == TabStripModel::kNoTab ||
++      !tab->IsPinned() || tab->IsActivated()) {
++    return;
++  }
++  tab->GetContents()->SetClosedByUserGesture(false);
++  if (auto* lifecycle =
++          resource_coordinator::TabLifecycleUnitExternal::FromWebContents(
++              tab->GetContents())) {
++    lifecycle->DiscardTab(
++        mojom::LifecycleUnitDiscardReason::EXTERNAL);
++  }
++}
++
+ }  // namespace
+ 
+ TabGroupModelFactory::TabGroupModelFactory() {
+@@ -4319,6 +4364,23 @@
+   for (content::WebContents* contents : items) {
+     tabs::TabInterface* tab = GetTabForWebContents(contents);
+     if (IsTabClosable(tab)) {
++      // A normal-window pin is a saved site. Closing its page releases the
++      // renderer, while only Unpin removes the saved shortcut. Window shutdown
++      // and private tabs retain the ordinary close/profile cleanup path.
++      if (!closing_all_ && delegate_->IsNormalWindow() &&
++          !profile_->IsOffTheRecord() && tab->IsPinned()) {
++        contents->SetClosedByUserGesture(close_types &
++                                         TabCloseTypes::CLOSE_USER_GESTURE);
++        if (RunUnloadListenerBeforeClosing(contents)) {
++          TabCloseTypesData::CreateForWebContents(contents, close_types);
++        } else {
++          base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
++              FROM_HERE,
++              base::BindOnce(&UnloadPinnedTab, weak_factory_.GetWeakPtr(),
++                             tab->GetWeakPtr()));
++        }
++        continue;
++      }
+       filtered_items.push_back(contents);
+     } else {
+       for (auto& observer : observers_) {
+diff --git a/chrome/browser/ui/browser_commands.cc b/chrome/browser/ui/browser_commands.cc
+--- a/chrome/browser/ui/browser_commands.cc
++++ b/chrome/browser/ui/browser_commands.cc
+@@ -1519,6 +1519,14 @@
+     return;
+   }
+ 
++  // Saved pins close into unloaded shortcuts; they no longer need a second
++  // accelerator press to confirm deleting the pin.
++  if (browser->GetType() == BrowserWindowInterface::TYPE_NORMAL &&
++      !browser->GetProfile()->IsOffTheRecord() && active_tab->IsPinned()) {
++    CloseSelectedTabAndRecordTabCountMetric(browser);
++    return;
++  }
++
+ #if !BUILDFLAG(IS_ANDROID)
+   if (base::FeatureList::IsEnabled(
+           contextual_tasks::kContextualTasksCloseTabExpandsSidePanel)) {
+diff --git a/chrome/browser/ui/views/tabs/common/tab_view_vertical_layout.cc b/chrome/browser/ui/views/tabs/common/tab_view_vertical_layout.cc
+--- a/chrome/browser/ui/views/tabs/common/tab_view_vertical_layout.cc
++++ b/chrome/browser/ui/views/tabs/common/tab_view_vertical_layout.cc
+@@ -68,6 +68,15 @@
+ 
+   int placed_children = 0;
+   for (const auto& child : tab_children_configs_) {
++    if (TabView().pinned_ && child.view == TabView().close_button_) {
++      // Keep the favicon centered and give the close affordance its own corner
++      // target, including in the icon rail. Hover/focus reveals the small X.
++      constexpr int kPinCloseSize = 18;
++      layouts.child_layouts.emplace_back(
++          child.view.get(), IsChildVisible(child.view, width),
++          gfx::Rect(width - kPinCloseSize, 0, kPinCloseSize, kPinCloseSize));
++      continue;
++    }
+     const bool can_render_child =
+         is_centered
+             ? (placed_children == 0)
+@@ -173,7 +182,8 @@
+ 
+   if (child_view == TabView().close_button_) {
+     if (TabView().pinned_) {
+-      return false;
++      return TabView().hovered_ || TabView().HasFocus() ||
++             TabView().close_button_->HasFocus();
+     }
+ 
+     if (base::CommandLine::ForCurrentProcess()->HasSwitch("hide-tab-close-buttons")) {
+diff --git a/chrome/browser/ui/views/tabs/tab.cc b/chrome/browser/ui/views/tabs/tab.cc
+--- a/chrome/browser/ui/views/tabs/tab.cc
++++ b/chrome/browser/ui/views/tabs/tab.cc
+@@ -604,6 +604,11 @@
+     close_button_->SetBoundsRect(
+         {gfx::Point(visible_left - non_visible_left_padding, top),
+          close_button_actual_size});
++    if (data().pinned) {
++      constexpr int kPinCloseSize = 18;
++      close_button_->SetBounds(width() - kPinCloseSize, 0, kPinCloseSize,
++                               kPinCloseSize);
++    }
+     close_x = visible_left - after_title_padding;
+   }
+   auto* browser = controller_->GetBrowserWindowInterface();
+@@ -1499,11 +1504,12 @@
+   is_animating_from_pinned_ &= animating();
+ 
+   if (data().pinned || is_animating_from_pinned_) {
+-    // When the tab is pinned, we can show one of the two icons; the alert icon
+-    // is given priority over the favicon. The close button is never shown.
++    // Pinned sites retain their icon and reveal a corner close target on hover
++    // or keyboard focus. Closing unloads the page without removing the pin.
+     showing_alert_indicator_ = has_alert_icon;
+     showing_icon_ = has_favicon && !has_alert_icon;
+-    showing_close_button_ = false;
++    showing_close_button_ = data().pinned && (mouse_hovered_ || HasFocus() ||
++                                              close_button_->HasFocus());
+ 
+     // While animating to or from the pinned state, pinned tabs are rendered as
+     // normal tabs. Force the extra padding on so the favicon doesn't jitter
+diff --git a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
+--- a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
++++ b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
+@@ -409,7 +409,7 @@
+   gfx::Size CalculatePreferredSize(const views::SizeBounds& available) const override {
+     const int width = available.width().value_or(180);
+     const bool vertical =
+-        (width < kSpaceRowMinWidth && !SharedMenu());
++        (width < kSpaceRowMinWidth && (!SharedMenu() || HasPrivateSpaces()));
+     const int rows =
+         vertical
+             ? static_cast<int>(VisibleDotCount(width)) + (SharedMenu() ? 0 : 1)
+@@ -438,15 +438,27 @@
+   }
+   void Layout(PassKey) override {
+     const bool vertical =
+-        (width() < kSpaceRowMinWidth && !SharedMenu());
++        (width() < kSpaceRowMinWidth && (!SharedMenu() || HasPrivateSpaces()));
+     const size_t count = VisibleDotCount(width());
+     std::vector<size_t> shown;
+-    for (size_t i = 0; i < count; ++i) shown.push_back(i);
+     const auto active = std::ranges::find(space_ids_, CurrentSpace());
+     if (count && active != space_ids_.end()) {
+-      const size_t index = active - space_ids_.begin();
+-      if (index >= count) shown.back() = index;
+-    }
++      shown.push_back(active - space_ids_.begin());
++    }
++    // A live private Space remains directly reachable after returning to a
++    // regular Space. Saved spaces may overflow into More; hiding the private
++    // shortcut makes a still-running session look as though it was closed.
++    for (size_t i = 0; i < space_ids_.size() && shown.size() < count; ++i) {
++      if (IsPrivate(space_ids_[i]) && !std::ranges::contains(shown, i)) {
++        shown.push_back(i);
++      }
++    }
++    for (size_t i = 0; i < space_ids_.size() && shown.size() < count; ++i) {
++      if (!std::ranges::contains(shown, i)) {
++        shown.push_back(i);
++      }
++    }
++    std::ranges::sort(shown);
+     const int cell_height = vertical ? kSpaceRailRowHeight : kSpaceTargetSize;
+     const int cell_inset = (cell_height - kSpaceTargetSize) / 2;
+     const int extent = static_cast<int>(count) * cell_height;
+@@ -627,6 +639,10 @@
+     const std::string current_;
+   };
+   size_t VisibleDotCount(int width) const {
++    if (SharedMenu() && GetProperty(kNoventraDockCompact) &&
++        HasPrivateSpaces()) {
++      return std::min(space_ids_.size(), kMaxRailSpaceDots);
++    }
+     const size_t capacity = SharedMenu()
+         ? static_cast<size_t>(std::clamp(
+               (width - 2 * kSpaceFooterPadding) / kSpaceTargetSize, 1,
+@@ -636,6 +652,10 @@
+             : static_cast<size_t>(std::max(
+                   1, (width - 2 * kSpaceFooterPadding) / kSpaceTargetSize - 1));
+     return std::min(space_ids_.size(), capacity);
++  }
++
++  bool HasPrivateSpaces() const {
++    return !noventra::IncognitoSpaces(browser_->browser()).empty();
+   }
+ 
+   BrowserWindowInterface* RegularBrowser() const {

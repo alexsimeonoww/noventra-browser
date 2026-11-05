@@ -1,0 +1,251 @@
+<grit-part>
+
+<message name="IDS_HELIUM_ONBOARDING_PAGE_TITLE" desc="The title of the Helium setup onboarding page.">
+  Noventra Setup
+</message>
+
+<message name="IDS_HELIUM_ONBOARDING_BUTTON_USE_DEFAULTS" desc="Button label that skips detailed setup and applies the default onboarding choices.">
+  Use defaults
+</message>
+<message name="IDS_HELIUM_ONBOARDING_BUTTON_CONFIGURE" desc="Button label that starts the detailed onboarding setup flow.">
+  Configure
+</message>
+<message name="IDS_HELIUM_ONBOARDING_BUTTON_NEXT" desc="Button label to continue to the next onboarding step.">
+  Next
+</message>
+<message name="IDS_HELIUM_ONBOARDING_BUTTON_BACK" desc="Button label to return to the previous onboarding step.">
+  Back
+</message>
+<message name="IDS_HELIUM_ONBOARDING_BUTTON_LETS_GO" desc="Button label that finishes onboarding and opens the browser.">
+  Let's go!
+</message>
+
+<message name="IDS_HELIUM_ONBOARDING_PARTNER_TITLE" desc="Badge title shown for partner services in onboarding.">
+  Noventra Partner
+</message>
+<message name="IDS_HELIUM_ONBOARDING_PARTNER_TOOLTIP" desc="Tooltip explaining why a listed service is marked as a Helium partner.">
+  Paying for this service will support the development of Noventra.
+</message>
+
+<message name="IDS_HELIUM_ONBOARDING_WELCOME_GREETING" desc="Main greeting on the first onboarding screen.">
+  Meet Noventra
+</message>
+<message name="IDS_HELIUM_ONBOARDING_WELCOME_BODY" desc="Introductory body text on the first onboarding screen.">
+  Configure Noventra to match your taste and import data from other browsers. Make it feel like home or jump straight to browsing.
+</message>
+<message name="IDS_HELIUM_ONBOARDING_WELCOME_TERMS" desc="Legal note shown during onboarding. Keep each BEGIN/END placeholder pair around its corresponding link text, but move the pairs as needed for a natural translation.">
+  By continuing, you agree to the <ph name="BEGIN_LINK_PRIVACY">$1</ph>privacy policy<ph name="END_LINK_PRIVACY">$2</ph> and <ph name="BEGIN_LINK_TERMS">$3</ph>terms of use<ph name="END_LINK_TERMS">$4</ph>.
+</message>
+<message name="IDS_HELIUM_ONBOARDING_WELCOME_FOOTER" desc="Footer text explaining that setup can be skipped but Helium services require consent.">
+  If you use defaults, Noventra services will be automatically enabled.
+</message>
+
+<message name="IDS_HELIUM_ONBOARDING_FINISH_TITLE" desc="Title on the final onboarding screen.">
+  Ready to browse?
+</message>
+<message name="IDS_HELIUM_ONBOARDING_FINISH_BODY" desc="Body text on the final onboarding screen.">
+  The setup is complete, thank you for choosing Noventra. Time to enjoy the internet again.
+</message>
+
+<message name="IDS_HELIUM_ONBOARDING_SERVICES_TITLE" desc="Title of the onboarding screen for Helium services consent.">
+  Noventra services
+</message>
+<message name="IDS_HELIUM_ONBOARDING_SERVICES_SUBTITLE" desc="Subtitle explaining when Helium services consent choices take effect.">
+  Services are not active until you consent to using them. Changes will be applied after you go to the next page.
+</message>
+<message name="IDS_HELIUM_ONBOARDING_SERVICES_CONNECTION_TITLE" desc="Title of the global toggle for connecting to Helium services.">
+  Allow connecting to Noventra services
+</message>
+<message name="IDS_HELIUM_ONBOARDING_SERVICES_CONNECTION_DESC" desc="Description of the global Helium services toggle.">
+  Noventra services provide additional functionality, such as: extension downloads, native !bangs, filter list updates, and browser updates. When disabled, none of these features will work, but Noventra will not make any web requests.
+</message>
+<message name="IDS_HELIUM_ONBOARDING_SERVICES_BANGS_TITLE" desc="Title of the toggle for downloading the Helium bangs list.">
+  Allow downloading the !bangs list
+</message>
+<message name="IDS_HELIUM_ONBOARDING_SERVICES_BANGS_DESC" desc="Description of the toggle for downloading the Helium bangs list.">
+  Noventra will fetch a list of bangs that help you browse the Internet faster, such as !w or !gh. When disabled, bangs will not work.
+</message>
+<message name="IDS_HELIUM_ONBOARDING_SERVICES_EXTENSIONS_TITLE" desc="Title of the toggle for proxying extension downloads and updates.">
+  Proxy extension downloads and updates
+</message>
+<message name="IDS_HELIUM_ONBOARDING_SERVICES_EXTENSIONS_DESC" desc="Description of the toggle for proxying extension downloads and updates.">
+  When enabled, Noventra will proxy extension downloads and updates to protect your privacy. When disabled, downloading and updating extensions will not work.
+</message>
+<message name="IDS_HELIUM_ONBOARDING_SERVICES_UBLOCK_TITLE" desc="Title of the toggle for downloading uBlock Origin filter lists.">
+  Allow downloading filter lists for uBlock Origin
+</message>
+<message name="IDS_HELIUM_ONBOARDING_SERVICES_UBLOCK_DESC" desc="Description of the toggle for downloading uBlock Origin filter lists.">
+  Noventra will fetch fresh filter lists for uBlock Origin. All requests to lists are proxied to protect your privacy. When disabled, default filter lists will be loaded from local storage, which are only updated along with Noventra. Optional filter lists will be requested without proxying.
+</message>
+<message name="IDS_HELIUM_ONBOARDING_SERVICES_AUTOUPDATES_TITLE" desc="Title of the toggle for automatic browser updates on platforms where Helium updates the browser.">
+  Allow automatic browser updates
+</message>
+<message name="IDS_HELIUM_ONBOARDING_SERVICES_AUTOUPDATES_DESC" desc="Description of the toggle for automatic browser updates on platforms where Helium updates the browser.">
+  Noventra will automatically check for updates and install them. This includes browser and component updates. We recommend keeping this setting enabled to ensure you get the latest features and security updates.
+</message>
+<message name="IDS_HELIUM_ONBOARDING_SERVICES_AUTOUPDATES_TITLE_LINUX" desc="Title of the toggle for automatic component updates on Linux.">
+  Allow automatic component updates
+</message>
+<message name="IDS_HELIUM_ONBOARDING_SERVICES_AUTOUPDATES_DESC_LINUX" desc="Description of the toggle for automatic component updates on Linux.">
+  Noventra will automatically check for component updates and install them. We recommend keeping this setting enabled. On Linux, browser updates are handled by your distro's package manager. Please check for Noventra package updates at least every week.
+</message>
+<message name="IDS_HELIUM_ONBOARDING_SERVICES_SPELLCHECK_TITLE" desc="Title of the toggle for downloading spell check dictionary files.">
+  Allow downloading dictionary files for spell checking
+</message>
+<message name="IDS_HELIUM_ONBOARDING_SERVICES_SPELLCHECK_DESC" desc="Description of the toggle for downloading spell check dictionary files.">
+  Noventra will fetch dictionary files used for spell checking when requested. When disabled, spell checking will not work.
+</message>
+<message name="IDS_HELIUM_ONBOARDING_SERVICES_INSTANCE_TITLE" desc="Title of the option describing custom Helium services instances.">
+  Use your own instance of Noventra services
+</message>
+<message name="IDS_HELIUM_ONBOARDING_SERVICES_INSTANCE_DESC" desc="Description of the option describing custom Helium services instances.">
+  You can host your own instance of Noventra services and use it in your browser instead of the pre-hosted server. If you have one, you can set it in Noventra settings.
+</message>
+
+<message name="IDS_HELIUM_ONBOARDING_SEARCH_TITLE" desc="Title of the onboarding screen for selecting a default search engine.">
+  Choose a search engine
+</message>
+<message name="IDS_HELIUM_ONBOARDING_SEARCH_SUBTITLE" desc="Subtitle for the onboarding screen for selecting a default search engine.">
+  You can change your choice later in Settings. Search engines are sorted by privacy.
+</message>
+<message name="IDS_HELIUM_ONBOARDING_SEARCH_CATEGORIES_PRIVATE" desc="Description for privacy-first search engines in onboarding.">
+  A privacy-first search engine which doesn't profile or track you.
+</message>
+<message name="IDS_HELIUM_ONBOARDING_SEARCH_CATEGORIES_SMALL" desc="Description for smaller search engines that are more private than mainstream engines but not privacy-focused.">
+  Transparent, but not privacy-focused. Offers better privacy than mainstream search engines.
+</message>
+<message name="IDS_HELIUM_ONBOARDING_SEARCH_CATEGORIES_MAINSTREAM" desc="Description for mainstream search engines in onboarding.">
+  A mainstream search engine which collects extensive personal data.
+</message>
+<message name="IDS_HELIUM_ONBOARDING_SEARCH_CATEGORIES_CUSTOM" desc="Description for a custom search engine in onboarding.">
+  A custom search engine. Its privacy wasn't verified by Noventra.
+</message>
+<message name="IDS_HELIUM_ONBOARDING_SEARCH_ENGINES_DUCKDUCKGO" desc="Onboarding description of DuckDuckGo as a search engine option.">
+  Privacy-focused. Relies on Bing for results. Promises not to track or profile you.
+</message>
+<message name="IDS_HELIUM_ONBOARDING_SEARCH_ENGINES_KAGI" desc="Onboarding description of Kagi as a search engine option.">
+  Privacy-focused. Doesn't use Google or Bing. Has custom ranking. Requires a paid account. No ads, tracking, or profiling.
+</message>
+<message name="IDS_HELIUM_ONBOARDING_SEARCH_ENGINES_QWANT" desc="Onboarding description of Qwant as a search engine option.">
+  Based in Europe. Relies on Bing for results. Sends tracking data to Microsoft.
+</message>
+<message name="IDS_HELIUM_ONBOARDING_SEARCH_ENGINES_ECOSIA" desc="Onboarding description of Ecosia as a search engine option.">
+  May plant trees for clicking ads. Relies on Google and Bing for results. Sends tracking data to Google and Microsoft.
+</message>
+<message name="IDS_HELIUM_ONBOARDING_SEARCH_ENGINES_BING" desc="Onboarding description of Bing as a search engine option.">
+  Collects extensive personal data. Privacy controls are buried and limited. Subjectively overwhelming UI.
+</message>
+<message name="IDS_HELIUM_ONBOARDING_SEARCH_ENGINES_GOOGLE" desc="Onboarding description of Google as a search engine option.">
+  It's Google. It dominates the search market, collects extensive personal data, and profiles you.
+</message>
+<message name="IDS_HELIUM_ONBOARDING_SEARCH_ENGINES_STARTPAGE" desc="Onboarding description of Startpage as a search engine option.">
+  Privacy-focused. Relies on Google and Bing for results. Promises not to track or profile you.
+</message>
+<message name="IDS_HELIUM_ONBOARDING_SEARCH_ENGINES_BRAVE" desc="Onboarding description of Brave as a search engine option.">
+  Privacy-focused. Doesn't use Google or Bing. Promises not to track or profile you. May show promotions related to Brave services.
+</message>
+
+<message name="IDS_HELIUM_ONBOARDING_DEFAULT_BROWSER_TITLE" desc="Title of the onboarding screen asking whether Helium should be the default browser.">
+  Ready to switch to Noventra?
+</message>
+<message name="IDS_HELIUM_ONBOARDING_DEFAULT_BROWSER_SUBTITLE" desc="Subtitle of the onboarding screen asking whether Helium should be the default browser.">
+  Better privacy, speed, and comfort. All in one click. Wanna make links open in Noventra by default?
+</message>
+<message name="IDS_HELIUM_ONBOARDING_DEFAULT_BROWSER_YES" desc="Label for the option to make Helium the default browser.">
+  Yes
+</message>
+<message name="IDS_HELIUM_ONBOARDING_DEFAULT_BROWSER_NO" desc="Label for the option to keep the current default browser.">
+  No
+</message>
+<message name="IDS_HELIUM_ONBOARDING_DEFAULT_BROWSER_YES_DESC" desc="Description for the option to make Helium the default browser.">
+  Make Noventra my default browser.
+</message>
+<message name="IDS_HELIUM_ONBOARDING_DEFAULT_BROWSER_NO_DESC" desc="Description for the option to keep the current default browser.">
+  Just trying Noventra for now.
+</message>
+
+<message name="IDS_HELIUM_ONBOARDING_DATA_IMPORT_TITLE" desc="Title of the onboarding screen for importing browser data.">
+  Import from other browsers
+</message>
+<message name="IDS_HELIUM_ONBOARDING_DATA_IMPORT_SUBTITLE" desc="Subtitle of the onboarding screen for importing browser data.">
+  Transfer your bookmarks, history, and extensions from other browsers.
+</message>
+<message name="IDS_HELIUM_ONBOARDING_DATA_IMPORT_PROMPT_TITLE" desc="Title of the prompt asking to look for other browsers before showing import options.">
+  Find browsers to import from
+</message>
+<message name="IDS_HELIUM_ONBOARDING_DATA_IMPORT_PROMPT_PERMISSION" desc="Explanation asking for permission to look for other browsers before choosing data to import.">
+  Allow Helium to look for other browsers on this device so you can choose what to transfer.
+</message>
+<message name="IDS_HELIUM_ONBOARDING_DATA_IMPORT_ALLOW" desc="Button that allows Helium to look for browsers to import data from.">
+  Allow
+</message>
+<message name="IDS_HELIUM_ONBOARDING_DATA_IMPORT_REFRESH" desc="Accessible label and tooltip for the icon-only button that looks for browsers to import data from again, after the user has changed macOS permissions.">
+  Refresh
+</message>
+<message name="IDS_HELIUM_ONBOARDING_DATA_IMPORT_NO_BROWSERS" desc="Notice shown when no previous browsers are available to import data from.">
+  No compatible browsers could be found.
+</message>
+<message name="IDS_HELIUM_ONBOARDING_DATA_IMPORT_DISCOVERY_ERROR" desc="Error shown when looking for browsers fails. The user can retry using the Allow button.">
+  An error occurred. Please try again.
+</message>
+<message name="IDS_HELIUM_ONBOARDING_DATA_IMPORT_MAC_NOTICE_TITLE" desc="Title of the macOS-only banner below browser import options.">
+  Don't see your previous browser?
+</message>
+<message name="IDS_HELIUM_ONBOARDING_DATA_IMPORT_MAC_NOTICE_BODY" desc="Explanation of macOS browser detection permissions. Keep the BEGIN/END placeholder pair around the System Settings link, but move it as needed for a natural translation.">
+  macOS protects some browsers from being automatically detected. To see more options, allow Helium to access them in <ph name="BEGIN_LINK_SETTINGS">$1</ph>System Settings<ph name="END_LINK_SETTINGS">$2</ph>.
+</message>
+<message name="IDS_HELIUM_ONBOARDING_DATA_IMPORT_BOOKMARKS" desc="Label for bookmarks as an importable data type.">
+  Bookmarks
+</message>
+<message name="IDS_HELIUM_ONBOARDING_DATA_IMPORT_HISTORY" desc="Label for history as an importable data type.">
+  History
+</message>
+<message name="IDS_HELIUM_ONBOARDING_DATA_IMPORT_EXTENSIONS" desc="Label for extensions as an importable data type.">
+  Extensions
+</message>
+
+<message name="IDS_HELIUM_ONBOARDING_PASSWORD_TITLE" desc="Title of the onboarding screen for choosing a password manager.">
+  Password manager
+</message>
+<message name="IDS_HELIUM_ONBOARDING_PASSWORD_SUBTITLE" desc="Subtitle of the onboarding screen for choosing a password manager.">
+  Noventra doesn't have a built-in password manager. Would you like to install one from the Web Store?
+</message>
+<message name="IDS_HELIUM_ONBOARDING_PASSWORD_IMPORT_GUIDE" desc="Link label linking to a password manager import guide. Short title for a guide.">
+  Import
+</message>
+<message name="IDS_HELIUM_ONBOARDING_PASSWORD_SETUP_GUIDE" desc="Link label linking to a password manager setup guide. Short title for a guide.">
+  Setup
+</message>
+<message name="IDS_HELIUM_ONBOARDING_PASSWORD_PRIVACY" desc="Link label linking to a password manager privacy policy. Short title for privacy policy.">
+  Privacy
+</message>
+<message name="IDS_HELIUM_ONBOARDING_PASSWORD_INSTALL" desc="Button label to install a password manager extension, CTA.">
+  Install
+</message>
+<message name="IDS_HELIUM_ONBOARDING_PASSWORD_INSTALLED" desc="Status label shown when a password manager extension is installed.">
+  Installed
+</message>
+<message name="IDS_HELIUM_ONBOARDING_PASSWORD_ERROR" desc="Prefix label shown before a password manager install error.">
+  Error:
+</message>
+
+<message name="IDS_HELIUM_ONBOARDING_PASSWORD_MANAGERS_PROTON_PASS" desc="Onboarding description of Proton Pass as a password manager option.">
+  Secure and privacy-focused password manager with open-source clients. Stores data only in Europe. Free with an optional paid plan.
+</message>
+<message name="IDS_HELIUM_ONBOARDING_PASSWORD_MANAGERS_BITWARDEN" desc="Onboarding description of Bitwarden as a password manager option.">
+  Secure and the most popular open-source password manager. Offers data storage in Europe or US. Free with an optional paid plan. Can be self-hosted.
+</message>
+<message name="IDS_HELIUM_ONBOARDING_PASSWORD_MANAGERS_ONE_PASSWORD" desc="Onboarding description of 1Password as a password manager option.">
+  Popular, paid, and closed-source password manager. Offers data storage in Europe or US. May not work correctly with Noventra without extra configuration.
+</message>
+<message name="IDS_HELIUM_ONBOARDING_PASSWORD_MANAGERS_DASHLANE" desc="Onboarding description of Dashlane as a password manager option.">
+  Popular, paid, and closed-source password manager. Stores data in Europe. Known for aggressive upselling tactics.
+</message>
+<message name="IDS_HELIUM_ONBOARDING_PASSWORD_MANAGERS_ICLOUD_PASSWORDS" desc="Onboarding description of iCloud Passwords as a password manager option.">
+  Free and closed-source password manager by Apple. Nags about using Safari, requires re-authentication on browser restart, and can't generate passwords.
+</message>
+<message name="IDS_HELIUM_ONBOARDING_PASSWORD_MANAGERS_KEE_PASS_XC" desc="Onboarding description of KeePassXC as a password manager option.">
+  Free, local, and open-source password manager for advanced users. Requires technical knowledge to set up and use. Cannot sync without extra software.
+</message>
+
+</grit-part>

@@ -1,0 +1,55 @@
+import("//mojo/public/tools/bindings/mojom.gni")
+import("//testing/test.gni")
+
+mojom("mojom") {
+  sources = [ "ubo_service.mojom" ]
+  public_deps = [ "//sandbox/policy/mojom" ]
+}
+
+executable("noventra_ubo_task_tests") {
+  testonly = true
+  sources = [ "isolate_task_runner_unittest.cc" ]
+  deps = [
+    "//base",
+    "//gin",
+    "//testing/gtest",
+    "//v8",
+  ]
+  configs += [ "//v8:external_startup_data" ]
+  data_deps = [ "//tools/v8_context_snapshot" ]
+}
+
+source_set("service") {
+  sources = [
+    "assets.h",
+    "isolate_task_runner.h",
+    "service.cc",
+    "service.h",
+  ]
+  configs += [ "//v8:external_startup_data" ]
+  deps = [
+    ":mojom",
+    "//base",
+    "//gin",
+    "//mojo/public/cpp/bindings",
+    "//third_party/boringssl",
+    "//tools/v8_context_snapshot:buildflags",
+    "//url",
+    "//v8",
+  ]
+}
+
+source_set("probe_client") {
+  sources = [
+    "probe_client.cc",
+    "probe_client.h",
+  ]
+  deps = [
+    ":mojom",
+    "//base",
+    "//chrome/browser:main_extra_parts",
+    "//content/public/browser",
+    "//mojo/public/cpp/bindings",
+    "//third_party/boringssl",
+  ]
+}

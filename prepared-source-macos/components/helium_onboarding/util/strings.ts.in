@@ -1,0 +1,88 @@
+import { assert } from './cr/assert';
+import { platform } from './platform';
+
+type StringKey = never/* $keys */;
+
+type LoadTimeData = {
+    data?: Record<string, string | boolean>;
+    getString(key: string): string;
+    getBoolean(key: string): boolean;
+};
+
+declare global {
+    var loadTimeData: LoadTimeData | undefined;
+}
+
+let loadTimeData: LoadTimeData | undefined;
+const installLoadTimeData = (): LoadTimeData => {
+    if (globalThis.loadTimeData) {
+        return globalThis.loadTimeData;
+    }
+
+    globalThis.loadTimeData = {
+        data: {},
+        getString(key: string) {
+            const value = globalThis.loadTimeData?.data?.[key] ?? '';
+            assert(typeof value === 'string', `${key} is not a string`);
+            return value;
+        },
+        getBoolean(key: string) {
+            const value = globalThis.loadTimeData?.data?.[key] ?? false;
+            assert(typeof value === 'boolean', `${key} is not a boolean`);
+            return value;
+        },
+    };
+    return globalThis.loadTimeData;
+};
+
+let chromiumStringsPromise: Promise<void> | undefined;
+const loadChromiumStrings = async (): Promise<void> => {
+    // Chromium serves this at runtime. Import it without a script.src assignment,
+    // which would require TrustedScriptURL under WebUI's Trusted Types CSP.
+    const stringsUrl = '/strings.js';
+    chromiumStringsPromise ??= import(/* @vite-ignore */ stringsUrl).then(() => {});
+
+    await chromiumStringsPromise;
+};
+
+export const initStrings = async (): Promise<void> => {
+    if (loadTimeData) {
+        return;
+    }
+
+    if (globalThis.location.protocol !== 'chrome:') {
+        return;
+    }
+
+    loadTimeData = installLoadTimeData();
+    await loadChromiumStrings();
+};
+
+const DEV_STRINGS = import.meta.env.DEV ? ({/* $devStrings */}) : {};
+const getString = (key: StringKey): string => {
+    if (import.meta.env.DEV) {
+        return (DEV_STRINGS as Record<StringKey, string>)[key];
+    }
+
+    const string = (loadTimeData ?? globalThis.loadTimeData)?.getString(key);
+    if (!string) {
+        console.error(`Could not get string for ${key}`);
+        return `¡${key}!`;
+    }
+
+    return string;
+};
+
+const DEV_BOOLEANS: Record<string, boolean> = import.meta.env.DEV ? {
+    canImportBrowserPasswords: platform.is.linux,
+    ...(platform.is.macos ? { showMacImportPermissionNotice: true } : {}),
+} : {};
+export const getBoolean = (key: string): boolean => {
+    if (import.meta.env.DEV) {
+        return DEV_BOOLEANS[key] ?? false;
+    }
+
+    return (loadTimeData ?? globalThis.loadTimeData)?.getBoolean(key) ?? false;
+};
+
+export const s = {/* $tree */} as const;

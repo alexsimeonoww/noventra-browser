@@ -1,0 +1,2297 @@
+diff --git a/chrome/browser/ui/BUILD.gn b/chrome/browser/ui/BUILD.gn
+--- a/chrome/browser/ui/BUILD.gn
++++ b/chrome/browser/ui/BUILD.gn
+@@ -2362,6 +2362,8 @@
+       "browser_shortcuts/browser_shortcut_service_factory.h",
+       "browser_tabstrip.cc",
+       "browser_tabstrip.h",
++      "noventra/incognito_space_host.cc",
++      "noventra/incognito_space_host.h",
+       "noventra/layout_model.cc",
+       "noventra/layout_model.h",
+       "noventra/window_mirror_service.cc",
+diff --git a/chrome/browser/ui/browser.cc b/chrome/browser/ui/browser.cc
+--- a/chrome/browser/ui/browser.cc
++++ b/chrome/browser/ui/browser.cc
+@@ -1,3 +1,4 @@
++#include "chrome/browser/ui/noventra/incognito_space_host.h"
+ #include "chrome/browser/ui/noventra/window_mirror_service.h"
+ // Copyright 2012 The Chromium Authors
+ // Use of this source code is governed by a BSD-style license that can be
+@@ -616,6 +617,9 @@
+ }
+ 
+ void Browser::TabStripEmpty() {
++  if (noventra::KeepEmptyIncognitoHost(this)) {
++    return;
++  }
+   if (auto* mirror = noventra::WindowMirrorService::GetForProfile(profile_);
+       mirror && mirror->KeepEmptyWindow(this)) {
+     return;
+diff --git a/chrome/browser/ui/browser_commands.cc b/chrome/browser/ui/browser_commands.cc
+--- a/chrome/browser/ui/browser_commands.cc
++++ b/chrome/browser/ui/browser_commands.cc
+@@ -1,3 +1,4 @@
++#include "chrome/browser/ui/noventra/incognito_space_host.h"
+ #include "chrome/browser/ui/views/frame/noventra_window_mirror_view.h"
+ #include "chrome/browser/ui/noventra/window_mirror_service.h"
+ #include "chrome/browser/ui/noventra_commands.h"
+@@ -1384,6 +1385,9 @@
+ }
+ 
+ void NewIncognitoWindow(Profile* profile) {
++  if (noventra::CreateIncognitoSpaceForProfile(profile)) {
++    return;
++  }
+   NewEmptyWindow(profile->GetPrimaryOTRProfile(/*create_if_needed=*/true));
+ }
+ 
+@@ -3438,6 +3442,9 @@
+   if (!browser) {
+     return {};
+   }
++  if (auto* host = IncognitoSpaceHost(browser); host && host != browser) {
++    return SpaceIds(host, include_archived);
++  }
+   Profile* profile = browser->GetProfile();
+   auto* prefs = profile->GetPrefs();
+   const auto known = KnownSpaceIds(browser);
+@@ -3454,7 +3461,28 @@
+     return std::ranges::find(known, id) == known.end() ||
+            (!include_archived && IsSpaceArchived(profile, id));
+   });
++  // Private identities are appended only AFTER saving the regular order.
++  // They never enter original-profile metadata or a restored private model.
++  if (!include_archived) {
++    for (const auto& space : IncognitoSpaces(browser)) {
++      order.push_back(space.id);
++    }
++  }
+   return order;
++}
++
++std::string CurrentSpaceId(BrowserWindowInterface* browser) {
++  if (auto* selected = SelectedIncognitoBrowser(browser)) {
++    browser = selected;
++  }
++  if (!browser) return {};
++  const auto private_id = IncognitoSpaceId(browser);
++  if (!private_id.empty()) return private_id;
++  if (auto* mirror = WindowMirrorService::GetForProfile(browser->GetProfile());
++      mirror && mirror->IsEnrolled(browser)) {
++    return mirror->SelectedSpace(browser);
++  }
++  return SpaceId(browser->GetTabStripModel()->GetActiveWebContents());
+ }
+ 
+ bool SetSpaceName(BrowserWindowInterface* browser,
+@@ -3577,6 +3605,14 @@
+       browser->GetTabStripModel()->closing_all()) {
+     return;
+   }
++  if (IncognitoSpaceHost(browser)) {
++    auto* target = IncognitoSpaceTarget(browser, id);
++    if (!target || target->IsDeleteScheduled()) return;
++    IncognitoWindowCloseCancelled(browser);
++    ShowIncognitoPresentation(target);
++    if (!IncognitoSpaceId(target).empty()) return;
++    browser = target;
++  }
+   const auto ids = SpaceIds(browser);
+   if (std::ranges::find(ids, id) == ids.end()) return;
+   if (auto* mirror = WindowMirrorService::GetForProfile(browser->GetProfile());
+@@ -3624,11 +3660,7 @@
+   if (ids.empty()) {
+     return;
+   }
+-  auto current = SpaceId(browser->GetTabStripModel()->GetActiveWebContents());
+-  if (auto* mirror = WindowMirrorService::GetForProfile(browser->GetProfile());
+-      mirror && mirror->IsEnrolled(browser)) {
+-    current = mirror->SelectedSpace(browser);
+-  }
++  const auto current = CurrentSpaceId(browser);
+   const auto it = std::ranges::find(ids, current);
+   const int index = it == ids.end() ? 0 : it - ids.begin();
+   const int count = static_cast<int>(ids.size());
+diff --git a/chrome/browser/ui/navigator/browser_navigator.cc b/chrome/browser/ui/navigator/browser_navigator.cc
+--- a/chrome/browser/ui/navigator/browser_navigator.cc
++++ b/chrome/browser/ui/navigator/browser_navigator.cc
+@@ -1,3 +1,4 @@
++#include "chrome/browser/ui/noventra/incognito_space_host.h"
+ // Copyright 2012 The Chromium Authors
+ // Use of this source code is governed by a BSD-style license that can be
+ // found in the LICENSE file.
+@@ -403,6 +404,10 @@
+       return {browser, -1};
+     }
+     case WindowOpenDisposition::OFF_THE_RECORD:
++      if (auto* space = noventra::CreateIncognitoSpace(
++              params.browser, /*add_initial_tab=*/false)) {
++        return {space, -1};
++      }
+       // Make or find an incognito window.
+       return {GetOrCreateBrowser(
+                   profile->GetPrimaryOTRProfile(/*create_if_needed=*/true),
+@@ -555,7 +560,11 @@
+                     : tab_util::GetSiteInstanceForNewTab(
+                           params.browser->GetProfile(), url);
+ 
+-  if (routed_space.has_value()) {
++  const auto incognito_space = noventra::IncognitoSpaceId(params.browser);
++  if (!incognito_space.empty() && !params.opener) {
++    initial_site_instance_for_new_contents = noventra::SpaceSiteInstance(
++        params.browser->GetProfile(), url, incognito_space);
++  } else if (routed_space.has_value()) {
+     // An engaged empty ID deliberately selects Personal, even when the
+     // current tab belongs to another account. Never repartition an old tab.
+     // Personal keeps the ordinary SiteInstance created above: the fixed
+diff --git a/chrome/browser/ui/noventra/incognito_space_host.cc b/chrome/browser/ui/noventra/incognito_space_host.cc
+new file mode 100644
+--- /dev/null
++++ b/chrome/browser/ui/noventra/incognito_space_host.cc
+@@ -0,0 +1,800 @@
++// Copyright 2026 The Noventra Authors
++#include "chrome/browser/ui/noventra/incognito_space_host.h"
++
++#include <algorithm>
++#include <map>
++#include <utility>
++
++#include "base/auto_reset.h"
++#include "base/check.h"
++#include "base/functional/bind.h"
++#include "base/functional/callback_helpers.h"
++#include "base/memory/weak_ptr.h"
++#include "base/no_destructor.h"
++#include "base/strings/string_number_conversions.h"
++#include "base/task/single_thread_task_runner.h"
++#include "base/uuid.h"
++#include "build/build_config.h"
++#include "chrome/browser/lifetime/browser_shutdown.h"
++#include "chrome/browser/prefs/incognito_mode_prefs.h"
++#include "chrome/browser/profiles/noventra_account_spaces.h"
++#include "chrome/browser/profiles/profile.h"
++#include "chrome/browser/ui/browser_commands.h"
++#include "chrome/browser/ui/browser_window.h"
++#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
++#include "chrome/browser/ui/browser_window/public/create_browser_window.h"
++#include "chrome/browser/ui/browser_window/public/global_browser_collection.h"
++#include "chrome/browser/ui/navigator/browser_navigator.h"
++#include "chrome/browser/ui/navigator/browser_navigator_params.h"
++#include "chrome/browser/ui/noventra_commands.h"
++#include "chrome/browser/ui/tabs/tab_strip_model.h"
++#include "chrome/browser/ui/views/frame/browser_native_widget.h"
++#include "chrome/browser/ui/views/frame/browser_view.h"
++#include "chrome/browser/ui/views/frame/browser_widget.h"
++#include "chrome/common/webui_url_constants.h"
++#include "components/javascript_dialogs/app_modal_dialog_queue.h"
++#include "components/policy/core/common/policy_pref_names.h"
++#include "components/tabs/public/tab_interface.h"
++#include "content/public/browser/browser_context.h"
++#include "content/public/browser/service_worker_context.h"
++#include "content/public/browser/storage_partition.h"
++#include "content/public/browser/web_contents.h"
++#include "third_party/blink/public/common/storage_key/storage_key.h"
++#include "ui/base/mojom/window_show_state.mojom.h"
++#include "ui/views/focus/focus_manager.h"
++#include "ui/views/focus/focus_manager_properties.h"
++#include "ui/views/widget/widget.h"
++
++#if defined(USE_AURA) && !BUILDFLAG(IS_CHROMEOS)
++#include "components/web_modal/web_contents_modal_dialog_manager.h"
++#include "components/web_modal/web_contents_modal_dialog_manager_delegate.h"
++#include "ui/aura/client/capture_client.h"
++#include "ui/views/widget/native_widget_aura.h"
++#include "ui/wm/core/transient_window_manager.h"
++#include "ui/wm/core/window_modality_controller.h"
++#endif
++
++namespace noventra {
++namespace {
++
++struct PrivateSpace {
++  base::WeakPtr<BrowserWindowInterface> browser;
++  std::string id;
++  std::u16string name;
++};
++
++struct Host {
++  base::WeakPtr<BrowserWindowInterface> browser;
++  std::vector<PrivateSpace> spaces;
++  base::WeakPtr<BrowserWindowInterface> selected;
++  bool close_requested = false;
++  int next_number = 1;
++};
++
++struct Creation {
++  base::WeakPtr<BrowserWindowInterface> host;
++  std::string id;
++  bool consumed = false;
++};
++
++// Retain no raw profile/partition pointer across asynchronous worker stop.
++// If the last OTR Browser closes, context destruction itself drops every
++// memory partition. Otherwise clear exactly this closed Space's partition.
++void ClearClosedPrivatePartition(Profile* profile, const std::string& id) {
++  CHECK(profile->IsOffTheRecord());
++  if (id.empty() || profile->ShutdownStarted()) {
++    return;
++  }
++  bool still_owned = false;
++  GlobalBrowserCollection::GetInstance()->ForEach(
++      [&](BrowserWindowInterface* browser) -> bool {
++        if (browser->GetProfile() == profile) {
++          auto* model = browser->GetTabStripModel();
++          for (int i = 0; model && i < model->count(); ++i) {
++            if (SpaceId(model->GetWebContentsAt(i)) == id) {
++              still_owned = true;
++              return false;
++            }
++          }
++        }
++        return true;
++      });
++  // A private tab explicitly moved to another private window still owns its
++  // original partition. Never clear data under a live consumer.
++  if (still_owned) {
++    return;
++  }
++  const auto config = SpaceConfig(profile, id);
++  auto* partition = profile->GetStoragePartition(config, /*can_create=*/false);
++  if (!partition) {
++    return;
++  }
++  partition->GetServiceWorkerContext()->StopAllServiceWorkers(base::BindOnce(
++      [](base::WeakPtr<content::BrowserContext> context,
++         content::StoragePartitionConfig config) {
++        if (!context) {
++          return;
++        }
++        if (auto* partition =
++                context->GetStoragePartition(config, /*can_create=*/false)) {
++          // The opaque StorageKey overload clears all origins in THIS
++          // partition, including cookies, workers, cache and site storage.
++          partition->ClearData(content::StoragePartition::REMOVE_DATA_MASK_ALL,
++                               blink::StorageKey(), base::Time(),
++                               base::Time::Max(), base::DoNothing());
++        }
++      },
++      static_cast<content::BrowserContext*>(profile)->GetWeakPtr(), config));
++}
++
++class IncognitoHosts {
++ public:
++  static IncognitoHosts& Get() {
++    static base::NoDestructor<IncognitoHosts> instance;
++    return *instance;
++  }
++
++  Host* Find(BrowserWindowInterface* browser) {
++    if (!browser) {
++      return nullptr;
++    }
++    for (auto& [id, host] : hosts_) {
++      if (host.browser.get() == browser ||
++          std::ranges::any_of(host.spaces, [browser](const auto& space) {
++            return space.browser.get() == browser;
++          })) {
++        return &host;
++      }
++    }
++    return nullptr;
++  }
++
++  Host& Enroll(BrowserWindowInterface* browser) {
++    auto& host = hosts_[browser->GetSessionID().id()];
++    host.browser = browser->GetWeakPtr();
++    return host;
++  }
++
++  void Select(Host& host,
++              BrowserWindowInterface* selected,
++              bool cancel_close = true) {
++    if (selecting_ || !host.browser || host.browser->IsDeleteScheduled() ||
++        (selected && selected->IsDeleteScheduled())) {
++      return;
++    }
++    base::AutoReset<bool> selecting(&selecting_, true);
++    const auto regular = host.browser;
++    const auto selected_browser = selected ? selected->GetWeakPtr() : nullptr;
++    const auto spaces = host.spaces;
++    host.selected = selected_browser;
++    if (cancel_close) {
++      host.close_requested = false;
++    }
++    // Every private BrowserView stays attached to its own widget/profile.
++    // Widget visibility changes never transfer a page between tab models.
++    auto* regular_view = BrowserView::GetBrowserViewForBrowser(regular.get());
++    if (!regular_view || !regular_view->browser_widget()) {
++      return;
++    }
++    const auto view = regular_view->GetAsWeakPtr();
++    regular_view->SetVisible(!selected_browser);
++    if (!view || !regular) {
++      return;
++    }
++    for (const auto& space : spaces) {
++      if (space.browser) {
++        auto* child =
++            BrowserView::GetBrowserViewForBrowser(space.browser.get());
++        if (child && child->browser_widget()) {
++          const bool selected = space.browser.get() == selected_browser.get();
++#if defined(USE_AURA) && !BUILDFLAG(IS_CHROMEOS)
++          // Only the selected presentation follows the host through a native
++          // hide/minimize/restore. Other Spaces must remain hidden.
++          if (auto* native = child->browser_widget()->GetNativeView()) {
++            wm::TransientWindowManager::GetOrCreate(native)
++                ->set_parent_controls_visibility(selected);
++          }
++#endif
++          if (selected) {
++            child->Show();
++          } else {
++            child->browser_widget()->Hide();
++          }
++        }
++      }
++    }
++    if (!view || !regular || !view->browser_widget()) {
++      return;
++    }
++    LayoutIncognitoSpaces(view.get());
++    // Raise the physical OS window, then activate the selected logical widget.
++    // Each complete BrowserView owns a separate focus/accelerator tree.
++    if (!view->browser_widget()->IsVisible()) {
++      view->browser_widget()->Show();
++    }
++    if (!view || !regular || !view->browser_widget()) {
++      return;
++    }
++    view->browser_widget()->Activate();
++    if (!view || !regular) {
++      return;
++    }
++    const auto active = selected_browser ? selected_browser : regular;
++    if (active) {
++      if (auto* active_view =
++              BrowserView::GetBrowserViewForBrowser(active.get());
++          active_view && active_view->browser_widget()) {
++        active_view->browser_widget()->Activate();
++      }
++      if (!active) {
++        return;
++      }
++      if (auto* contents = active->GetTabStripModel()->GetActiveWebContents()) {
++        contents->Focus();
++      }
++    }
++    changed_.Notify();
++  }
++
++  void Destroying(BrowserWindowInterface* browser) {
++    auto* host = Find(browser);
++    if (!host) {
++      return;
++    }
++    if (host->browser.get() == browser) {
++      // Native parent destruction owns the child-widget destruction. Normal
++      // close requests first run every private Browser's unload checks below.
++      hosts_.erase(browser->GetSessionID().id());
++      changed_.Notify();
++      return;
++    }
++    const auto regular = host->browser;
++    const bool selected = host->selected.get() == browser;
++    const bool finish_close = host->close_requested;
++    const auto closed =
++        std::ranges::find_if(host->spaces, [browser](const auto& space) {
++          return space.browser.get() == browser;
++        });
++    if (closed != host->spaces.end()) {
++      ClearClosedPrivatePartition(browser->GetProfile(), closed->id);
++    }
++    std::erase_if(host->spaces, [browser](const auto& space) {
++      return !space.browser || space.browser.get() == browser;
++    });
++    if (selected) {
++      host->selected.reset();
++    }
++    // Run after native close has removed the child surface and finished any
++    // tab-model notification. A weak host cannot revive a destroying window.
++    base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
++        FROM_HERE,
++        base::BindOnce(
++            [](base::WeakPtr<BrowserWindowInterface> regular, bool selected,
++               bool finish_close) {
++              if (!regular || regular->IsDeleteScheduled()) {
++                return;
++              }
++              auto& self = Get();
++              auto* host = self.Find(regular.get());
++              if (!host) {
++                return;
++              }
++              if (finish_close) {
++                if (host->spaces.empty()) {
++                  self.Select(*host, nullptr, /*cancel_close=*/false);
++                }
++                if (regular) {
++                  regular->GetWindow()->Close();
++                }
++              } else if (selected) {
++                self.Select(*host, nullptr);
++                if (regular->GetTabStripModel()->empty()) {
++                  chrome::NewTab(regular.get(), NewTabTypes::kNoUserAction);
++                }
++              }
++              self.changed_.Notify();
++            },
++            regular, selected, finish_close));
++    changed_.Notify();
++  }
++
++  Creation* creating_ = nullptr;
++  bool selecting_ = false;
++  base::RepeatingClosureList changed_;
++
++ private:
++  std::map<int, Host> hosts_;
++};
++
++#if defined(USE_AURA) && !BUILDFLAG(IS_CHROMEOS)
++// BrowserNativeWidgetAura is a DESKTOP widget and creates a new OS host.
++// This adapter uses NativeWidgetAura on the existing desktop Aura root, with a
++// transient ownership relation to the regular widget. It is a logical top-level
++// Widget so that its complete BrowserView owns focus/IME state through
++// teardown. No DesktopNativeWidgetAura or additional OS window is created.
++class PrivateNativeWidget : public views::NativeWidgetAura,
++                            public BrowserNativeWidget {
++ public:
++  PrivateNativeWidget(BrowserWidget* widget,
++                      BrowserView* host,
++                      base::WeakPtr<BrowserWindowInterface> owner)
++      : views::NativeWidgetAura(widget),
++        host_(host->GetAsWeakPtr()),
++        owner_(std::move(owner)) {}
++
++  void InitNativeWidget(views::Widget::InitParams params) override {
++    const auto widget = GetWidget()->GetWeakPtr();
++    views::NativeWidgetAura::InitNativeWidget(std::move(params));
++    if (widget) {
++      // The native parent embeds an independent Browser/FocusManager, rather
++      // than an auxiliary bubble. Keep its accelerator fallback in this root.
++      widget->SetNativeWindowProperty(views::kSkipParentAcceleratorFallbackKey,
++                                      widget.get());
++    }
++  }
++
++  void Activate() override {
++    if (CanActivatePrivatePresentation()) {
++      views::NativeWidgetAura::Activate();
++    }
++  }
++  bool ShouldActivate() const override {
++    return CanActivatePrivatePresentation() &&
++           views::NativeWidgetAura::ShouldActivate();
++  }
++
++  views::Widget::InitParams GetWidgetParams(
++      views::Widget::InitParams::Ownership ownership) override {
++    CHECK(host_ && host_->GetWidget());
++    views::Widget::InitParams params(ownership);
++    params.native_widget = this;
++    params.type = views::Widget::InitParams::TYPE_WINDOW;
++    params.parent = host_->GetWidget()->GetNativeView();
++    params.child = false;
++    params.remove_standard_frame = true;
++    params.bounds = host_->GetBoundsInScreen();
++    return params;
++  }
++  bool UseCustomFrame() const override { return true; }
++  bool UsesNativeSystemMenu() const override { return false; }
++  bool ShouldSaveWindowPlacement() const override { return false; }
++  void GetWindowPlacement(gfx::Rect* bounds,
++                          ui::mojom::WindowShowState* state) const override {
++    *bounds = GetWidget()->GetWindowBoundsInScreen();
++    *state = ui::mojom::WindowShowState::kNormal;
++  }
++  content::KeyboardEventProcessingResult PreHandleKeyboardEvent(
++      const input::NativeWebKeyboardEvent&) override {
++    return content::KeyboardEventProcessingResult::NOT_HANDLED;
++  }
++  bool HandleKeyboardEvent(const input::NativeWebKeyboardEvent&) override {
++    return false;
++  }
++  bool ShouldRestorePreviousBrowserWidgetState() const override {
++    return false;
++  }
++  bool ShouldUseInitialVisibleOnAllWorkspaces() const override { return false; }
++  bool IsMoveLoopSupported() const override {
++    return host_ && host_->browser_widget() &&
++           host_->browser_widget()->IsMoveLoopSupported();
++  }
++  views::Widget::MoveLoopResult RunMoveLoop(
++      const gfx::Vector2d& drag_offset,
++      views::Widget::MoveLoopSource source,
++      views::Widget::MoveLoopEscapeBehavior escape_behavior) override {
++    return host_ && host_->browser_widget()
++               ? host_->browser_widget()->RunMoveLoop(drag_offset, source,
++                                                      escape_behavior)
++               : views::Widget::MoveLoopResult::kCanceled;
++  }
++  void EndMoveLoop() override {
++    if (host_ && host_->browser_widget()) {
++      host_->browser_widget()->EndMoveLoop();
++    }
++  }
++
++ private:
++  bool CanActivatePrivatePresentation() const {
++    if (!owner_ || !host_ || owner_->IsDeleteScheduled()) {
++      return false;
++    }
++    auto* regular = IncognitoSpaceHost(owner_.get());
++    if (!regular || regular->IsDeleteScheduled() ||
++        regular != host_->browser() ||
++        SelectedIncognitoBrowser(owner_.get()) != owner_.get()) {
++      return false;
++    }
++    auto* physical = host_->browser_widget();
++    auto* native = physical ? physical->browser_native_widget() : nullptr;
++    // Leave pending FocusManager state for the user's return to the physical
++    // OS window and selected Space; never raise that window here.
++    return physical && physical->IsVisible() && !physical->IsClosed() &&
++           !physical->IsMinimized() && native &&
++           native->IsPhysicalWindowActive();
++  }
++
++  base::WeakPtr<BrowserView> host_;
++  base::WeakPtr<BrowserWindowInterface> owner_;
++};
++#endif
++
++}  // namespace
++
++BrowserWindowInterface* IncognitoSpaceHost(BrowserWindowInterface* browser) {
++  auto* host = IncognitoHosts::Get().Find(browser);
++  return host ? host->browser.get() : nullptr;
++}
++
++std::string IncognitoSpaceId(BrowserWindowInterface* browser) {
++  if (auto* host = IncognitoHosts::Get().Find(browser)) {
++    for (const auto& space : host->spaces) {
++      if (space.browser.get() == browser) {
++        return space.id;
++      }
++    }
++  }
++  return {};
++}
++
++std::vector<IncognitoSpaceEntry> IncognitoSpaces(
++    BrowserWindowInterface* browser) {
++  std::vector<IncognitoSpaceEntry> entries;
++  if (auto* host = IncognitoHosts::Get().Find(browser)) {
++    for (const auto& space : host->spaces) {
++      if (space.browser && !space.browser->IsDeleteScheduled()) {
++        entries.push_back({space.id, space.name});
++      }
++    }
++  }
++  return entries;
++}
++
++BrowserWindowInterface* SelectedIncognitoBrowser(
++    BrowserWindowInterface* browser) {
++  if (auto* host = IncognitoHosts::Get().Find(browser)) {
++    return host->selected ? host->selected.get() : host->browser.get();
++  }
++  return nullptr;
++}
++
++bool IncognitoPresentationIsSelected(BrowserWindowInterface* browser) {
++  auto* selected = SelectedIncognitoBrowser(browser);
++  return !selected || selected == browser;
++}
++
++BrowserWindowInterface* IncognitoSpaceTarget(BrowserWindowInterface* browser,
++                                             const std::string& id) {
++  auto* host = IncognitoHosts::Get().Find(browser);
++  if (!host || !host->browser) {
++    return nullptr;
++  }
++  for (const auto& space : host->spaces) {
++    if (space.id == id && space.browser) {
++      return space.browser.get();
++    }
++  }
++  const auto ids = SpaceIds(host->browser.get());
++  return std::ranges::find(ids, id) != ids.end() ? host->browser.get()
++                                                 : nullptr;
++}
++
++void ShowIncognitoPresentation(BrowserWindowInterface* browser) {
++  auto& self = IncognitoHosts::Get();
++  if (auto* host = self.Find(browser)) {
++    self.Select(*host, host->browser.get() == browser ? nullptr : browser,
++                /*cancel_close=*/false);
++  }
++}
++
++bool DispatchIncognitoHostActivation(BrowserWindowInterface* browser,
++                                     bool active) {
++  auto* host = IncognitoHosts::Get().Find(browser);
++  if (!host || host->browser.get() != browser) {
++    return false;
++  }
++  const auto selected = host->selected;
++  // OS activation first activates the desktop content widget. Restore the
++  // selected private Aura widget, whose own native activation notifications
++  // restore its focus manager and enable its accelerators. Do not translate a
++  // regular Aura deactivation into private deactivation: selecting a private
++  // root child itself deactivates the regular content window.
++  if (active && selected && !selected->IsDeleteScheduled()) {
++    if (auto* child = BrowserView::GetBrowserViewForBrowser(selected.get());
++        child && child->browser_widget() &&
++        !child->browser_widget()->IsClosed()) {
++      child->browser_widget()->Activate();
++    }
++  }
++  return !!selected;
++}
++
++void RestoreIncognitoFocusAfterModal(content::WebContents* contents) {
++  if (!contents) {
++    return;
++  }
++  auto* browser =
++      GlobalBrowserCollection::GetInstance()->FindBrowserWithTab(contents);
++  auto* host = IncognitoHosts::Get().Find(browser);
++  if (!browser || !host || host->selected.get() != browser ||
++      IncognitoSpaceId(browser).empty()) {
++    return;
++  }
++  // WindowClosing runs while the modal/widget and event blocker are still
++  // unwinding. Restore on the next UI task, retaining no raw view/window.
++  base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
++      FROM_HERE,
++      base::BindOnce(
++          [](base::WeakPtr<BrowserWindowInterface> regular,
++             base::WeakPtr<BrowserWindowInterface> selected) {
++            if (!regular || !selected || regular->IsDeleteScheduled() ||
++                selected->IsDeleteScheduled()) {
++              return;
++            }
++            auto* host = IncognitoHosts::Get().Find(regular.get());
++            if (!host || host->browser.get() != regular.get() ||
++                host->selected.get() != selected.get() ||
++                host->close_requested ||
++                selected->GetTabStripModel()->empty() ||
++                javascript_dialogs::AppModalDialogQueue::GetInstance()
++                    ->HasActiveDialog()) {
++              return;
++            }
++            auto* regular_view =
++                BrowserView::GetBrowserViewForBrowser(regular.get());
++            auto* physical =
++                regular_view ? regular_view->browser_widget() : nullptr;
++            auto* native =
++                physical ? physical->browser_native_widget() : nullptr;
++            if (!physical || !physical->IsVisible() ||
++                physical->IsMinimized() || !native ||
++                !native->IsPhysicalWindowActive()) {
++              return;
++            }
++            auto* child = BrowserView::GetBrowserViewForBrowser(selected.get());
++            if (!child || !child->browser_widget() ||
++                !child->browser_widget()->IsVisible() ||
++                child->browser_widget()->IsClosed()) {
++              return;
++            }
++#if defined(USE_AURA) && !BUILDFLAG(IS_CHROMEOS)
++            auto* active_contents =
++                selected->GetTabStripModel()->GetActiveWebContents();
++            if (!active_contents) {
++              return;
++            }
++            // Closing one modal can leave the physical regular root active
++            // while the selected private tab already has its next modal.
++            // Focus that current dialog directly, without restoring browser
++            // or omnibox focus over it. Leave healthy roots and capture alone.
++            if (!child->browser_widget()->IsActive() && physical->IsActive() &&
++                !aura::client::GetCaptureWindow(physical->GetNativeView())) {
++              auto* modal =
++                  web_modal::WebContentsModalDialogManager::FromWebContents(
++                      active_contents);
++              if (modal && modal->IsDialogActive() && modal->delegate() &&
++                  modal->delegate()->IsWebContentsVisible(active_contents)) {
++                modal->FocusTopmostDialog();
++                return;
++              }
++            }
++#endif
++            // A child-modal dialog belongs to the active tab's contents,
++            // rather than the private widget root. Respect its modal token
++            // even when the app-modal queue and root transient check are empty.
++            auto* active_tab = selected->GetTabStripModel()->GetActiveTab();
++            if (!active_tab || !active_tab->CanShowModalUI()) {
++              return;
++            }
++#if defined(USE_AURA) && !BUILDFLAG(IS_CHROMEOS)
++            if (wm::GetModalTransient(active_contents->GetNativeView())) {
++              return;
++            }
++#endif
++            const auto view = child->GetAsWeakPtr();
++            // NativeWidgetAura::Activate stays inside the already-active OS
++            // host. Its activation callback re-enables the private shortcuts.
++            child->browser_widget()->Activate();
++            if (!view || !regular || !selected ||
++                selected->IsDeleteScheduled() ||
++                !IncognitoPresentationIsSelected(selected.get())) {
++              return;
++            }
++            regular_view = BrowserView::GetBrowserViewForBrowser(regular.get());
++            physical = regular_view ? regular_view->browser_widget() : nullptr;
++            native = physical ? physical->browser_native_widget() : nullptr;
++            if (!native || !native->IsPhysicalWindowActive()) {
++              return;
++            }
++            // Activation observers may synchronously open another tab modal.
++            active_tab = selected->GetTabStripModel()->GetActiveTab();
++            if (!active_tab || !active_tab->CanShowModalUI() ||
++                javascript_dialogs::AppModalDialogQueue::GetInstance()
++                    ->HasActiveDialog()) {
++              return;
++            }
++#if defined(USE_AURA) && !BUILDFLAG(IS_CHROMEOS)
++            active_contents =
++                selected->GetTabStripModel()->GetActiveWebContents();
++            if (!active_contents ||
++                wm::GetModalTransient(active_contents->GetNativeView())) {
++              return;
++            }
++#endif
++            if (auto* focus = view->GetFocusManager();
++                !focus || !focus->RestoreFocusedView()) {
++              if (auto* active =
++                      selected->GetTabStripModel()->GetActiveWebContents()) {
++                active->RestoreFocus();
++              }
++            }
++          },
++          host->browser, browser->GetWeakPtr()));
++}
++
++bool SelectIncognitoSpace(BrowserWindowInterface* browser,
++                          const std::string& id) {
++  if (!IncognitoSpaceHost(browser)) {
++    return false;
++  }
++  SwitchSpace(browser, id);
++  return true;
++}
++
++base::CallbackListSubscription ObserveIncognitoSpaces(
++    base::RepeatingClosure callback) {
++  return IncognitoHosts::Get().changed_.Add(std::move(callback));
++}
++
++BrowserNativeWidget* MaybeCreateIncognitoNativeWidget(BrowserWidget* widget,
++                                                      BrowserView* view) {
++#if defined(USE_AURA) && !BUILDFLAG(IS_CHROMEOS)
++  auto& self = IncognitoHosts::Get();
++  auto* creation = self.creating_;
++  if (!creation || creation->consumed || !creation->host ||
++      view->browser()->GetType() != BrowserWindowInterface::TYPE_NORMAL ||
++      !view->GetProfile()->IsIncognitoProfile() ||
++      view->GetProfile()->GetOriginalProfile() !=
++          creation->host->GetProfile()->GetOriginalProfile()) {
++    return nullptr;
++  }
++  auto* host_view = BrowserView::GetBrowserViewForBrowser(creation->host.get());
++  CHECK(host_view && host_view->GetWidget());
++  creation->consumed = true;
++  auto& host = self.Enroll(creation->host.get());
++  const auto name = host.next_number++;
++  host.spaces.push_back({view->browser()->GetWeakPtr(), creation->id,
++                         name == 1
++                             ? u"Incognito"
++                             : u"Incognito " + base::NumberToString16(name)});
++  return new PrivateNativeWidget(widget, host_view,
++                                 view->browser()->GetWeakPtr());
++#else
++  return nullptr;
++#endif
++}
++
++BrowserWindowInterface* CreateIncognitoSpace(BrowserWindowInterface* source,
++                                             bool add_initial_tab) {
++#if defined(USE_AURA) && !BUILDFLAG(IS_CHROMEOS)
++  if (!source) {
++    return nullptr;
++  }
++  auto* regular = IncognitoSpaceHost(source);
++  if (!regular) {
++    regular = source;
++  }
++  if (regular->GetProfile()->IsOffTheRecord() ||
++      regular->GetProfile()->IsGuestSession() ||
++      regular->GetProfile()->ShutdownStarted() ||
++      regular->IsDeleteScheduled() ||
++      regular->GetType() != BrowserWindowInterface::TYPE_NORMAL ||
++      IncognitoModePrefs::GetAvailability(regular->GetProfile()) ==
++          policy::IncognitoModeAvailability::kDisabled) {
++    return nullptr;
++  }
++  auto* view = BrowserView::GetBrowserViewForBrowser(regular);
++  if (!view || !view->GetWidget() || view->GetWidget()->IsClosed()) {
++    return nullptr;
++  }
++  auto& self = IncognitoHosts::Get();
++  Creation creation{regular->GetWeakPtr(),
++                    base::Uuid::GenerateRandomV4().AsLowercaseString()};
++  base::AutoReset<Creation*> scoped_creation(&self.creating_, &creation);
++  auto* profile = regular->GetProfile()->GetPrimaryOTRProfile(true);
++  BrowserWindowCreateParams params(BrowserWindowInterface::TYPE_NORMAL, profile,
++                                   true);
++  params.should_trigger_session_restore = false;
++  params.omit_from_session_restore = true;
++  auto* browser = CreateBrowserWindow(std::move(params));
++  CHECK_EQ(IncognitoSpaceHost(browser), regular);
++  if (add_initial_tab) {
++    const GURL url(chrome::kChromeUINewTabURL);
++    NavigateParams navigate(browser, url, ui::PAGE_TRANSITION_AUTO_TOPLEVEL);
++    navigate.disposition = WindowOpenDisposition::NEW_FOREGROUND_TAB;
++    Navigate(&navigate);
++  }
++  self.Select(*self.Find(browser), browser);
++  browser->GetWindow()->Show();
++  chrome::FocusLocationBar(browser);
++  self.changed_.Notify();
++  return browser;
++#else
++  // Unsupported native backends retain genuine Chromium incognito windows;
++  // they never put private pages into a regular model as a cosmetic fallback.
++  return nullptr;
++#endif
++}
++
++bool CreateIncognitoSpaceForProfile(Profile* profile) {
++  if (!profile) {
++    return false;
++  }
++  BrowserWindowInterface* source = nullptr;
++  GlobalBrowserCollection::GetInstance()->ForEach(
++      [&](BrowserWindowInterface* browser) {
++        if (browser->GetProfile()->GetOriginalProfile() ==
++                profile->GetOriginalProfile() &&
++            browser->GetType() == BrowserWindowInterface::TYPE_NORMAL &&
++            (!browser->GetProfile()->IsOffTheRecord() ||
++             IncognitoSpaceHost(browser))) {
++          source = browser;
++          return false;
++        }
++        return true;
++      },
++      BrowserCollection::Order::kActivation);
++  return CreateIncognitoSpace(source) != nullptr;
++}
++
++void LayoutIncognitoSpaces(BrowserView* host_view) {
++  auto* host = IncognitoHosts::Get().Find(host_view->browser());
++  if (!host || host->browser.get() != host_view->browser() ||
++      !host_view->GetWidget()) {
++    return;
++  }
++  const gfx::Rect bounds = host_view->GetBoundsInScreen();
++  for (const auto& space : host->spaces) {
++    if (space.browser) {
++      auto* view = BrowserView::GetBrowserViewForBrowser(space.browser.get());
++      if (view && view->browser_widget() &&
++          !view->browser_widget()->IsClosed()) {
++        view->browser_widget()->SetBounds(bounds);
++      }
++    }
++  }
++}
++
++bool PrepareIncognitoHostClose(BrowserWindowInterface* browser) {
++  auto* host = IncognitoHosts::Get().Find(browser);
++  if (!host || host->browser.get() != browser || host->spaces.empty()) {
++    return true;
++  }
++  // Sequential closing preserves each private page's beforeunload/download
++  // checks. Show the child so that any cancellation prompt has a visible host.
++  const auto child =
++      host->selected ? host->selected : host->spaces.back().browser;
++  if (child) {
++    IncognitoHosts::Get().Select(*host, child.get());
++    host->close_requested = true;
++    child->GetWindow()->Close();
++  }
++  return false;
++}
++
++bool KeepEmptyIncognitoHost(BrowserWindowInterface* browser) {
++  auto* host = IncognitoHosts::Get().Find(browser);
++  return host && host->browser.get() == browser && !host->spaces.empty() &&
++         !host->close_requested && !browser_shutdown::IsTryingToQuit();
++}
++
++void IncognitoWindowCloseCancelled(BrowserWindowInterface* browser) {
++  if (auto* host = IncognitoHosts::Get().Find(browser)) {
++    host->close_requested = false;
++  }
++}
++
++void IncognitoBrowserViewDestroying(BrowserWindowInterface* browser) {
++  IncognitoHosts::Get().Destroying(browser);
++}
++
++}  // namespace noventra
+diff --git a/chrome/browser/ui/noventra/incognito_space_host.h b/chrome/browser/ui/noventra/incognito_space_host.h
+new file mode 100644
+--- /dev/null
++++ b/chrome/browser/ui/noventra/incognito_space_host.h
+@@ -0,0 +1,71 @@
++// Copyright 2026 The Noventra Authors
++#ifndef CHROME_BROWSER_UI_NOVENTRA_INCOGNITO_SPACE_HOST_H_
++#define CHROME_BROWSER_UI_NOVENTRA_INCOGNITO_SPACE_HOST_H_
++
++#include <string>
++#include <vector>
++
++#include "base/callback_list.h"
++#include "base/functional/callback_forward.h"
++
++class BrowserNativeWidget;
++class BrowserView;
++class BrowserWidget;
++class BrowserWindowInterface;
++class Profile;
++
++namespace content {
++class WebContents;
++}
++
++namespace noventra {
++
++// An Incognito Space owns a complete off-the-record Browser and tab model.
++// Its logical top-level widget shares the regular window's desktop Aura root;
++// it owns focus/IME state without creating a second OS window.
++// These identities and labels exist only while that private Browser is alive.
++struct IncognitoSpaceEntry {
++  std::string id;
++  std::u16string name;
++};
++
++BrowserWindowInterface* CreateIncognitoSpace(BrowserWindowInterface* source,
++                                             bool add_initial_tab = true);
++bool CreateIncognitoSpaceForProfile(Profile* profile);
++BrowserWindowInterface* IncognitoSpaceHost(BrowserWindowInterface* browser);
++BrowserWindowInterface* SelectedIncognitoBrowser(
++    BrowserWindowInterface* browser);
++BrowserWindowInterface* IncognitoSpaceTarget(BrowserWindowInterface* browser,
++                                             const std::string& id);
++bool IncognitoPresentationIsSelected(BrowserWindowInterface* browser);
++// Selection changes logical presentation, raising the physical window before
++// activating the selected logical widget and its independent FocusManager.
++void ShowIncognitoPresentation(BrowserWindowInterface* browser);
++bool DispatchIncognitoHostActivation(BrowserWindowInterface* browser,
++                                     bool active);
++// JS modal dismissal can leave a root-sibling private widget inactive while
++// the OS host stays active. Restore only the same selected live presentation,
++// after the dialog teardown, and never activate an inactive physical window.
++void RestoreIncognitoFocusAfterModal(content::WebContents* contents);
++std::string IncognitoSpaceId(BrowserWindowInterface* browser);
++std::vector<IncognitoSpaceEntry> IncognitoSpaces(
++    BrowserWindowInterface* browser);
++// A private identity selects its own Browser. A regular identity returns to
++// the regular model without moving or reparenting any tab across profiles.
++bool SelectIncognitoSpace(BrowserWindowInterface* browser,
++                          const std::string& id);
++base::CallbackListSubscription ObserveIncognitoSpaces(
++    base::RepeatingClosure callback);
++
++// Browser-widget integration. The native factory returns null outside a
++// supported, explicitly scoped private-space creation.
++BrowserNativeWidget* MaybeCreateIncognitoNativeWidget(BrowserWidget* widget,
++                                                      BrowserView* view);
++void LayoutIncognitoSpaces(BrowserView* host_view);
++bool PrepareIncognitoHostClose(BrowserWindowInterface* browser);
++bool KeepEmptyIncognitoHost(BrowserWindowInterface* browser);
++void IncognitoBrowserViewDestroying(BrowserWindowInterface* browser);
++void IncognitoWindowCloseCancelled(BrowserWindowInterface* browser);
++
++}  // namespace noventra
++#endif
+diff --git a/chrome/browser/ui/noventra/workspace_routes.cc b/chrome/browser/ui/noventra/workspace_routes.cc
+--- a/chrome/browser/ui/noventra/workspace_routes.cc
++++ b/chrome/browser/ui/noventra/workspace_routes.cc
+@@ -137,7 +137,7 @@
+   if (!canonical.has_value()) {
+     return base::unexpected(canonical.error());
+   }
+-  const auto ids = SpaceIds(browser);
++  const auto ids = SpaceIds(browser, /*include_archived=*/true);
+   if (std::ranges::find(ids, space_id) == ids.end() ||
+       IsSpaceArchived(browser->GetProfile(), space_id)) {
+     return base::unexpected("Choose an existing, non-archived space.");
+@@ -196,7 +196,7 @@
+       IsSpaceArchived(browser->GetProfile(), route->space_id)) {
+     return std::nullopt;
+   }
+-  const auto ids = SpaceIds(browser);
++  const auto ids = SpaceIds(browser, /*include_archived=*/true);
+   if (std::ranges::find(ids, route->space_id) == ids.end()) {
+     return std::nullopt;
+   }
+diff --git a/chrome/browser/ui/noventra_commands.h b/chrome/browser/ui/noventra_commands.h
+--- a/chrome/browser/ui/noventra_commands.h
++++ b/chrome/browser/ui/noventra_commands.h
+@@ -34,10 +34,13 @@
+ inline constexpr int IDC_NOVENTRA_SELECT_SPACE_8 = 57017;
+ inline constexpr int IDC_NOVENTRA_GRID_SPLIT = 57018;
+ namespace noventra {
+-// All consumers share this saved order. Archived spaces retain their positions
+-// but are omitted unless explicitly requested. Personal has the empty ID.
++// Visible navigation appends live temporary private Spaces to the saved order.
++// include_archived returns persistent metadata ONLY, for Settings/export/routes;
++// private identities must never be serialized. Personal has the empty ID.
+ std::vector<std::string> SpaceIds(BrowserWindowInterface* browser,
+                                   bool include_archived = false);
++// The selected logical Browser is authoritative for temporary private Spaces.
++std::string CurrentSpaceId(BrowserWindowInterface* browser);
+ bool IsSpaceArchived(Profile* profile, const std::string& id);
+ bool CanManageSpaces(Profile* profile);
+ // Appearance is account-neutral display metadata. Invalid stored choices fall
+diff --git a/chrome/browser/ui/unload_controller.cc b/chrome/browser/ui/unload_controller.cc
+--- a/chrome/browser/ui/unload_controller.cc
++++ b/chrome/browser/ui/unload_controller.cc
+@@ -1,3 +1,4 @@
++#include "chrome/browser/ui/noventra/incognito_space_host.h"
+ #include "chrome/browser/ui/noventra/window_mirror_service.h"
+ // Copyright 2012 The Chromium Authors
+ // Use of this source code is governed by a BSD-style license that can be
+@@ -565,6 +566,7 @@
+ }
+ 
+ void UnloadController::CancelWindowClose() {
++  noventra::IncognitoWindowCloseCancelled(browser_);
+   if (auto* mirror = noventra::WindowMirrorService::GetForProfileIfExisting(
+           browser_->GetProfile())) {
+     mirror->WindowCloseCancelled(browser_);
+diff --git a/chrome/browser/ui/views/chrome_javascript_app_modal_view_factory_views.cc b/chrome/browser/ui/views/chrome_javascript_app_modal_view_factory_views.cc
+--- a/chrome/browser/ui/views/chrome_javascript_app_modal_view_factory_views.cc
++++ b/chrome/browser/ui/views/chrome_javascript_app_modal_view_factory_views.cc
+@@ -7,6 +7,7 @@
+ #include "build/build_config.h"
+ #include "chrome/browser/ui/blocked_content/popunder_preventer.h"
+ #include "chrome/browser/ui/javascript_dialogs/chrome_javascript_app_modal_dialog_view_factory.h"
++#include "chrome/browser/ui/noventra/incognito_space_host.h"
+ #include "chrome/browser/ui/views/javascript_app_modal_event_blocker.h"
+ #include "components/constrained_window/constrained_window_views.h"
+ #include "components/javascript_dialogs/app_modal_dialog_controller.h"
+@@ -69,7 +70,10 @@
+   }
+ 
+   // views::DialogDelegate:
+-  void WindowClosing() override { event_blocker_.reset(); }
++  void WindowClosing() override {
++    event_blocker_.reset();
++    noventra::RestoreIncognitoFocusAfterModal(controller()->web_contents());
++  }
+ 
+  private:
+   // Blocks events to other browser windows while the dialog is open.
+diff --git a/chrome/browser/ui/views/frame/browser_frame_view_factory_views.cc b/chrome/browser/ui/views/frame/browser_frame_view_factory_views.cc
+--- a/chrome/browser/ui/views/frame/browser_frame_view_factory_views.cc
++++ b/chrome/browser/ui/views/frame/browser_frame_view_factory_views.cc
+@@ -3,6 +3,8 @@
+ // found in the LICENSE file.
+ 
+ #include <memory>
++
++#include "chrome/browser/ui/noventra/incognito_space_host.h"
+ 
+ #include "build/build_config.h"
+ #include "chrome/browser/themes/theme_service.h"
+@@ -120,6 +122,12 @@
+ std::unique_ptr<BrowserFrameView> CreateBrowserFrameView(
+     BrowserWidget* widget,
+     BrowserView* browser_view) {
++  if (!noventra::IncognitoSpaceId(browser_view->browser()).empty()) {
++    auto frame = std::make_unique<OpaqueBrowserFrameView>(
++        widget, browser_view, new OpaqueBrowserFrameViewLayout());
++    frame->InitViews();
++    return frame;
++  }
+ #if BUILDFLAG(IS_WIN)
+   return CreateBrowserFrameViewWin(widget, browser_view);
+ #else
+diff --git a/chrome/browser/ui/views/frame/browser_native_widget.h b/chrome/browser/ui/views/frame/browser_native_widget.h
+--- a/chrome/browser/ui/views/frame/browser_native_widget.h
++++ b/chrome/browser/ui/views/frame/browser_native_widget.h
+@@ -69,6 +69,10 @@
+   // On the other OSes, it returns true to apply the initial value.
+   virtual bool ShouldUseInitialVisibleOnAllWorkspaces() const = 0;
+ 
++  // Actual OS window activity, independent of which Aura child is active.
++  // Unsupported/non-desktop native widgets must not request OS reactivation.
++  virtual bool IsPhysicalWindowActive() const { return false; }
++
+   // Called when the tab drag kind for this frame changes.
+   virtual void TabDraggingKindChanged(TabDragKind tab_drag_kind) {}
+ 
+diff --git a/chrome/browser/ui/views/frame/browser_native_widget_aura.cc b/chrome/browser/ui/views/frame/browser_native_widget_aura.cc
+--- a/chrome/browser/ui/views/frame/browser_native_widget_aura.cc
++++ b/chrome/browser/ui/views/frame/browser_native_widget_aura.cc
+@@ -12,6 +12,7 @@
+ #include "ui/aura/window_observer.h"
+ #include "ui/base/mojom/window_show_state.mojom.h"
+ #include "ui/views/view.h"
++#include "ui/views/widget/desktop_aura/desktop_window_tree_host.h"
+ #include "ui/views/widget/widget.h"
+ #include "ui/wm/core/visibility_controller.h"
+ 
+@@ -124,6 +125,12 @@
+   return true;
+ }
+ 
++bool BrowserNativeWidgetAura::IsPhysicalWindowActive() const {
++  return browser_widget_ && browser_desktop_window_tree_host_ &&
++         browser_desktop_window_tree_host_->AsDesktopWindowTreeHost()
++             ->IsActive();
++}
++
+ void BrowserNativeWidgetAura::ClientDestroyedWidget() {
+   browser_widget_ = nullptr;
+   browser_view_ = nullptr;
+diff --git a/chrome/browser/ui/views/frame/browser_native_widget_aura.h b/chrome/browser/ui/views/frame/browser_native_widget_aura.h
+--- a/chrome/browser/ui/views/frame/browser_native_widget_aura.h
++++ b/chrome/browser/ui/views/frame/browser_native_widget_aura.h
+@@ -64,6 +64,7 @@
+   bool HandleKeyboardEvent(const input::NativeWebKeyboardEvent& event) override;
+   bool ShouldRestorePreviousBrowserWidgetState() const override;
+   bool ShouldUseInitialVisibleOnAllWorkspaces() const override;
++  bool IsPhysicalWindowActive() const override;
+   void ClientDestroyedWidget() override;
+ 
+  private:
+diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
+--- a/chrome/browser/ui/views/frame/browser_view.cc
++++ b/chrome/browser/ui/views/frame/browser_view.cc
+@@ -1,3 +1,4 @@
++#include "chrome/browser/ui/noventra/incognito_space_host.h"
+ #include "chrome/browser/lifetime/browser_shutdown.h"
+ #include "chrome/browser/ui/views/frame/noventra_window_mirror_view.h"
+ #include "chrome/browser/ui/noventra/window_mirror_service.h"
+@@ -1241,6 +1242,7 @@
+ }
+ 
+ BrowserView::~BrowserView() {
++  noventra::IncognitoBrowserViewDestroying(browser_);
+   noventra_window_mirror_.reset();
+   noventra_dock_controller_.reset();
+   if (browser_shortcut_service_) {
+@@ -1313,21 +1315,27 @@
+ // static
+ BrowserWindow* BrowserWindow::FindBrowserWindowWithWebContents(
+     content::WebContents* web_contents) {
+-  // Check first to see if the we can find a top level widget for the
+-  // `web_contents`. This covers the case of searching for the browser window
+-  // associated with a non-tab contents and the active tab contents. Fall back
+-  // to searching the tab strip model for a tab contents match. This later
+-  // search is necessary as a tab contents can be swapped out of the browser
+-  // window's ContentWebView on a tab switch and may disassociate with its top
+-  // level NativeView.
++  // Logical tab ownership carries the BrowserContext. A private child shares
++  // an OS top-level with a regular Browser, so that top-level is not its owner.
++  if (const auto* browser =
++          GlobalBrowserCollection::GetInstance()->FindBrowserWithTab(web_contents)) {
++    return BrowserView::GetBrowserViewForBrowser(browser);
++  }
++#if defined(USE_AURA)
++  // Non-tab contents (previews and bubbles) can also belong to a private
++  // child. Find the nearest logical BrowserWidget before the physical root.
++  for (auto* window = web_contents->GetNativeView(); window;
++       window = window->parent()) {
++    if (auto* view = BrowserView::GetBrowserViewForNativeWindow(window)) {
++      return view;
++    }
++  }
++#endif
+   if (const auto* widget = views::Widget::GetTopLevelWidgetForNativeView(
+           web_contents->GetNativeView())) {
+-    return BrowserView::GetBrowserViewForNativeWindow(
+-        widget->GetNativeWindow());
+-  }
+-  const auto* browser =
+-      GlobalBrowserCollection::GetInstance()->FindBrowserWithTab(web_contents);
+-  return browser ? BrowserView::GetBrowserViewForBrowser(browser) : nullptr;
++    return BrowserView::GetBrowserViewForNativeWindow(widget->GetNativeWindow());
++  }
++  return nullptr;
+ }
+ 
+ // static
+@@ -2429,6 +2437,7 @@
+   if (browser_widget_->IsClosed()) {
+     return;
+   }
++  noventra::ShowIncognitoPresentation(browser_);
+ 
+   if (auto* manager = InitialWebUIManager::From(browser())) {
+     if (manager->RequestDeferShow(base::BindOnce(
+@@ -2504,6 +2513,11 @@
+ }
+ 
+ void BrowserView::SetBounds(const gfx::Rect& bounds) {
++  auto* host = noventra::IncognitoSpaceHost(browser_);
++  if (host && host != browser_) {
++    host->GetWindow()->SetBounds(bounds);
++    return;
++  }
+   if (BrowserWindowFullscreenController::From(browser())->IsForceFullscreen()) {
+     return;
+   }
+@@ -2534,6 +2548,7 @@
+     // to continue.
+     return;
+   }
++  noventra::ShowIncognitoPresentation(browser_);
+ 
+   if (auto* manager = InitialWebUIManager::From(browser())) {
+     if (manager->RequestDeferShow(base::BindOnce(
+@@ -2551,23 +2566,24 @@
+ }
+ 
+ void BrowserView::Deactivate() {
+-  browser_widget_->Deactivate();
++  GetTopLevelBrowserWidget()->Deactivate();
+ }
+ 
+ bool BrowserView::IsActive() const {
+-  return browser_widget_->IsActive();
++  return noventra::IncognitoPresentationIsSelected(browser_) &&
++         browser_widget_->IsActive();
+ }
+ 
+ void BrowserView::FlashFrame(bool flash) {
+-  browser_widget_->FlashFrame(flash);
++  GetTopLevelBrowserWidget()->FlashFrame(flash);
+ }
+ 
+ ui::ZOrderLevel BrowserView::GetZOrderLevel() const {
+-  return browser_widget_->GetZOrderLevel();
++  return GetTopLevelBrowserWidget()->GetZOrderLevel();
+ }
+ 
+ void BrowserView::SetZOrderLevel(ui::ZOrderLevel level) {
+-  browser_widget_->SetZOrderLevel(level);
++  GetTopLevelBrowserWidget()->SetZOrderLevel(level);
+ }
+ 
+ gfx::NativeWindow BrowserView::GetNativeWindow() const {
+@@ -2814,7 +2830,7 @@
+                             !tab_change_in_split_view;
+ #else
+   bool will_restore_focus =
+-      !browser_->GetTabStripModel()->closing_all() && GetWidget()->IsActive() &&
++      !browser_->GetTabStripModel()->closing_all() && IsActive() &&
+       GetWidget()->IsVisible() && !tab_change_in_split_view;
+ #endif
+   // Update various elements that are interested in knowing the current
+@@ -2915,7 +2931,7 @@
+     // We only restore focus if our window is visible, to avoid invoking blur
+     // handlers when we are eventually shown.
+     new_contents->RestoreFocus();
+-  } else if (!GetWidget()->IsActive()) {
++  } else if (!IsActive()) {
+     // When the window is inactive during tab switch, restore focus for the
+     // active web content on activation.
+     GetFocusManager()->SetStoredFocusView(nullptr);
+@@ -2967,19 +2983,19 @@
+ gfx::Rect BrowserView::GetRestoredBounds() const {
+   gfx::Rect bounds;
+   ui::mojom::WindowShowState state = ui::mojom::WindowShowState::kDefault;
+-  browser_widget_->GetWindowPlacement(&bounds, &state);
++  GetTopLevelBrowserWidget()->GetWindowPlacement(&bounds, &state);
+   return bounds;
+ }
+ 
+ ui::mojom::WindowShowState BrowserView::GetRestoredState() const {
+   gfx::Rect bounds;
+   ui::mojom::WindowShowState state = ui::mojom::WindowShowState::kDefault;
+-  browser_widget_->GetWindowPlacement(&bounds, &state);
++  GetTopLevelBrowserWidget()->GetWindowPlacement(&bounds, &state);
+   return state;
+ }
+ 
+ gfx::Rect BrowserView::GetBounds() const {
+-  return browser_widget_->GetWindowBoundsInScreen();
++  return GetTopLevelBrowserWidget()->GetWindowBoundsInScreen();
+ }
+ 
+ gfx::Size BrowserView::GetContentsSize() const {
+@@ -3043,28 +3059,38 @@
+   SetBounds(bounds);
+ }
+ 
++BrowserWidget* BrowserView::GetTopLevelBrowserWidget() const {
++  auto* host = noventra::IncognitoSpaceHost(browser_);
++  if (host && host != browser_) {
++    if (auto* view = BrowserView::GetBrowserViewForBrowser(host)) {
++      return view->browser_widget();
++    }
++  }
++  return browser_widget_.get();
++}
++
+ bool BrowserView::IsMaximized() const {
+-  return browser_widget_->IsMaximized();
++  return GetTopLevelBrowserWidget()->IsMaximized();
+ }
+ 
+ bool BrowserView::IsMinimized() const {
+-  return browser_widget_->IsMinimized();
++  return GetTopLevelBrowserWidget()->IsMinimized();
+ }
+ 
+ void BrowserView::Maximize() {
+-  browser_widget_->Maximize();
++  GetTopLevelBrowserWidget()->Maximize();
+ }
+ 
+ void BrowserView::Minimize() {
+-  browser_widget_->Minimize();
++  GetTopLevelBrowserWidget()->Minimize();
+ }
+ 
+ void BrowserView::Restore() {
+-  browser_widget_->Restore();
++  GetTopLevelBrowserWidget()->Restore();
+ }
+ 
+ bool BrowserView::IsFullscreen() const {
+-  return browser_widget_->IsFullscreen();
++  return GetTopLevelBrowserWidget()->IsFullscreen();
+ }
+ 
+ void BrowserView::RestoreFocus() {
+@@ -5047,10 +5073,14 @@
+   if (toolbar_) {
+     toolbar_->DestroyWebUIToolbarWebContents();
+   }
++  noventra::IncognitoBrowserViewDestroying(browser_);
+ }
+ 
+ void BrowserView::OnWidgetActivationChanged(views::Widget* widget,
+                                             bool active) {
++  if (noventra::DispatchIncognitoHostActivation(browser_, active)) {
++    active = false;  // The physical root hosts an active private presentation.
++  }
+   if (noventra_window_mirror_) {
+     noventra_window_mirror_->OnActivationChanged(active);
+   }
+@@ -5085,6 +5115,7 @@
+ void BrowserView::OnWidgetBoundsChanged(views::Widget* widget,
+                                         const gfx::Rect& new_bounds) {
+   TryNotifyWindowBoundsChanged(new_bounds);
++  noventra::LayoutIncognitoSpaces(this);
+ }
+ 
+ void BrowserView::OnWindowBeginUserBoundsChange() {
+@@ -5259,7 +5290,7 @@
+   // contents within MultiContentsView. See crbug.com/458189541 and
+   // crbug.com/447369458
+   if (focus_active_view) {
+-    if (!GetWidget()->IsActive()) {
++    if (!IsActive()) {
+       GetFocusManager()->SetStoredFocusView(
+           multi_contents_view_->GetActiveContentsView());
+       restore_focus_on_activation_ = true;
+@@ -5297,7 +5328,7 @@
+       multi_contents_view_->contents_container_views(), [this](const auto& container) {
+         return container->GetVisible() && container->contents_view() != multi_contents_view_->GetActiveContentsView() && container->contents_view()->HasFocus();
+       });
+-  if (GetWidget()->IsActive() && inactive_has_focus) {
++  if (IsActive() && inactive_has_focus) {
+     multi_contents_view_->GetActiveContentsView()->RequestFocus();
+   }
+ }
+@@ -5512,6 +5543,10 @@
+   // You cannot close a frame for which there is an active originating drag
+   // session.
+   if (tab_strip_view() && !tab_strip_view()->IsTabStripCloseable()) {
++    return views::CloseRequestResult::kCannotClose;
++  }
++
++  if (!noventra::PrepareIncognitoHostClose(browser_)) {
+     return views::CloseRequestResult::kCannotClose;
+   }
+ 
+@@ -5839,6 +5874,7 @@
+   }
+ 
+   LayoutSuperclass<views::View>(this);
++  noventra::LayoutIncognitoSpaces(this);
+   if (noventra_window_mirror_) {
+     noventra_window_mirror_->Layout();
+   }
+@@ -6641,7 +6677,7 @@
+ void BrowserView::RequestFullscreen(bool fullscreen, int64_t display_id) {
+ #if BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN) || BUILDFLAG(IS_CHROMEOS)
+   // Request target display fullscreen from lower layers on supported platforms.
+-  browser_widget_->SetFullscreen(fullscreen, display_id);
++  GetTopLevelBrowserWidget()->SetFullscreen(fullscreen, display_id);
+ #else   // BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN) || BUILDFLAG(IS_CHROMEOS)
+   // TODO(crbug.com/40111909): Reimplement this at lower layers on all
+   // platforms.
+@@ -6654,7 +6690,7 @@
+         current_display.id() != display_id) {
+       // Fullscreen windows must exit fullscreen to move to another display.
+       if (IsFullscreen()) {
+-        browser_widget_->SetFullscreen(false);
++        GetTopLevelBrowserWidget()->SetFullscreen(false);
+ 
+         // Activate the window to give it input focus and bring it to the front
+         // of the z-order. This prevents an inactive fullscreen window from
+@@ -6677,7 +6713,7 @@
+               if (view && view->browser_widget()) {
+                 // Adjust restored bounds to be on-screen, in case the original
+                 // screen was disconnected or repositioned during fullscreen.
+-                view->browser_widget()->SetBoundsConstrained(bounds);
++                view->GetTopLevelBrowserWidget()->SetBoundsConstrained(bounds);
+                 if (maximize) {
+                   view->Maximize();
+                 }
+@@ -6692,10 +6728,10 @@
+         Restore();
+       }
+       SetBounds({display.work_area().origin(),
+-                 browser_widget_->GetWindowBoundsInScreen().size()});
+-    }
+-  }
+-  browser_widget_->SetFullscreen(fullscreen);
++                 GetTopLevelBrowserWidget()->GetWindowBoundsInScreen().size()});
++    }
++  }
++  GetTopLevelBrowserWidget()->SetFullscreen(fullscreen);
+   if (!fullscreen && restore_pre_fullscreen_bounds_callback_) {
+     std::move(restore_pre_fullscreen_bounds_callback_).Run();
+   }
+@@ -7234,7 +7270,9 @@
+     return;
+   }
+ 
+-  const bool is_active = browser_widget_->ShouldPaintAsActive();
++  const bool is_active = noventra::IncognitoSpaceHost(browser_)
++                             ? IsActive()
++                             : browser_widget_->ShouldPaintAsActive();
+ 
+   // TODO: Unify semantics of "active" between the BrowserList and
+   // BrowserWindowInterface clients. The latter is more accurate definition
+diff --git a/chrome/browser/ui/views/frame/browser_view.h b/chrome/browser/ui/views/frame/browser_view.h
+--- a/chrome/browser/ui/views/frame/browser_view.h
++++ b/chrome/browser/ui/views/frame/browser_view.h
+@@ -194,6 +194,7 @@
+                                 base::Unretained(this)));
+   }
+   BrowserWidget* browser_widget() const { return browser_widget_.get(); }
++  BrowserWidget* GetTopLevelBrowserWidget() const;
+ 
+   // Returns a pointer to the BrowserView* interface implementation (an
+   // instance of this object, typically) for a given native window, or null if
+diff --git a/chrome/browser/ui/views/frame/browser_widget.cc b/chrome/browser/ui/views/frame/browser_widget.cc
+--- a/chrome/browser/ui/views/frame/browser_widget.cc
++++ b/chrome/browser/ui/views/frame/browser_widget.cc
+@@ -1,3 +1,4 @@
++#include "chrome/browser/ui/noventra/incognito_space_host.h"
+ // Copyright 2012 The Chromium Authors
+ // Use of this source code is governed by a BSD-style license that can be
+ // found in the LICENSE file.
+@@ -135,10 +136,42 @@
+   browser_view_->browser()->GetFeatures().TearDownPreBrowserWindowDestruction();
+ }
+ 
++int BrowserWidget::GetNonClientComponent(const gfx::Point& point) {
++  const int physical_component = views::Widget::GetNonClientComponent(point);
++  auto* browser = browser_view_->browser();
++  auto* selected = noventra::SelectedIncognitoBrowser(browser);
++  if (noventra::IncognitoSpaceHost(browser) == browser && selected &&
++      selected != browser && !selected->IsDeleteScheduled() &&
++      !ui::IsResizingComponent(physical_component)) {
++    auto* selected_view = BrowserView::GetBrowserViewForBrowser(selected);
++    auto* selected_widget =
++        selected_view ? selected_view->browser_widget() : nullptr;
++    if (selected_widget && selected_widget->IsVisible() &&
++        selected_widget->GetRootView()) {
++      gfx::Point selected_point =
++          views::View::ConvertPointToScreen(GetRootView(), point);
++      views::View::ConvertPointFromScreen(selected_widget->GetRootView(),
++                                          &selected_point);
++      if (selected_widget->GetRootView()->GetLocalBounds().Contains(
++              selected_point)) {
++        // The private widget uses its own frame. Its host differs from itself,
++        // so the same override falls through to Widget without recursion.
++        return selected_widget->GetNonClientComponent(selected_point);
++      }
++    }
++  }
++  // Physical outer resize borders always belong to the real OS window.
++  return physical_component;
++}
++
+ void BrowserWidget::InitBrowserWidget() {
+   browser_native_widget_ =
+-      BrowserNativeWidgetFactory::CreateBrowserNativeWidget(this,
+-                                                            browser_view_);
++      noventra::MaybeCreateIncognitoNativeWidget(this, browser_view_);
++  if (!browser_native_widget_) {
++    browser_native_widget_ =
++        BrowserNativeWidgetFactory::CreateBrowserNativeWidget(this,
++                                                              browser_view_);
++  }
+   views::Widget::InitParams params = browser_native_widget_->GetWidgetParams(
+       views::Widget::InitParams::CLIENT_OWNS_WIDGET);
+   params.name = "BrowserWidget";
+diff --git a/chrome/browser/ui/views/frame/browser_widget.h b/chrome/browser/ui/views/frame/browser_widget.h
+--- a/chrome/browser/ui/views/frame/browser_widget.h
++++ b/chrome/browser/ui/views/frame/browser_widget.h
+@@ -101,6 +101,7 @@
+   void UserChangedTheme(BrowserThemeChangeType theme_change_type);
+ 
+   // views::Widget:
++  int GetNonClientComponent(const gfx::Point& point) override;
+   views::internal::RootView* CreateRootView() override;
+   std::unique_ptr<views::FrameView> CreateFrameView() override;
+   bool GetAccelerator(int command_id,
+diff --git a/chrome/browser/ui/views/frame/opaque_browser_frame_view.cc b/chrome/browser/ui/views/frame/opaque_browser_frame_view.cc
+--- a/chrome/browser/ui/views/frame/opaque_browser_frame_view.cc
++++ b/chrome/browser/ui/views/frame/opaque_browser_frame_view.cc
+@@ -207,22 +207,22 @@
+   InitWindowCaptionButton(
+       minimize_button_,
+       base::BindRepeating(&BrowserWidget::Minimize,
+-                          base::Unretained(browser_widget())),
++                          base::Unretained(GetBrowserView()->GetTopLevelBrowserWidget())),
+       IDS_ACCNAME_MINIMIZE, VIEW_ID_MINIMIZE_BUTTON);
+   InitWindowCaptionButton(
+       maximize_button_,
+       base::BindRepeating(&BrowserWidget::Maximize,
+-                          base::Unretained(browser_widget())),
++                          base::Unretained(GetBrowserView()->GetTopLevelBrowserWidget())),
+       IDS_ACCNAME_MAXIMIZE, VIEW_ID_MAXIMIZE_BUTTON);
+   InitWindowCaptionButton(
+       restore_button_,
+       base::BindRepeating(&BrowserWidget::Restore,
+-                          base::Unretained(browser_widget())),
++                          base::Unretained(GetBrowserView()->GetTopLevelBrowserWidget())),
+       IDS_ACCNAME_RESTORE, VIEW_ID_RESTORE_BUTTON);
+   InitWindowCaptionButton(
+       close_button_,
+       base::BindRepeating(&BrowserWidget::CloseWithReason,
+-                          base::Unretained(browser_widget()),
++                          base::Unretained(GetBrowserView()->GetTopLevelBrowserWidget()),
+                           views::Widget::ClosedReason::kCloseButtonClicked),
+       IDS_ACCNAME_CLOSE, VIEW_ID_CLOSE_BUTTON);
+ 
+@@ -584,15 +584,15 @@
+ }
+ 
+ bool OpaqueBrowserFrameView::IsMaximized() const {
+-  return browser_widget()->IsMaximized();
++  return GetBrowserView()->IsMaximized();
+ }
+ 
+ bool OpaqueBrowserFrameView::IsMinimized() const {
+-  return browser_widget()->IsMinimized();
++  return GetBrowserView()->IsMinimized();
+ }
+ 
+ bool OpaqueBrowserFrameView::IsFullscreen() const {
+-  return browser_widget()->IsFullscreen();
++  return GetBrowserView()->IsFullscreen();
+ }
+ 
+ bool OpaqueBrowserFrameView::IsTabStripVisible() const {
+diff --git a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
+--- a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
++++ b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
+@@ -1,3 +1,5 @@
++#include "chrome/app/chrome_command_ids.h"
++#include "chrome/browser/ui/noventra/incognito_space_host.h"
+ #include "chrome/browser/ui/noventra/window_mirror_service.h"
+ #include "chrome/browser/ui/noventra_commands.h"
+ #include "chrome/browser/ui/toolbar/app_menu_model.h"
+@@ -134,6 +136,9 @@
+ enum class SpaceDragPhase { kMove, kDrop, kCancel };
+ 
+ const gfx::VectorIcon* SpaceIcon(const std::string& icon) {
++  if (icon == "incognito") {
++    return &kIncognitoIcon;
++  }
+   if (icon == "work") {
+     return &vector_icons::kWorkIcon;
+   }
+@@ -395,6 +400,8 @@
+       mirror_changed_ = mirror->RegisterChanged(base::BindRepeating(
+           &AccountSpacesButton::ScheduleRefresh, weak_factory_.GetWeakPtr()));
+     }
++    incognito_changed_ = noventra::ObserveIncognitoSpaces(base::BindRepeating(
++        &AccountSpacesButton::ScheduleRefresh, weak_factory_.GetWeakPtr()));
+     ScheduleRefresh();
+     Model()->AddObserver(this);
+   }
+@@ -512,11 +519,14 @@
+         AddCheckItem(Command(100 + i), owner_->Name(ids_[i]));
+       }
+       AddSeparator(ui::NORMAL_SEPARATOR);
++      AddItem(Command(6), u"New incognito space");
+       AddItem(Command(1), u"New account space…");
+       AddItem(Command(2), u"Rename current space…");
+       AddItem(Command(4), u"Archive current space");
+-      if (noventra::SpaceIds(owner_->browser_->browser(), true).size() >
+-          ids_.size()) {
++      const auto persistent = noventra::SpaceIds(owner_->RegularBrowser(), true);
++      if (std::ranges::any_of(persistent, [&](const auto& id) {
++            return noventra::IsSpaceArchived(owner_->RegularBrowser()->GetProfile(), id);
++          })) {
+         AddItem(Command(5), u"Restore archived spaces…");
+       }
+       AddItem(Command(3), u"Manage spaces in Settings…");
+@@ -544,8 +554,7 @@
+           static_cast<size_t>(command - 100) >= ids_.size()) {
+         return {};
+       }
+-      const auto appearance = noventra::GetSpaceAppearance(
+-          owner_->browser_->GetProfile(), ids_[command - 100]);
++      const auto appearance = owner_->Appearance(ids_[command - 100]);
+       const auto* icon = SpaceIcon(appearance.icon);
+       if (!icon && appearance.color == "default") {
+         return {};
+@@ -559,8 +568,14 @@
+         return false;
+       }
+       command = Action(command);
++      if (command == 6) {
++        return chrome::IsCommandEnabled(owner_->RegularBrowser(),
++                                        IDC_NEW_INCOGNITO_WINDOW);
++      }
+       if (command == 1 || command == 2 || command == 4) {
+-        return noventra::CanManageSpaces(owner_->browser_->GetProfile()) &&
++        return !owner_->browser_->GetProfile()->IsOffTheRecord() &&
++               !owner_->IsPrivate(current_) &&
++               noventra::CanManageSpaces(owner_->browser_->GetProfile()) &&
+                (command != 4 || !current_.empty());
+       }
+       return command == 3 || command == 5 ||
+@@ -574,8 +589,11 @@
+       command = Action(command);
+       if (command >= 100) {
+         owner_->Switch(ids_[command - 100]);
++      } else if (command == 6) {
++        chrome::NewIncognitoWindow(owner_->browser_->GetProfile());
+       } else if (command == 3 || command == 5) {
+-        chrome::ShowSettingsSubPage(owner_->browser_->browser(),
++        noventra::ShowIncognitoPresentation(owner_->RegularBrowser());
++        chrome::ShowSettingsSubPage(owner_->RegularBrowser(),
+                                     "appearance?section=spaces");
+       } else if (command == 4) {
+         base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+@@ -620,6 +638,25 @@
+     return std::min(space_ids_.size(), capacity);
+   }
+ 
++  BrowserWindowInterface* RegularBrowser() const {
++    auto* host = noventra::IncognitoSpaceHost(browser_->browser());
++    return host ? host : browser_->browser();
++  }
++
++  bool IsPrivate(const std::string& id) const {
++    const auto spaces = noventra::IncognitoSpaces(browser_->browser());
++    return std::ranges::any_of(spaces, [&](const auto& space) {
++      return space.id == id;
++    });
++  }
++
++  noventra::SpaceAppearance Appearance(const std::string& id) const {
++    if (IsPrivate(id)) {
++      return {.color = "purple", .icon = "incognito", .theme = "browser"};
++    }
++    return noventra::GetSpaceAppearance(RegularBrowser()->GetProfile(), id);
++  }
++
+   std::vector<std::string> SpaceIds() const {
+     return noventra::SpaceIds(browser_->browser());
+   }
+@@ -632,14 +669,16 @@
+   void DragSpace(const std::string& id, const gfx::Point& point,
+                  SpaceDragPhase phase) {
+     ClearDropIndicators();
+-    if (phase == SpaceDragPhase::kCancel ||
++    if (IsPrivate(id) || browser_->GetProfile()->IsOffTheRecord() ||
++        phase == SpaceDragPhase::kCancel ||
+         !noventra::CanManageSpaces(browser_->GetProfile())) return;
+     const bool vertical =
+         (width() < kSpaceRowMinWidth && !SharedMenu());
+     for (size_t i = 0; i < buttons_.size(); ++i) {
+       auto* target = buttons_[i].get();
+       const gfx::Rect bounds = target->GetBoundsInScreen();
+-      if (!target->GetVisible() || space_ids_[i] == id || !bounds.Contains(point))
++      if (!target->GetVisible() || IsPrivate(space_ids_[i]) ||
++          space_ids_[i] == id || !bounds.Contains(point))
+         continue;
+       const bool trailing_edge = vertical
+           ? point.y() >= bounds.CenterPoint().y()
+@@ -682,16 +721,14 @@
+     std::string id_;
+   };
+   std::string CurrentSpace() const {
+-    if (auto* mirror = noventra::WindowMirrorService::GetForProfile(
+-            browser_->GetProfile());
+-        mirror && mirror->IsEnrolled(browser_->browser())) {
+-      return mirror->SelectedSpace(browser_->browser());
+-    }
+-    return noventra::SpaceId(Model()->GetActiveWebContents());
++    return noventra::CurrentSpaceId(browser_->browser());
+   }
+   TabStripModel* Model() const { return browser_->browser()->GetTabStripModel(); }
+   std::u16string Name(const std::string& id) const {
+-    const auto* name = browser_->GetProfile()->GetPrefs()->GetDict(noventra::kSpacesPref).FindString(id);
++    for (const auto& space : noventra::IncognitoSpaces(browser_->browser())) {
++      if (space.id == id) return space.name;
++    }
++    const auto* name = RegularBrowser()->GetProfile()->GetPrefs()->GetDict(noventra::kSpacesPref).FindString(id);
+     return name ? base::UTF8ToUTF16(*name) : id.empty() ? u"Personal" : u"Account space";
+   }
+   void ScheduleRefresh() {
+@@ -738,7 +775,7 @@
+     for (size_t i = 0; i < space_ids_.size(); ++i)
+       buttons_[i]->UpdateSpace(
+           Name(space_ids_[i]), space_ids_[i] == active,
+-          noventra::GetSpaceAppearance(browser_->GetProfile(), space_ids_[i]));
++          Appearance(space_ids_[i]));
+     more_->SetAccessibleName(u"Account spaces: " + Name(active));
+     more_->SetTooltipText(Name(active) + u" — all workspaces, create or manage");
+     InvalidateLayout();
+@@ -779,7 +816,9 @@
+         std::move(model), browser_->GetWidget()->GetNativeWindow());
+   }
+   void Switch(const std::string& id) {
+-    noventra::SwitchSpace(browser_->browser(), id);
++    if (!noventra::SelectIncognitoSpace(browser_->browser(), id)) {
++      noventra::SwitchSpace(browser_->browser(), id);
++    }
+     ScheduleRefresh();
+   }
+   bool refresh_pending_ = false;
+@@ -792,6 +831,7 @@
+   std::unique_ptr<ui::SimpleMenuModel> menu_;
+   std::unique_ptr<views::MenuRunner> runner_;
+   base::CallbackListSubscription mirror_changed_;
++  base::CallbackListSubscription incognito_changed_;
+   base::WeakPtrFactory<AccountSpacesButton> weak_factory_{this};
+ };
+ 
+diff --git a/chrome/browser/ui/views/javascript_tab_modal_dialog_view_views.cc b/chrome/browser/ui/views/javascript_tab_modal_dialog_view_views.cc
+--- a/chrome/browser/ui/views/javascript_tab_modal_dialog_view_views.cc
++++ b/chrome/browser/ui/views/javascript_tab_modal_dialog_view_views.cc
+@@ -5,8 +5,10 @@
+ #include "chrome/browser/ui/views/javascript_tab_modal_dialog_view_views.h"
+ 
+ #include "base/functional/callback.h"
++#include "base/memory/weak_ptr.h"
+ #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+ #include "chrome/browser/ui/javascript_dialogs/javascript_tab_modal_dialog_manager_delegate_desktop.h"
++#include "chrome/browser/ui/noventra/incognito_space_host.h"
+ #include "chrome/browser/ui/tabs/tab_strip_model.h"
+ #include "chrome/browser/ui/views/title_origin_label.h"
+ #include "components/constrained_window/constrained_window_views.h"
+@@ -134,6 +136,13 @@
+             }
+           },
+           base::Unretained(this)));
++  // Restore only after native teardown. WillClose is early enough for later
++  // modal/focus notifications to overwrite restoration of the private widget.
++  RegisterWindowClosingCallback(base::BindOnce(
++      [](base::WeakPtr<content::WebContents> parent) {
++        noventra::RestoreIncognitoFocusAfterModal(parent.get());
++      },
++      parent_web_contents->GetWeakPtr()));
+ 
+   message_box_view_ = new views::MessageBoxView(
+       message_text, /* detect_directionality = */ true);
+diff --git a/chrome/browser/ui/views/tabs/dragging/tab_drag_controller.cc b/chrome/browser/ui/views/tabs/dragging/tab_drag_controller.cc
+--- a/chrome/browser/ui/views/tabs/dragging/tab_drag_controller.cc
++++ b/chrome/browser/ui/views/tabs/dragging/tab_drag_controller.cc
+@@ -33,6 +33,7 @@
+ #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+ #include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
+ #include "chrome/browser/ui/browser_window/public/create_browser_window.h"
++#include "chrome/browser/ui/noventra/incognito_space_host.h"
+ #include "chrome/browser/ui/omnibox/omnibox_next_features.h"
+ #include "chrome/browser/ui/sad_tab_helper.h"
+ #include "chrome/browser/ui/tabs/split_tab_util.h"
+@@ -43,6 +44,7 @@
+ #include "chrome/browser/ui/tabs/tab_strip_model_observer.h"
+ #include "chrome/browser/ui/ui_features.h"
+ #include "chrome/browser/ui/views/frame/browser_view.h"
++#include "chrome/browser/ui/views/frame/browser_widget.h"
+ #include "chrome/browser/ui/views/omnibox/omnibox_popup_presenter_base.h"
+ #include "chrome/browser/ui/views/tabs/dragging/drag_session_data.h"
+ #include "chrome/browser/ui/views/tabs/dragging/tab_drag_context.h"
+@@ -261,6 +263,13 @@
+   return nullptr;
+ }
+ 
++views::Widget* GetWindowWidgetForContext(TabDragContext* context) {
++  if (auto* browser_view = GetBrowserViewForContext(context)) {
++    return browser_view->GetTopLevelBrowserWidget();
++  }
++  return context->GetWidget()->GetTopLevelWidget();
++}
++
+ void UpdateSystemDnDDragImage(TabDragContext* attached_context,
+                               const gfx::ImageSkia& image) {
+ #if BUILDFLAG(IS_LINUX)
+@@ -423,7 +432,7 @@
+ 
+   if (current_state_ == DragState::kDraggingWindow) {
+     VLOG(1) << "EndMoveLoop in TabDragController dtor";
+-    GetAttachedBrowserWidget()->EndMoveLoop();
++    GetAttachedWindowWidget()->EndMoveLoop();
+   }
+ 
+   if (event_source_ == ui::mojom::DragEventSource::kTouch) {
+@@ -459,8 +468,10 @@
+   base::WeakPtr<TabDragController> ref(weak_factory_.GetWeakPtr());
+ 
+   ref->source_context_ = source_context;
+-  ref->was_source_maximized_ = source_context->GetWidget()->IsMaximized();
+-  ref->was_source_fullscreen_ = source_context->GetWidget()->IsFullscreen();
++  ref->was_source_maximized_ =
++      GetWindowWidgetForContext(source_context)->IsMaximized();
++  ref->was_source_fullscreen_ =
++      GetWindowWidgetForContext(source_context)->IsFullscreen();
+   ref->presentation_time_recorder_ =
+       ui::CreatePresentationTimeHistogramRecorder(
+           source_context->GetWidget()->GetCompositor(),
+@@ -594,7 +605,7 @@
+   // non-immersive fullscreen case is a essentially a NOP, so use it
+   // unconditionally here for all platforms.
+   const views::Widget* source_top_level_widget =
+-      ref->source_context_->GetWidget()->GetTopLevelWidget();
++      GetWindowWidgetForContext(ref->source_context_);
+   CHECK(source_top_level_widget);
+   ref->initial_window_size_ =
+       source_top_level_widget->GetRestoredBounds().size();
+@@ -832,7 +843,7 @@
+       // this was the plan all along.
+       const gfx::Vector2d drag_offset =
+           start_point_in_screen_ -
+-          attached_context_->GetWidget()->GetWindowBoundsInScreen().origin();
++          GetAttachedWindowWidget()->GetWindowBoundsInScreen().origin();
+       return RunMoveLoop(point_in_screen, drag_offset);
+     }
+ 
+@@ -890,7 +901,7 @@
+   // before the move loop actually exits.
+   if (current_state_ == DragState::kDraggingWindow && in_move_loop_) {
+     VLOG(1) << "EndMoveLoop in EndDrag";
+-    GetAttachedBrowserWidget()->EndMoveLoop();
++    GetAttachedWindowWidget()->EndMoveLoop();
+   }
+ 
+   if (reason == EndDragReason::kComplete && drag_start_time_.has_value()) {
+@@ -1189,7 +1200,7 @@
+     // returns to the event loop. The rest of this method will complete before
+     // control returns to RunMoveLoop().
+     VLOG(1) << "EndMoveLoop in DragBrowserToNewTabStrip";
+-    browser_widget->EndMoveLoop();
++    GetAttachedWindowWidget()->EndMoveLoop();
+     CHECK(ref);
+ 
+     // Ideally we would always swap the tabs now, but on non-ash Windows, it
+@@ -1254,7 +1265,7 @@
+ }
+ 
+ bool TabDragController::ShouldDragWindowUsingSystemDnD() {
+-  return !GetAttachedBrowserWidget()->IsMoveLoopSupported();
++  return !GetAttachedWindowWidget()->IsMoveLoopSupported();
+ }
+ 
+ void TabDragController::RequestTabThumbnail() {
+@@ -1779,10 +1790,9 @@
+                                               point_in_screen);
+     }
+ 
+-    const bool restore_window =
+-        attached_context_->GetWidget()->IsMaximized() ||
+-        (attached_context_->GetWidget()->IsFullscreen() &&
+-         CanRestoreFullscreenWindowDuringDrag());
++    const bool restore_window = GetAttachedWindowWidget()->IsMaximized() ||
++                                (GetAttachedWindowWidget()->IsFullscreen() &&
++                                 CanRestoreFullscreenWindowDuringDrag());
+     if (attached_context_ == source_context_) {
+       did_restore_window_ = restore_window;
+     }
+@@ -1792,7 +1802,7 @@
+ 
+     const gfx::Vector2d drag_offset =
+         point_in_screen -
+-        attached_context_->GetWidget()->GetWindowBoundsInScreen().origin();
++        GetAttachedWindowWidget()->GetWindowBoundsInScreen().origin();
+     return RunMoveLoop(point_in_screen, drag_offset);
+   }
+ 
+@@ -1942,7 +1952,7 @@
+     gfx::Vector2d drag_offset) {
+   CHECK(!ShouldDragWindowUsingSystemDnD());
+ 
+-  move_loop_widget_ = GetAttachedBrowserWidget();
++  move_loop_widget_ = GetAttachedWindowWidget();
+   DCHECK(move_loop_widget_);
+ #if !BUILDFLAG(IS_CHROMEOS)
+   // In ChromeOS, `SetBounds` is not used to avoid accidentally moving the
+@@ -2087,7 +2097,7 @@
+       // - Some dragging gesture (like fling down) minimizes the window, but the
+       //   window activation cancels minimized status. See
+       //   https://crbug.com/40601420
+-      if (!attached_context_->GetWidget()->IsMinimized()) {
++      if (!GetAttachedWindowWidget()->IsMinimized()) {
+         RestoreFocus();
+       }
+ 
+@@ -2614,7 +2624,7 @@
+ }
+ 
+ void TabDragController::MaximizeAttachedWindow() {
+-  GetAttachedBrowserWidget()->Maximize();
++  GetAttachedWindowWidget()->Maximize();
+ #if BUILDFLAG(IS_MAC)
+   if (was_source_fullscreen_) {
+     GetAttachedBrowserWidget()->SetFullscreen(true);
+@@ -2718,10 +2728,14 @@
+   return attached_context_->GetWidget();
+ }
+ 
++views::Widget* TabDragController::GetAttachedWindowWidget() {
++  return GetWindowWidgetForContext(attached_context_);
++}
++
+ void TabDragController::RestoreAttachedWindowForDrag() {
+   const gfx::Size restored_size = CalculateDraggedWindowSize(attached_context_);
+ 
+-  views::Widget* widget = attached_context_->GetWidget();
++  views::Widget* widget = GetAttachedWindowWidget();
+   widget->SetVisibilityChangedAnimationsEnabled(false);
+   widget->Restore();
+   widget->SetVisibilityChangedAnimationsEnabled(true);
+@@ -2748,12 +2762,12 @@
+         std::max(0, work_area.height() - 2 * kMaximizedWindowInset));
+   }
+ 
+-  if (source->GetWidget()->IsMaximized()) {
++  if (GetWindowWidgetForContext(source)->IsMaximized()) {
+     // If the restore bounds is really small, we don't want to honor it
+     // (dragging a really small window looks wrong), instead make sure the new
+     // window is at least 50% the size of the old.
+     const gfx::Size maximized_size(
+-        source->GetWidget()->GetWindowBoundsInScreen().size());
++        GetWindowWidgetForContext(source)->GetWindowBoundsInScreen().size());
+     new_size.set_width(std::max(maximized_size.width() / 2, new_size.width()));
+     new_size.set_height(
+         std::max(maximized_size.height() / 2, new_size.height()));
+@@ -2966,9 +2980,10 @@
+       source_tab_bounds.y() + cursor_y_offset_within_tab);
+   desired_cursor_pos_in_widget = views::View::ConvertPointToTarget(
+       source_view->parent(), attached_context_, desired_cursor_pos_in_widget);
+-  views::View::ConvertPointToWidget(attached_context_,
++  views::View::ConvertPointToScreen(attached_context_,
+                                     &desired_cursor_pos_in_widget);
+-  return desired_cursor_pos_in_widget.OffsetFromOrigin();
++  return desired_cursor_pos_in_widget -
++         GetAttachedWindowWidget()->GetWindowBoundsInScreen().origin();
+ }
+ 
+ TabDragController::Liveness TabDragController::GetLocalProcessWindow(
+@@ -2982,6 +2997,7 @@
+     if (dragged_window) {
+       exclude.insert(dragged_window);
+     }
++    exclude.insert(GetAttachedWindowWidget()->GetNativeWindow());
+   }
+ 
+   // Exclude windows whose tab strips are empty and pending closure once the
+@@ -2989,7 +3005,10 @@
+   ForEachCurrentBrowserWindowInterfaceOrderedByActivation(
+       [&exclude](BrowserWindowInterface* browser) {
+         if (browser->GetTabStripModel()->empty()) {
+-          exclude.insert(browser->GetWindow()->GetNativeWindow());
++          auto* selected = noventra::SelectedIncognitoBrowser(browser);
++          if (!selected || selected == browser) {
++            exclude.insert(browser->GetWindow()->GetNativeWindow());
++          }
+         }
+         return true;
+       });
+@@ -3009,6 +3028,16 @@
+     *window =
+         window_finder_->GetLocalProcessWindowAtPoint(screen_point, exclude);
+   }
++  if (ref && *window) {
++    if (auto* view = BrowserView::GetBrowserViewForNativeWindow(*window)) {
++      if (auto* selected = noventra::SelectedIncognitoBrowser(view->browser());
++          selected && selected != view->browser()) {
++        // Desktop hit testing finds the OS host. Tab/model compatibility and
++        // target geometry belong to its currently visible presentation.
++        *window = selected->GetWindow()->GetNativeWindow();
++      }
++    }
++  }
+   return ref ? Liveness::kAlive : Liveness::kDeleted;
+ }
+ 
+@@ -3100,6 +3129,15 @@
+ 
+   // Profiles must be the same.
+   if (other_browser->GetProfile() != browser->GetProfile()) {
++    return false;
++  }
++
++  // Registered private Spaces share the genuine primary OTR profile, but each
++  // owns a fixed independent partition. Dropping into another catalog entry
++  // would make the entry's identity disagree with the tab's unchanged jar.
++  const auto space = noventra::IncognitoSpaceId(browser);
++  const auto other_space = noventra::IncognitoSpaceId(other_browser);
++  if (space != other_space && (!space.empty() || !other_space.empty())) {
+     return false;
+   }
+ 
+diff --git a/chrome/browser/ui/views/tabs/dragging/tab_drag_controller.h b/chrome/browser/ui/views/tabs/dragging/tab_drag_controller.h
+--- a/chrome/browser/ui/views/tabs/dragging/tab_drag_controller.h
++++ b/chrome/browser/ui/views/tabs/dragging/tab_drag_controller.h
+@@ -498,6 +498,9 @@
+   // Returns the Widget of the currently attached TabDragContext's
+   // BrowserView.
+   views::Widget* GetAttachedBrowserWidget();
++  // Whole-window geometry and native operations use the physical host. The
++  // attached context/widget retains logical tab, profile and capture ownership.
++  views::Widget* GetAttachedWindowWidget();
+ 
+   // Restores and resizes `attached_context_` so it can be dragged.
+   void RestoreAttachedWindowForDrag();
+diff --git a/chrome/browser/ui/webui/help/version_updater_basic.cc b/chrome/browser/ui/webui/help/version_updater_basic.cc
+--- a/chrome/browser/ui/webui/help/version_updater_basic.cc
++++ b/chrome/browser/ui/webui/help/version_updater_basic.cc
+@@ -5,10 +5,87 @@
+ #include <memory>
+ #include <string>
+ 
++#include "build/build_config.h"
+ #include "chrome/browser/ui/webui/help/version_updater.h"
+ #include "chrome/browser/upgrade_detector/upgrade_detector.h"
+ 
++#if BUILDFLAG(IS_LINUX)
++#include "base/base_paths.h"
++#include "base/command_line.h"
++#include "base/files/file_util.h"
++#include "base/functional/bind.h"
++#include "base/json/json_reader.h"
++#include "base/memory/weak_ptr.h"
++#include "base/path_service.h"
++#include "base/process/launch.h"
++#include "base/process/process_handle.h"
++#include "base/strings/string_number_conversions.h"
++#include "base/strings/utf_string_conversions.h"
++#include "base/task/thread_pool.h"
++#endif
++
+ namespace {
++
++#if BUILDFLAG(IS_LINUX)
++struct DesktopUpdateResult {
++  VersionUpdater::Status status = VersionUpdater::FAILED;
++  std::string version;
++  std::u16string message =
++      u"Could not check for updates. Updates require Python 3.11 or newer "
++      u"and OpenSSL.";
++};
++
++DesktopUpdateResult CheckDesktopUpdate(const base::FilePath& helper,
++                                       VersionUpdater::Status fallback) {
++  DesktopUpdateResult result;
++  if (!base::PathExists(helper)) {
++    result.status = fallback;
++    result.message.clear();
++    return result;
++  }
++  // No shell, URL or executable supplied by the feed. The helper and pinned
++  // public key are inventoried files beside this installed executable.
++  base::CommandLine command(base::FilePath("/usr/bin/python3"));
++  command.AppendArg("-I");
++  command.AppendArg("-B");
++  command.AppendArgPath(helper);
++  // A late-starting child must not bind to a supervisor after this process
++  // exits.
++  command.AppendArg("--owner-pid");
++  command.AppendArg(base::NumberToString(base::GetCurrentProcId()));
++  command.AppendArg("check");
++  std::string output;
++  int exit_code = -1;
++  if (!base::GetAppOutputWithExitCode(command, &output, &exit_code) ||
++      output.size() > 64 * 1024) {
++    return result;
++  }
++  const auto value = base::JSONReader::ReadDict(output, base::JSON_PARSE_RFC);
++  if (!value) {
++    return result;
++  }
++  if (const auto* message = value->FindString("message")) {
++    result.message = base::UTF8ToUTF16(*message);
++  }
++  const auto* status = value->FindString("status");
++  if (exit_code != 0 || !status) {
++    return result;
++  }
++  if (*status == "up_to_date" || *status == "applied") {
++    result.status = VersionUpdater::UPDATED;
++  } else if (*status == "ready" || *status == "busy") {
++    // Chromium's Relaunch invokes the executable directly. Applying is done
++    // by the coordinated package launcher after every window has closed.
++    // DEFERRED displays the helper's honest close/reopen instruction instead
++    // of offering a Relaunch button that would bypass that launcher.
++    result.status = VersionUpdater::DEFERRED;
++    if (const auto* version = value->FindString("version")) {
++      result.version = *version;
++    }
++  }
++  return result;
++}
++#endif
+ 
+ // Bare bones implementation just checks if a new version is ready.
+ class VersionUpdaterBasic : public VersionUpdater {
+@@ -20,11 +97,52 @@
+ 
+   // VersionUpdater implementation.
+   void CheckForUpdate(StatusCallback callback, PromoteCallback) override {
++#if BUILDFLAG(IS_LINUX)
++    base::FilePath executable;
++    if (base::PathService::Get(base::FILE_EXE, &executable)) {
++      const auto helper = executable.DirName()
++                              .DirName()
++                              .DirName()
++                              .AppendASCII("updater")
++                              .AppendASCII("desktop_updater.py");
++      callback.Run(CHECKING, 0, false, false, std::string(), 0,
++                   std::u16string());
++      if (!checking_) {
++        checking_ = true;
++        const Status fallback =
++            UpgradeDetector::GetInstance()->is_upgrade_available()
++                ? NEARLY_UPDATED
++                : DISABLED;
++        base::ThreadPool::PostTaskAndReplyWithResult(
++            FROM_HERE,
++            {base::MayBlock(), base::TaskPriority::USER_VISIBLE,
++             // Only local helper I/O runs here; the weak reply stays on the UI
++             // sequence. The parent-death-bound helper must not block quitting.
++             base::TaskShutdownBehavior::CONTINUE_ON_SHUTDOWN},
++            base::BindOnce(&CheckDesktopUpdate, helper, fallback),
++            base::BindOnce(&VersionUpdaterBasic::OnDesktopChecked,
++                           weak_factory_.GetWeakPtr(), callback));
++      }
++      return;
++    }
++#endif
+     const Status status = UpgradeDetector::GetInstance()->is_upgrade_available()
+                               ? NEARLY_UPDATED
+                               : DISABLED;
+     callback.Run(status, 0, false, false, std::string(), 0, std::u16string());
+   }
++
++#if BUILDFLAG(IS_LINUX)
++ private:
++  void OnDesktopChecked(StatusCallback callback, DesktopUpdateResult result) {
++    checking_ = false;
++    callback.Run(result.status, 0, false, false, result.version, 0,
++                 result.message);
++  }
++
++  bool checking_ = false;
++  base::WeakPtrFactory<VersionUpdaterBasic> weak_factory_{this};
++#endif
+ };
+ 
+ }  // namespace
+diff --git a/ui/views/BUILD.gn b/ui/views/BUILD.gn
+--- a/ui/views/BUILD.gn
++++ b/ui/views/BUILD.gn
+@@ -271,6 +271,7 @@
+     "focus/focus_manager.h",
+     "focus/focus_manager_delegate.h",
+     "focus/focus_manager_factory.h",
++    "focus/focus_manager_properties.h",
+     "focus/focus_search.h",
+     "focus/native_view_focus_manager.h",
+     "input_event_activation_protector.h",
+diff --git a/ui/views/focus/focus_manager.cc b/ui/views/focus/focus_manager.cc
+--- a/ui/views/focus/focus_manager.cc
++++ b/ui/views/focus/focus_manager.cc
+@@ -21,6 +21,7 @@
+ #include "ui/views/bubble/bubble_dialog_delegate_view.h"
+ #include "ui/views/cascading_property.h"
+ #include "ui/views/focus/focus_manager_delegate.h"
++#include "ui/views/focus/focus_manager_properties.h"
+ #include "ui/views/focus/focus_search.h"
+ #include "ui/views/focus/native_view_focus_manager.h"
+ #include "ui/views/view.h"
+@@ -31,6 +32,9 @@
+ #include "ui/views/widget/widget_delegate.h"
+ 
+ namespace views {
++
++const char kSkipParentAcceleratorFallbackKey[] =
++    "SkipParentAcceleratorFallback";
+ 
+ FocusManager::FocusManager(Widget* widget,
+                            std::unique_ptr<FocusManagerDelegate> delegate)
+@@ -631,6 +635,9 @@
+ 
+ bool FocusManager::RedirectAcceleratorToParentWidget(
+     const ui::Accelerator& accelerator) {
++  if (widget_->GetNativeWindowProperty(kSkipParentAcceleratorFallbackKey)) {
++    return false;
++  }
+   Widget* parent_widget = widget_->parent();
+   if (!parent_widget || !widget_->widget_delegate()) {
+     return false;
+diff --git a/ui/views/focus/focus_manager_properties.h b/ui/views/focus/focus_manager_properties.h
+new file mode 100644
+--- /dev/null
++++ b/ui/views/focus/focus_manager_properties.h
+@@ -0,0 +1,20 @@
++// Copyright 2026 The Chromium Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++#ifndef UI_VIEWS_FOCUS_FOCUS_MANAGER_PROPERTIES_H_
++#define UI_VIEWS_FOCUS_FOCUS_MANAGER_PROPERTIES_H_
++
++#include "ui/views/views_export.h"
++
++namespace views {
++
++// A non-null Widget native property suppresses only that widget's parent
++// accelerator fallback. Use for an independent focus owner with a native
++// embedding parent. Its own accelerators and delegate still run first;
++// unhandled keys remain unhandled. The property value is not owned.
++VIEWS_EXPORT extern const char kSkipParentAcceleratorFallbackKey[];
++
++}  // namespace views
++
++#endif  // UI_VIEWS_FOCUS_FOCUS_MANAGER_PROPERTIES_H_

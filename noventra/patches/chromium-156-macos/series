@@ -1,0 +1,16 @@
+noventra-macos-candidate.patch
+noventra-preview-polish.patch
+noventra-sidebar-split-polish.patch
+noventra-toolbar-bookmarks-frameless.patch
+noventra-incognito-public-updates.patch
+noventra-incognito-cli-space.patch
+noventra-about-license-footer.patch
+noventra-pin-close-private-spaces.patch
+noventra-sidebar-space-capacity-animation.patch
+noventra-wayland-modal-position.patch
+noventra-native-toolbar-resource.patch
+noventra-settings-media-defaults.patch
+noventra-shared-cookie-import.patch
+noventra-onboarding-device-transfer-entry.patch
+noventra-shared-profile-pin-infrastructure.patch
+noventra-responsive-subpages.patch

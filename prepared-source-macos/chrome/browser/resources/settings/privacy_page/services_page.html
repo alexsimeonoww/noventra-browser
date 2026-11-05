@@ -1,0 +1,176 @@
+<style include="cr-shared-style settings-shared">
+    .label-wrapper {
+        padding: var(--cr-section-vertical-padding) 0;
+    }
+
+    #changelog-notice {
+        --cr-changelog-padding: 16px;
+        border-radius: calc(var(--cr-changelog-padding) / 2);
+        margin: var(--cr-changelog-padding);
+        margin-top: 0;
+        padding: var(--cr-changelog-padding);
+        background: var(--md-background-color);
+    }
+
+    #changelog-title {
+        font-size: 15px;
+        font-weight: 500;
+    }
+
+    #changelog-notice-actions {
+        --cr-checkbox-label-padding-start: 8px;
+        display: flex;
+        gap: var(--cr-changelog-padding);
+        border-top: var(--cr-separator-line);
+        margin-top: var(--cr-changelog-padding);
+        padding-top: calc(var(--cr-changelog-padding) / 2);
+    }
+
+    #onboarding-text {
+        display: flex;
+        align-items: center;
+        max-width: 350px;
+        gap: calc(var(--cr-section-padding) * 0.8);
+    }
+
+    #onboarding-notice {
+        padding: calc(var(--cr-section-padding) / 2) var(--cr-section-padding);
+        justify-content: space-between;
+    }
+    #servicesIntro { margin: 0; padding: 16px var(--cr-section-padding); color: var(--cr-secondary-text-color); }
+    #advancedServices { border-top: var(--cr-separator-line); }
+    #advancedServices > summary { cursor: pointer; padding: 18px var(--cr-section-padding); }
+    #advancedServices > summary:focus-visible { outline: 2px solid var(--cr-focus-outline-color); outline-offset: -4px; }
+    #customServicesExplanation { margin: 0; padding: 0 var(--cr-section-padding) 12px; color: var(--cr-secondary-text-color); }
+</style>
+
+<settings-subpage page-title="$i18n{heliumServicesTitle}" route-path$="[[routePath]]">
+  <div class="cr-col first">
+    <p id="servicesIntro">Choose optional downloads. You do not need an account or a custom server.</p>
+    <settings-toggle-button id="chromeWebStoreToggleButton"
+        pref="{{prefs.helium.extensions.chrome_web_store}}"
+        label="Chrome Web Store downloads"
+        sub-label="Download and update extensions directly from Google. Installing an extension during setup enables this.">
+    </settings-toggle-button>
+    <if expr="use_renderer_spellchecker">
+      <settings-toggle-button id="dictionaryDownloadsToggleButton"
+          pref="{{prefs.helium.downloads.spelling_dictionaries}}"
+          label="Download spelling dictionaries"
+          sub-label="Download language files from Google. Spell checking happens on your device; the text you type is not sent.">
+      </settings-toggle-button>
+      <cr-link-row id="spellingLanguagesLink" label="Spelling languages"
+          sub-label="After enabling downloads, return to Languages and retry any missing dictionary."
+          on-click="onSpellingLanguagesClick_"></cr-link-row>
+    </if>
+    <details id="advancedServices">
+      <summary>Advanced service settings</summary>
+      <p id="customServicesExplanation">For people who run or trust a compatible service. Leave this empty to use only the download choices above.</p>
+<div class="cr-row">
+  <div class="flex">
+    <div class="flex label-wrapper">
+        <div class="label">$i18n{heliumOriginOverride}</div>
+        <div class="cr-secondary-text label">
+            $i18n{heliumOriginOverrideDescription}
+            <br><br>
+            <b>$i18n{heliumOriginOverrideDescriptionWarning}</b>
+        </div>
+    </div>
+    <cr-input
+        id="heliumOriginOverride"
+        placeholder="$i18n{heliumOriginOverrideLabel}"
+        value="[[prefs.helium.services.origin_override.value]]"
+        pattern="https://.*"
+        on-keydown="onOriginOverrideKeydown_"
+        on-change="onOriginOverrideChange_"
+        type="url"
+        maxlength="128"
+        aria-label="$i18n{heliumOriginOverrideLabel}"
+        auto-validate
+        error-message="$i18n{heliumOriginOverrideInvalidOrigin}"
+        spellcheck="false">
+    </cr-input>
+  </div>
+</div>
+
+      <settings-toggle-button id="customServicesConsentToggleButton"
+          pref="{{prefs.helium.services.user_consented}}"
+          label="Allow connections to this custom service"
+          sub-label="The service operator receives requests for the custom features you enable below.">
+      </settings-toggle-button>
+    <template is="dom-if" if="[[prefs.helium.services.user_consented.value]]">
+        <template is="dom-if" if="[[changes_.length]]">
+          <div id="changelog-notice">
+            <div id="changelog-title">$i18n{heliumSchemaUpdatedTitle}</div>
+            <ul>
+                <template is="dom-repeat" items="[[changes_]]" as="change">
+                    <li>[[change]]</li>
+                </template>
+            </ul>
+            <div id="changelog-description">
+                $i18n{heliumSchemaUpdatedDescription}
+            </div>
+            <div id="changelog-notice-actions">
+                <cr-button on-click="onAcknowledgedChangelog_">$i18n{heliumGotIt}</cr-button>
+                <cr-checkbox id="checkbox" checked="{{ignoreChecked_}}">
+                    $i18n{heliumSchemaIgnore}
+                </cr-checkbox>
+            </div>
+          </div>
+        </template>
+    <settings-toggle-button id="servicesToggleButton"
+        pref="{{prefs.helium.services.enabled}}"
+        label="$i18n{heliumServicesToggle}"
+        sub-label="$i18n{heliumServicesToggleDescription}">
+    </settings-toggle-button>
+    <div class="cr-col">
+        <cr-collapse id="servicesCollapse" opened="[[prefs.helium.services.enabled.value]]">
+            <settings-toggle-button id="extProxyToggleButton"
+                pref="{{prefs.helium.services.ext_proxy}}"
+                label="$i18n{heliumExtProxyToggle}"
+                sub-label="Use your configured Noventra service for extension downloads and updates. Direct Chrome Web Store downloads are controlled separately.">
+            </settings-toggle-button>
+            <settings-toggle-button id="bangToggleButton"
+                pref="{{prefs.helium.services.bangs}}"
+                label="$i18n{heliumBangsToggle}"
+                sub-label="$i18n{heliumBangsToggleDescription}">
+            </settings-toggle-button>
+            <if expr="use_renderer_spellchecker">
+                <settings-toggle-button id="spellcheckToggleButton"
+                    pref="{{prefs.helium.services.spellcheck_files}}"
+                    label="$i18n{heliumSpellcheckToggle}"
+                    sub-label="$i18n{heliumSpellcheckToggleDescription}">
+                </settings-toggle-button>
+            </if>
+            <settings-toggle-button id="updatesToggleButton"
+                pref="{{prefs.helium.services.browser_updates}}"
+                label="$i18n{heliumUpdatesToggle}"
+                sub-label="$i18n{heliumUpdatesToggleDescription}">
+            </settings-toggle-button>
+            <settings-toggle-button id="filterlistToggleButton"
+                pref="{{prefs.helium.services.ublock_assets}}"
+                label="$i18n{heliumUboToggle}"
+                sub-label="$i18n{heliumUboToggleDescription}">
+            </settings-toggle-button>
+        </cr-collapse>
+    </div>
+    </template>
+    <div class="cr-row hr">
+      <div class="flex label-wrapper" aria-hidden="true">
+        <div class="label">$i18n{heliumCrashReportingTitle}</div>
+        <div class="cr-secondary-text label">
+          $i18n{heliumCrashReportingDescription}
+        </div>
+      </div>
+      <settings-dropdown-menu id="crashReportingControl"
+        label="$i18n{heliumCrashReportingTitle}"
+        pref="[[crashReportingPref_]]"
+        menu-options="[[crashReportingOptions_]]"
+        disabled="[[!crashReportingConfigured_]]"
+        no-set-pref
+        on-settings-control-change="onCrashReportingChange_">
+      </settings-dropdown-menu>
+    </div>
+
+    </details>
+  </div>
+</settings-subpage>

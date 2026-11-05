@@ -1,0 +1,51 @@
+// Copyright 2026 The Helium Authors
+// You can use, redistribute, and/or modify this source code under
+// the terms of the GPL-3.0 license that can be found in the LICENSE file.
+
+syntax = "proto2";
+
+option optimize_for = LITE_RUNTIME;
+
+package noventra_sync_pb;
+
+// Encrypted vault metadata. Cryptographic authentication is provided
+// by the enclosing AEAD.
+message SyncVaultDescriptor {
+  optional uint32 format_version = 1;
+  optional string vault_uuid = 2;
+  optional int64 creation_time_millis = 3;
+}
+
+message SyncVaultHead {
+  optional uint32 format_version = 1;
+  optional uint64 generation = 2;
+  optional string record_id = 3;
+  optional uint32 epoch = 4;
+  optional uint64 epoch_start_generation = 5;
+  optional uint32 minimum_retained_epoch = 6;
+  optional uint64 minimum_retained_generation = 7;
+  optional uint64 epoch_uploaded_bytes = 8;
+}
+
+message SyncVaultObjectReference {
+  optional string object_id = 1;
+  optional uint32 plaintext_size = 2;
+}
+
+message SyncVaultJournalRecord {
+  optional uint32 format_version = 1;
+  optional uint64 generation = 2;
+  optional int64 creation_time_millis = 3;
+  optional uint32 mutation_count = 4;
+  optional string parent_record_id = 5;
+  repeated SyncVaultObjectReference state_chunks = 6;
+  optional uint32 epoch = 7;
+}
+
+message SyncVaultCheckpoint {
+  optional uint32 format_version = 1;
+  optional string vault_uuid = 2;
+  optional uint64 generation = 3;
+  optional string record_id = 4;
+  optional uint32 epoch = 5;
+}

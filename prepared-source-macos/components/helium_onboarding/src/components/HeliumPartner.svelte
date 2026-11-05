@@ -1,0 +1,40 @@
+<script lang="ts">
+    import { Tooltip } from "@imput/helium-prism";
+    import { s } from "../lib/strings";
+    import NoventraLogo from "./NoventraLogo.svelte";
+</script>
+
+<div class="helium-partner">
+    <Tooltip>
+        {#snippet anchor()}
+            <div class="helium-partner-badge">
+                <NoventraLogo height="13px" />
+                {s.partner.title}
+            </div>
+        {/snippet}
+        {#snippet content()}
+            {s.partner.tooltip}
+        {/snippet}
+    </Tooltip>
+</div>
+
+<style>
+    .helium-partner {
+        display: flex;
+        position: relative;
+        width: fit-content;
+        cursor: help;
+    }
+
+    .helium-partner-badge {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 13.5px;
+        font-weight: 500;
+        width: fit-content;
+        line-height: 0;
+        padding: 2px 0;
+
+    }
+</style>

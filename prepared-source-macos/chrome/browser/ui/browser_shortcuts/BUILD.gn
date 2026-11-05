@@ -1,0 +1,16 @@
+# Copyright 2026 The Noventra Authors
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# BrowserView's public header observes this service. Expose its declarations
+# without making the BrowserView header depend on //chrome/browser/ui:ui,
+# which remains the linked provider of the service implementation.
+source_set("service_headers") {
+  public = [ "browser_shortcut_service.h" ]
+  public_deps = [
+    "//base",
+    "//components/keyed_service/core",
+    "//components/prefs",
+    "//ui/base",
+  ]
+}

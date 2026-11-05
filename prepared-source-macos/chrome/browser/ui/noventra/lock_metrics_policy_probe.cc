@@ -1,0 +1,125 @@
+// Copyright 2026 The Noventra Authors. All rights reserved.
+
+#include <array>
+#include <cstdio>
+#include <string_view>
+
+#include "base/at_exit.h"
+#include "base/command_line.h"
+#include "base/feature_list.h"
+#include "base/metrics/field_trial.h"
+#include "base/metrics/histogram_base.h"
+#include "base/metrics/histogram_samples.h"
+#include "base/metrics/statistics_recorder.h"
+#include "base/strings/strcat.h"
+#include "base/synchronization/lock.h"
+#include "base/synchronization/lock_metrics_recorder.h"
+#include "base/threading/platform_thread.h"
+#include "base/time/time.h"
+
+namespace {
+
+// Use fresh native threads and the real feature parameters. Overriding the
+// recorder's cached allowlist for testing would hide a wrong product default.
+class ThreadMetricsProbe : public base::PlatformThread::Delegate {
+ public:
+  ThreadMetricsProbe(std::string_view suffix, bool expected)
+      : suffix_(suffix), expected_(expected) {}
+
+  void ThreadMain() override { passed_ = CheckPolicyAndRecording(); }
+
+  bool passed() const { return passed_; }
+
+ private:
+  bool CheckPolicyAndRecording() {
+    if (base::LockMetricsRecorder::GetForCurrentThread()) {
+      return false;
+    }
+    base::LockMetricsRecorder::EnableRecordingOnCurrentThread(suffix_);
+    auto* recorder = base::LockMetricsRecorder::GetForCurrentThread();
+    if ((recorder != nullptr) != expected_) {
+      return false;
+    }
+
+    // Lock acquisition and the timer remain usable on excluded threads.
+    {
+      base::Lock lock;
+      base::AutoLock held(lock);
+      base::LockMetricsRecorder::ScopedLockAcquisitionTimer timer(
+          base::Lock::GetBaseLockMetricTagList());
+    }
+    if (!recorder) {
+      return base::LockMetricsRecorder::GetForCurrentThread() == nullptr;
+    }
+
+    const auto duration = base::Microseconds(1234);
+    recorder->RecordLockAcquisitionTime(
+        {duration, base::Lock::GetBaseLockMetricTagList()});
+    bool found_sample = false;
+    recorder->ForEachSample(
+        [&](const base::LockMetricsRecorder::LockMetricSample& sample) {
+          found_sample |= sample.wait_time == duration;
+        });
+    if (!found_sample) {
+      return false;
+    }
+    recorder->RecordLockAcquisitionTime(
+        {duration, base::Lock::GetBaseLockMetricTagList()});
+    recorder->ReportLockAcquisitionTimes();
+    auto* histogram = base::StatisticsRecorder::FindHistogram(base::StrCat(
+        {"Scheduling.ContendedLockAcquisitionTime.BaseLock.", suffix_}));
+    return histogram && histogram->SnapshotSamples()->TotalCount() > 0;
+  }
+
+  const std::string_view suffix_;
+  const bool expected_;
+  bool passed_ = false;
+};
+
+}  // namespace
+
+int main(int argc, char** argv) {
+  base::AtExitManager at_exit;
+  base::CommandLine::Init(argc, argv);
+  base::FieldTrialList field_trials;
+  const auto& command = *base::CommandLine::ForCurrentProcess();
+  base::FeatureList::InitInstance(
+      command.GetSwitchValueASCII("enable-features"),
+      command.GetSwitchValueASCII("disable-features"));
+  const bool worker_opt_in = command.HasSwitch("worker-opt-in");
+  constexpr std::array<std::string_view, 13> kThreadSuffixes = {
+      "CrBrowserMain",
+      "CrRendererMain",
+      "CrGpuMain",
+      "VizCompositor",
+      "Compositor",
+      "BrowserIO",
+      "NetworkService",
+      "GPU.ForegroundWorker",
+      "GPU.BackgroundWorker",
+      "Renderer.ForegroundWorker",
+      "Renderer.BackgroundWorker",
+      "Browser.ForegroundWorker",
+      "Browser.BackgroundWorker"};
+  bool passed = true;
+  for (const auto suffix : kThreadSuffixes) {
+    const bool expected =
+        worker_opt_in ? suffix == "Renderer.ForegroundWorker"
+                      : suffix == "CrBrowserMain" || suffix == "CrRendererMain";
+    ThreadMetricsProbe probe(suffix, expected);
+    base::PlatformThreadHandle handle;
+    if (!base::PlatformThread::Create(0, &probe, &handle)) {
+      return 2;
+    }
+    base::PlatformThread::Join(handle);
+    if (!probe.passed()) {
+      std::fprintf(stderr, "Unexpected lock-metrics policy: %.*s\n",
+                   static_cast<int>(suffix.size()), suffix.data());
+      passed = false;
+    }
+  }
+  std::printf("Lock-metrics %s policy: %s (13 native threads)\n",
+              worker_opt_in ? "explicit opt-in" : "default",
+              passed ? "PASS" : "FAIL");
+  return passed ? 0 : 1;
+}

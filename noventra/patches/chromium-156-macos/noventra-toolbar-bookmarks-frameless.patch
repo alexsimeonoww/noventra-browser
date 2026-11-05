@@ -1,0 +1,451 @@
+diff --git a/chrome/browser/resources/settings/appearance_page/noventra_layout_model.ts b/chrome/browser/resources/settings/appearance_page/noventra_layout_model.ts
+--- a/chrome/browser/resources/settings/appearance_page/noventra_layout_model.ts
++++ b/chrome/browser/resources/settings/appearance_page/noventra_layout_model.ts
+@@ -168,6 +168,20 @@
+       throw new Error('This navigation placement is not available. Check the tabs position and organization restrictions.');
+     }
+     const edge = navigationEdge(next, action.placement)!;
++    let restoredTopTools = false;
++    if (action.placement === 'top') {
++      // Choosing Top creates a usable toolbar, including when the sidebar
++      // preset hid address entry. Keep individually hidden navigation buttons
++      // and organization restrictions intact.
++      for (const item of next.items) {
++        const cap = caps.find(capability => capability.id === item.id);
++        if (!item.visible && ['address', 'extensions', 'menu'].includes(item.id) &&
++            cap?.requiredVisibility !== false && cap?.edges.includes(edge)) {
++          item.visible = true;
++          restoredTopTools = true;
++        }
++      }
++    }
+     const moving = EDGES.filter(source => source !== edge).flatMap(source =>
+       visibleItems(next, source).filter(item => NAVIGATION_CONTROLS.includes(item.id)));
+     let peers = visibleItems(next, edge).filter(item => item.id !== 'spaces');
+@@ -185,13 +199,15 @@
+       const firstTabControl = peers.findIndex(item => ['new-tab', 'tabs'].includes(item.id));
+       peers.splice(firstTabControl, 0, ...navigation, ...bookmarks, ...extensions, ...menu, ...address);
+     } else {
+-      // Moving back to Top preserves controls already arranged there.
+-      if (!moving.length) return state;
++      if (!moving.length && !restoredTopTools) return state;
++      // Put restored controls in the same row as existing navigation. Keep
++      // its custom button order, with address entry before the browser tools.
++      const controls = [...peers.filter(item => NAVIGATION_CONTROLS.includes(item.id)), ...moving];
++      const navigation = controls.filter(item => !['address', 'extensions', 'menu'].includes(item.id));
++      const address = controls.filter(item => item.id === 'address');
++      const tools = controls.filter(item => ['extensions', 'menu'].includes(item.id));
++      peers = peers.filter(item => !NAVIGATION_CONTROLS.includes(item.id));
+       const tabsIndex = peers.findIndex(item => item.id === 'tabs');
+-      // The top toolbar keeps its address before the trailing browser tools.
+-      const navigation = moving.filter(item => !['address', 'extensions', 'menu'].includes(item.id));
+-      const address = moving.filter(item => item.id === 'address');
+-      const tools = moving.filter(item => ['extensions', 'menu'].includes(item.id));
+       peers.splice(tabsIndex < 0 ? peers.length : tabsIndex, 0, ...navigation, ...address, ...tools);
+     }
+     for (const item of moving) item.edge = edge;
+diff --git a/chrome/browser/ui/noventra/layout_model.cc b/chrome/browser/ui/noventra/layout_model.cc
+--- a/chrome/browser/ui/noventra/layout_model.cc
++++ b/chrome/browser/ui/noventra/layout_model.cc
+@@ -684,8 +684,10 @@
+     edge = DockEdge::kTop;
+   }
+   if (name == "sidebar-top") {
++    // Use the searchable popup instead of duplicating it with an expanded
++    // library heading beside the tabs.
+     constexpr std::string_view side[] = {
+-        "action:bookmarks", "bookmarks", "new-tab", "tabs", "spaces"};
++        "action:bookmarks", "new-tab", "tabs", "spaces"};
+     constexpr std::string_view top[] = {"back",     "forward",    "reload",
+                                         "address",  "extensions", "menu",
+                                         "customize"};
+diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
+--- a/chrome/browser/ui/views/frame/browser_view.cc
++++ b/chrome/browser/ui/views/frame/browser_view.cc
+@@ -453,9 +453,9 @@
+ constexpr int kZenModeRevealTriggerThickness = 6;
+ constexpr int kZenModeChromeHoverLeeway = 8;
+ constexpr base::TimeDelta kZenModeRevealAnimationDuration =
+-    base::Milliseconds(140);
++    base::Milliseconds(120);
+ constexpr base::TimeDelta kZenModeCursorExitGracePeriod =
+-    base::Milliseconds(3000);
++    base::Milliseconds(400);
+ constexpr base::TimeDelta kZenModeHoverExitGracePeriod =
+     base::Milliseconds(150);
+ 
+@@ -1051,11 +1051,11 @@
+   SetProperty(views::kElementIdentifierKey, kBrowserViewElementId);
+   zen_top_chrome_animation_.SetSlideDuration(
+       gfx::Animation::RichAnimationDuration(kZenModeRevealAnimationDuration));
+-  zen_top_chrome_animation_.SetTweenType(gfx::Tween::FAST_OUT_SLOW_IN_3);
++  zen_top_chrome_animation_.SetTweenType(gfx::Tween::EASE_OUT);
+   zen_top_chrome_animation_.Reset(1);
+   zen_side_chrome_animation_.SetSlideDuration(
+       gfx::Animation::RichAnimationDuration(kZenModeRevealAnimationDuration));
+-  zen_side_chrome_animation_.SetTweenType(gfx::Tween::FAST_OUT_SLOW_IN_3);
++  zen_side_chrome_animation_.SetTweenType(gfx::Tween::EASE_OUT);
+   zen_side_chrome_animation_.Reset(1);
+ 
+   browser_->GetTabStripModel()->AddObserver(this);
+@@ -2350,6 +2350,9 @@
+   }
+   if (!top_container_ || !GetWidget()) {
+     return false;
++  }
++  if (custom_docks && noventra_dock_controller_->HasOpenPopup(side)) {
++    return true;
+   }
+   for (views::Widget* widget :
+        views::Widget::GetAllOwnedWidgets(GetWidget()->GetNativeView())) {
+diff --git a/chrome/browser/ui/views/frame/noventra_bookmarks_view.cc b/chrome/browser/ui/views/frame/noventra_bookmarks_view.cc
+--- a/chrome/browser/ui/views/frame/noventra_bookmarks_view.cc
++++ b/chrome/browser/ui/views/frame/noventra_bookmarks_view.cc
+@@ -69,6 +69,9 @@
+ namespace {
+ constexpr int kBookmarkRowHeight = 32;
+ constexpr int kBookmarkViewportHeight = 6 * kBookmarkRowHeight;
++constexpr int kPopupBookmarkRowHeight = 36;
++constexpr int kPopupBookmarkViewportHeight = 9 * kPopupBookmarkRowHeight;
++constexpr int kMinimumLibraryWidth = 200;
+ constexpr size_t kMaximumPopupRows = 100;
+ constexpr int kInlineHeadingHeight = 24;
+ 
+@@ -360,6 +363,8 @@
+     search_->SetPlaceholderText(u"Search bookmarks");
+     search_->SetDefaultWidthInChars(20);
+     search_->SetCornerRadius(8);
++    search_->SetTextColorId(kColorToolbarText);
++    search_->SetBackgroundColor(kColorLocationBarBackground);
+     search_->set_controller(this);
+     SetInitiallyFocusedView(search_);
+ 
+@@ -462,8 +467,9 @@
+       return;
+     }
+     const auto window = owner_->GetWidget()->GetWindowBoundsInScreen();
+-    set_fixed_width(std::max(1, std::min(340, window.width() - 40)));
+-    scroll_->ClipHeightTo(0, std::max(0, std::min(224, window.height() - 204)));
++    set_fixed_width(std::max(1, std::min(400, window.width() - 40)));
++    scroll_->ClipHeightTo(0, std::max(0, std::min(kPopupBookmarkViewportHeight,
++                                                  window.height() - 204)));
+   }
+ 
+   void Back() {
+@@ -621,11 +627,11 @@
+         button->SetStyle(ui::ButtonStyle::kText);
+         button->SetBgColorOverrideDeprecated(SK_ColorTRANSPARENT);
+         button->SetHorizontalAlignment(gfx::ALIGN_TO_HEAD);
+-        button->SetEnabledTextColors(ui::kColorLabelForeground);
++        button->SetEnabledTextColors(kColorToolbarText);
+         button->SetCustomPadding(gfx::Insets::VH(6, 8));
+         button->SetMinSize(gfx::Size(0, 0));
+         button->SetCornerRadius(6);
+-        button->SetPreferredSize(gfx::Size(0, kBookmarkRowHeight));
++        button->SetPreferredSize(gfx::Size(0, kPopupBookmarkRowHeight));
+         button->SetTriggerableEventFlags(ui::EF_LEFT_MOUSE_BUTTON |
+                                          ui::EF_MIDDLE_MOUSE_BUTTON);
+         buttons_[id] = rows_->AddChildView(std::move(button));
+@@ -742,7 +748,7 @@
+   // MdTextButton also derives its vector-icon color from its text color.
+   // Match native chrome instead of inheriting the default accent color.
+   compact_button_->SetEnabledTextColors(kColorToolbarText);
+-  if (presentation_ != Presentation::kSection) {
++  if (presentation_ != Presentation::kSection || !favorites_) {
+     // Match native toolbar buttons over glass. The ink drop and focus ring
+     // continue to provide the themed hover, press and menu-anchor feedback.
+     compact_button_->SetBgColorOverrideDeprecated(SK_ColorTRANSPARENT);
+@@ -755,7 +761,7 @@
+   compact_button_->SetHorizontalAlignment(gfx::ALIGN_CENTER);
+   compact_button_->SetAccessibleName(title);
+   compact_button_->SetFocusBehavior(FocusBehavior::ALWAYS);
+-  if (presentation_ == Presentation::kPanelButton) {
++  if (UsesPopupButton()) {
+     // Use Chromium's native popup-button click suppression so clicking the
+     // anchor dismisses the bubble instead of immediately reopening it.
+     compact_button_->SetCallback(views::Button::PressedCallback());
+@@ -769,8 +775,8 @@
+     compact_button_->SetButtonController(std::move(controller));
+   }
+   compact_button_->GetViewAccessibility().SetHasPopup(
+-      presentation_ == Presentation::kPanelButton ? ax::mojom::HasPopup::kDialog
+-                                                : ax::mojom::HasPopup::kMenu);
++      UsesPopupButton() ? ax::mojom::HasPopup::kDialog
++                        : ax::mojom::HasPopup::kMenu);
+   compact_button_->GetViewAccessibility().SetIsCollapsed();
+   compact_button_->SetTooltipText(presentation_ == Presentation::kPanelButton
+                                       ? u"Show or hide bookmarks"
+@@ -779,12 +785,10 @@
+   compact_button_->SetImageModel(
+       views::Button::STATE_NORMAL,
+       ui::ImageModel::FromVectorIcon(
+-          presentation_ == Presentation::kPanelButton
+-              ? kBookmarksSidePanelRefreshOldIcon
+-          : favorites_ ? kStarIcon
+-                       : kKeyboardDoubleArrowRightIcon,
+-          kColorToolbarButtonIcon,
+-          favorites_ || presentation_ == Presentation::kPanelButton ? 18 : 16));
++          UsesPopupButton() ? kBookmarksSidePanelRefreshOldIcon
++          : favorites_      ? kStarIcon
++                            : kKeyboardDoubleArrowRightIcon,
++          kColorToolbarButtonIcon, favorites_ || UsesPopupButton() ? 18 : 16));
+   manage_ = AddChildView(std::make_unique<views::MdTextButton>(
+       base::BindRepeating(&NoventraBookmarksView::Manage,
+                           base::Unretained(this)),
+@@ -805,7 +809,7 @@
+   registrar_.Add(CollapsePref(),
+                  base::BindRepeating(&NoventraBookmarksView::ScheduleRefresh,
+                                      base::Unretained(this)));
+-  if (presentation_ == Presentation::kPanelButton) {
++  if (UsesPopupButton()) {
+     registrar_.Add(
+         "noventra.browser.bookmark_opening",
+         base::BindRepeating(&NoventraBookmarksView::OnOpeningStyleChanged,
+@@ -829,11 +833,15 @@
+   return favorites_ ? "noventra.browser.favorites_collapsed"
+                     : "noventra.browser.bookmarks_collapsed";
+ }
++bool NoventraBookmarksView::UsesPopupButton() const {
++  return !favorites_ && presentation_ != Presentation::kButton;
++}
+ bool NoventraBookmarksView::Compact() const {
+   return presentation_ != Presentation::kSection ||
+-         (inline_folders_ ? width() < 160 || GetProperty(kNoventraDockCompact)
+-                          : GetProperty(kNoventraDockHorizontal) ||
+-                                GetProperty(kNoventraDockCompact));
++         GetProperty(kNoventraDockHorizontal) ||
++         GetProperty(kNoventraDockCompact) ||
++         (!favorites_ && width() > 0 &&
++          width() < (inline_folders_ ? 160 : kMinimumLibraryWidth));
+ }
+ void NoventraBookmarksView::SetInlineFolders(bool enabled) {
+   enabled = enabled && !favorites_ && presentation_ == Presentation::kSection;
+@@ -854,7 +862,7 @@
+   heading_->SetCustomPadding(gfx::Insets::VH(enabled ? 2 : 4, 6));
+   heading_->SetMinSize(gfx::Size(0, enabled ? kInlineHeadingHeight : 28));
+   SetFlatBackground(heading_, enabled);
+-  SetFlatBackground(compact_button_, enabled);
++  SetFlatBackground(compact_button_, enabled || !favorites_);
+   new_folder_->SetEnabledTextColors(
+       enabled ? std::make_optional<ui::ColorVariant>(
+                     ui::kColorLabelForegroundSecondary)
+@@ -868,6 +876,13 @@
+ bool NoventraBookmarksView::Collapsed() const {
+   return browser_->GetProfile()->GetPrefs()->GetBoolean(CollapsePref());
+ }
++bool NoventraBookmarksView::HasOpenPopup() const {
++  // Native Show() can activate the bubble (and deactivate the browser) before
++  // its visibility flag changes. Include that opening interval. ClosePopup()
++  // synchronously clears the delegate before hiding or destroying the widget.
++  return popup_ && (!popup_widget_ || !popup_widget_->IsClosed());
++}
++
+ bool NoventraBookmarksView::HasDockContent() const {
+   if (favorites_ || presentation_ == Presentation::kPanelButton) {
+     return true;
+@@ -931,7 +946,7 @@
+ }
+ void NoventraBookmarksView::CloseMenu() {
+   menu_highlight_.reset();
+-  if (presentation_ != Presentation::kPanelButton) {
++  if (!UsesPopupButton()) {
+     compact_button_->GetViewAccessibility().SetIsCollapsed();
+   }
+   menu_.reset();
+@@ -958,7 +973,7 @@
+   }
+   base::SingleThreadTaskRunner::GetCurrentDefault()->DeleteSoon(
+       FROM_HERE, std::move(closing));
+-  if (presentation_ == Presentation::kPanelButton) {
++  if (UsesPopupButton()) {
+     compact_button_->GetViewAccessibility().SetIsCollapsed();
+   }
+ }
+@@ -1180,14 +1195,33 @@
+   if (!HasDockContent()) {
+     return gfx::Size();
+   }
+-  const bool compact = inline_folders_ && available.width().is_bounded()
+-                           ? available.width().value() < 160 ||
+-                                 GetProperty(kNoventraDockCompact)
+-                           : Compact();
++  const bool compact =
++      available.width().is_bounded()
++          ? presentation_ != Presentation::kSection ||
++                GetProperty(kNoventraDockHorizontal) ||
++                GetProperty(kNoventraDockCompact) ||
++                (!favorites_ &&
++                 available.width().value() <
++                     (inline_folders_ ? 160 : kMinimumLibraryWidth))
++          : Compact();
+   if (compact) {
+     return gfx::Size(40, 40);
+   }
+   return gfx::Size(232, ExpandedHeight());
++}
++void NoventraBookmarksView::OnBoundsChanged(const gfx::Rect& previous_bounds) {
++  views::View::OnBoundsChanged(previous_bounds);
++  if (!favorites_ && presentation_ == Presentation::kSection) {
++    const int minimum_width = inline_folders_ ? 160 : kMinimumLibraryWidth;
++    const bool was_narrow =
++        previous_bounds.width() > 0 && previous_bounds.width() < minimum_width;
++    const bool narrow = width() > 0 && width() < minimum_width;
++    if (was_narrow != narrow) {
++      // The dock's next measurement must reserve a single shortcut row when
++      // shrinking, and restore the saved library height when widening again.
++      PreferredSizeChanged();
++    }
++  }
+ }
+ int NoventraBookmarksView::ExpandedHeight() const {
+   const int count = static_cast<int>(order_.size());
+@@ -1217,6 +1251,23 @@
+     return;
+   }
+   const bool compact = Compact();
++  if (!compact && popup_) {
++    ClosePopup();
++  }
++  // A narrow saved library layout gets one readable entry point instead of
++  // squeezing a disclosure, an ellipsized title and a New Folder button into
++  // the sidebar. The expanded folder/collapse state remains intact.
++  const bool labeled_shortcut =
++      compact && UsesPopupButton() && presentation_ == Presentation::kSection &&
++      width() >= 120 && !GetProperty(kNoventraDockHorizontal) &&
++      !GetProperty(kNoventraDockCompact);
++  compact_button_->SetText(labeled_shortcut ? u"Bookmarks" : u"");
++  // LabelButton derives accessibility from its text, including an empty icon
++  // label. Preserve the control's stable name when its presentation changes.
++  compact_button_->SetAccessibleName(favorites_ ? u"Favorites" : u"Bookmarks");
++  compact_button_->SetHorizontalAlignment(labeled_shortcut ? gfx::ALIGN_TO_HEAD
++                                                           : gfx::ALIGN_CENTER);
++  compact_button_->SetImageLabelSpacing(8);
+   heading_->SetVisible(!compact);
+   compact_button_->SetVisible(compact);
+   compact_button_->SetBounds(0, 0, width(), height());
+@@ -1309,7 +1360,7 @@
+   Navigate(&params);
+ }
+ void NoventraBookmarksView::ShowLibrary(const ui::Event& event) {
+-  if (presentation_ == Presentation::kPanelButton) {
++  if (UsesPopupButton()) {
+     auto* prefs = browser_->GetProfile()->GetPrefs();
+     if (prefs->GetInteger("noventra.browser.bookmark_opening") == 1) {
+       ClosePopup();
+diff --git a/chrome/browser/ui/views/frame/noventra_bookmarks_view.h b/chrome/browser/ui/views/frame/noventra_bookmarks_view.h
+--- a/chrome/browser/ui/views/frame/noventra_bookmarks_view.h
++++ b/chrome/browser/ui/views/frame/noventra_bookmarks_view.h
+@@ -45,6 +45,7 @@
+   ~NoventraBookmarksView() override;
+   gfx::Size CalculatePreferredSize(
+       const views::SizeBounds& available) const override;
++  void OnBoundsChanged(const gfx::Rect& previous_bounds) override;
+   void Layout(PassKey) override;
+   int ExpandedHeight() const;
+   // Combined sidebars expand folders in place. Other library presentations
+@@ -54,6 +55,7 @@
+   // Empty library/menu controls do not occupy a dock slot. Favorites retains
+   // its creation affordance, and the searchable popup stays reachable.
+   bool HasDockContent() const;
++  bool HasOpenPopup() const;
+   void AfterPropertyChange(const void* key, int64_t old_value) override;
+   void BookmarkModelChanged() override;
+   void BookmarkModelBeingDeleted() override;
+@@ -82,6 +84,7 @@
+   void Manage();
+   void NewFolder();
+   bool CanCreateFolder() const;
++  bool UsesPopupButton() const;
+   bool Compact() const;
+   bool Collapsed() const;
+   const char* CollapsePref() const;
+diff --git a/chrome/browser/ui/views/frame/noventra_dock_controller.cc b/chrome/browser/ui/views/frame/noventra_dock_controller.cc
+--- a/chrome/browser/ui/views/frame/noventra_dock_controller.cc
++++ b/chrome/browser/ui/views/frame/noventra_dock_controller.cc
+@@ -833,6 +833,18 @@
+   return address_requested_ && IsControlOnSide("address") == side;
+ }
+ 
++bool NoventraDockController::HasOpenPopup(bool side) const {
++  // Wayland popups can be separate native surfaces rather than owned widgets.
++  // Query the view that owns the popup without walking every tab's subtree.
++  for (const auto& [id, view] : controls_) {
++    if (const auto* library = views::AsViewClass<NoventraBookmarksView>(view);
++        library && library->HasOpenPopup() && IsControlOnSide(id) == side) {
++      return true;
++    }
++  }
++  return false;
++}
++
+ bool NoventraDockController::ShouldReveal(const gfx::Point& point,
+                                           bool side) const {
+   if (address_pane_ && address_pane_->GetVisible() &&
+@@ -846,10 +858,15 @@
+     if (side_dock != side || !dock->HasVisibleControls()) continue;
+     if (dock->GetVisible() && views::View::ConvertRectToTarget(
+             dock, browser_, dock->GetLocalBounds()).Contains(point)) return true;
+-    if ((edge == noventra::DockEdge::kTop && point.y() < 3) ||
+-        (edge == noventra::DockEdge::kBottom && point.y() >= browser_->height() - 3) ||
+-        (edge == noventra::DockEdge::kLeft && point.x() < 3) ||
+-        (edge == noventra::DockEdge::kRight && point.x() >= browser_->width() - 3)) return true;
++    // An edge should be easy to acquire without requiring a three-pixel aim.
++    // Keep the browser's existing top/side precedence at shared corners.
++    constexpr int kEdgeTrigger = 6;
++    if ((edge == noventra::DockEdge::kTop && point.y() < kEdgeTrigger) ||
++        (edge == noventra::DockEdge::kBottom &&
++         point.y() >= browser_->height() - kEdgeTrigger) ||
++        (edge == noventra::DockEdge::kLeft && point.x() < kEdgeTrigger) ||
++        (edge == noventra::DockEdge::kRight &&
++         point.x() >= browser_->width() - kEdgeTrigger)) return true;
+   }
+   return !side && IsVisibleCaptionPoint(point);
+ }
+diff --git a/chrome/browser/ui/views/frame/noventra_dock_controller.h b/chrome/browser/ui/views/frame/noventra_dock_controller.h
+--- a/chrome/browser/ui/views/frame/noventra_dock_controller.h
++++ b/chrome/browser/ui/views/frame/noventra_dock_controller.h
+@@ -58,6 +58,7 @@
+   bool ShouldReveal(const gfx::Point& point, bool side) const;
+   bool IsControlOnSide(std::string_view id) const;
+   bool HasFocusedControl(bool side) const;
++  bool HasOpenPopup(bool side) const;
+   std::vector<const views::View*> GetChromeRoots(bool side) const;
+   void AppendAccessiblePanes(std::vector<views::View*>& panes) const;
+  private:
+diff --git a/chrome/browser/ui/views/frame/noventra_dock_view.cc b/chrome/browser/ui/views/frame/noventra_dock_view.cc
+--- a/chrome/browser/ui/views/frame/noventra_dock_view.cc
++++ b/chrome/browser/ui/views/frame/noventra_dock_view.cc
+@@ -440,8 +440,7 @@
+         // trailing controls. Spare space surrounds the field, so the menu and
+         // extension region still reach the end of the row.
+         constexpr int kMaximumAddressWidth = 720;
+-        address_margin = tabs_first ? 0 :
+-            std::max(0, extent - kMaximumAddressWidth);
++        address_margin = std::max(0, extent - kMaximumAddressWidth);
+         extent -= address_margin;
+         x += address_margin / 2;
+       }
+@@ -625,7 +624,9 @@
+ void NoventraDockView::OnBoundsChanged(const gfx::Rect& previous_bounds) {
+   views::AccessiblePaneView::OnBoundsChanged(previous_bounds);
+   UpdateGlassBlur();
+-  UpdateResizeEdge();
++  if (previous_bounds.size() != size()) {
++    UpdateResizeEdge();
++  }
+ }
+ 
+ void NoventraDockView::UpdateGlassBlur() {
+@@ -740,7 +741,11 @@
+         // RTL transforms. Keep an easy-to-find grip in the collapsed rail.
+         auto grip = views::View::ConvertRectToTarget(target, this,
+                                                      target->GetLocalBounds());
+-        const int grip_width = std::min(8, width());
++        // Keep a generous target along the entire edge, including below the
++        // natural tab list. Icon rails retain room for their small buttons.
++        const int grip_width = std::min(
++            width() >= VerticalTabStripRegionView::kUncollapsedMinWidth ? 12 : 8,
++            width());
+         grip.set_x(grip.CenterPoint().x() < width() / 2 ? 0
+                                                         : width() - grip_width);
+         grip.set_y(0);

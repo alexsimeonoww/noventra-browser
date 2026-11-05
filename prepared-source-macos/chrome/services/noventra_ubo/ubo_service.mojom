@@ -1,0 +1,10 @@
+// Experimental core qualification only; no network interception interface.
+module noventra_ubo.mojom;
+import "sandbox/policy/mojom/sandbox.mojom";
+struct Asset { string name; string sha256; array<uint8> bytes; };
+enum Operation { kInitialize, kLiteral, kLoad, kReplay, kBenchmark };
+[ServiceSandbox=sandbox.mojom.Sandbox.kService]
+interface UboService {
+  Initialize(array<Asset> assets) => (string error);
+  Run(Operation operation, string payload) => (string reply);
+};

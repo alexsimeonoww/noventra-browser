@@ -1,0 +1,77 @@
+name: Noventra Mac source checks
+
+on:
+  pull_request:
+    paths:
+      - 'LICENSE'
+      - 'noventra/resources/initial_preferences.json'
+      - 'noventra/resources/generated/macos/**'
+      - '.github/workflows/noventra-macos-source.yml'
+      - 'noventra/patches/chromium-156-macos/**'
+      - 'noventra/package/macos/**'
+      - 'noventra/macos-source-identity.json'
+      - 'prepared-source-macos/**'
+      - 'tools/noventra/*macos.py'
+      - 'tests/noventra/test_*macos.py'
+      - 'tests/noventra/fixtures/macos-install-156.sh'
+  push:
+    branches: [main]
+    paths:
+      - 'LICENSE'
+      - 'noventra/resources/initial_preferences.json'
+      - 'noventra/resources/generated/macos/**'
+      - '.github/workflows/noventra-macos-source.yml'
+      - 'noventra/patches/chromium-156-macos/**'
+      - 'noventra/package/macos/**'
+      - 'noventra/macos-source-identity.json'
+      - 'prepared-source-macos/**'
+      - 'tools/noventra/*macos.py'
+      - 'tests/noventra/test_*macos.py'
+      - 'tests/noventra/fixtures/macos-install-156.sh'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-and-tools:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out source without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check source declarations and Mac tools offline
+        run: |
+          python3 --version
+          python3 -B tools/noventra/build_macos.py check-layer
+          python3 -B -m unittest discover -s tests/noventra -p 'test_*macos.py' -v
+      - name: Verify the separate Mac source inventory
+        run: |
+          python3 -B - <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          sys.path.insert(0, str(Path('tools/noventra').resolve()))
+          import build_macos as build
+          root = Path.cwd()
+          identity = json.loads((root / 'noventra/macos-source-identity.json').read_text())
+          manifest, manifest_sha = build.load_layer()
+          assert identity['kind'] == 'noventra-macos-source-identity'
+          assert identity['layer_manifest_sha256'] == manifest_sha
+          assert identity['engine'] == build.ENGINE
+          assert identity['native_build_verified'] is False
+          assert identity['native_ui_verified'] is False
+          assert identity['automatic_updates_enabled'] is False
+          assert identity['binary_snapshot'] is None
+          for name, record in identity['files'].items():
+              path = build.child(root, name)
+              assert build.sha(path) == record['sha256'], name
+              assert path.stat().st_size == record['bytes'], name
+              assert path.stat().st_mode & 0o777 == record['mode'], name
+          build.verify_files(root / 'prepared-source-macos', manifest['final_files'])
+          expected = {'prepared-source-macos/' + name for name in manifest['final_files']}
+          assert {name for name in identity['files'] if name.startswith('prepared-source-macos/')} == expected
+          print('Verified all declared Mac source and build inputs. Native Mac qualification remains required.')
+          PY

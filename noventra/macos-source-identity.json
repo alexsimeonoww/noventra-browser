@@ -1,0 +1,3622 @@
+{
+  "automatic_updates_enabled": false,
+  "binary_snapshot": null,
+  "engine": {
+    "chromium": "a21ce95c24ce3964416f09ae1862f53f319eb4d0",
+    "helium": "2f81b9cafa38a95071e20de3f9cd6b0aca6d3c65",
+    "platform": "0c7da2ba0b61a2143adf1c6d56ccd0df6a53d0bf",
+    "target_cpu": "arm64",
+    "target_os": "mac",
+    "version": "156.0.8078.79"
+  },
+  "files": {
+    ".github/workflows/noventra-macos-source.yml": {
+      "bytes": 3228,
+      "mode": 420,
+      "sha256": "cf40d1ecb158609c28cbe7fe73fa9ce4aee4bbc6db9ca71c380652fa83e15b0a"
+    },
+    "LICENSE": {
+      "bytes": 35071,
+      "mode": 420,
+      "sha256": "a0279a9937ce228eb71ea2a0252d0830458708570fee3df516fa4bd4c8a134bc"
+    },
+    "noventra/package/macos/BUILD.md": {
+      "bytes": 10652,
+      "mode": 420,
+      "sha256": "33b6f2fb4bcad7c4549ca46335f962324389631e4d09a880d77da265197cf0bc"
+    },
+    "noventra/package/macos/PARITY.md": {
+      "bytes": 4011,
+      "mode": 420,
+      "sha256": "3e29c8610a4b47873424d8c4564da26ad101910aff9a05d4d2a0ef70b9c567c4"
+    },
+    "noventra/package/macos/README.md": {
+      "bytes": 9451,
+      "mode": 420,
+      "sha256": "0b1782a4b0fcebb5494baec90fb2a9a092bc44131827fa9c5c25318557b83ed7"
+    },
+    "noventra/package/macos/RUNTIME.md": {
+      "bytes": 7441,
+      "mode": 420,
+      "sha256": "e8cef3077bd58f0de9e80d2ea42b7cfffd755686ba6f3ab6318748ea3f4482d0"
+    },
+    "noventra/patches/chromium-156-macos/manifest.json": {
+      "bytes": 347370,
+      "mode": 420,
+      "sha256": "d5ca765513c1547fae6c71807ff01a88fcff3fccf3dd58b399381bff95029be9"
+    },
+    "noventra/patches/chromium-156-macos/noventra-about-license-footer.patch": {
+      "bytes": 783,
+      "mode": 420,
+      "sha256": "4e4f427d09fa84161040d167117fa3f84d7968a79d9af775afbb124b16b712bb"
+    },
+    "noventra/patches/chromium-156-macos/noventra-incognito-cli-space.patch": {
+      "bytes": 4057,
+      "mode": 420,
+      "sha256": "6a91b23d32aae03604895ffa351b30acc00e969164e10c6dd55121241e3d27ef"
+    },
+    "noventra/patches/chromium-156-macos/noventra-incognito-public-updates.patch": {
+      "bytes": 94290,
+      "mode": 420,
+      "sha256": "6dd5b932d0eb2b4223029a31382a0464f19e65f1607d90fc7bc3f7e0e4a34ec0"
+    },
+    "noventra/patches/chromium-156-macos/noventra-macos-candidate.patch": {
+      "bytes": 8425338,
+      "mode": 420,
+      "sha256": "f2a65cfae8953d86240d01009316df4ee6e4e6fff9a1ff04deae9c61f64da458"
+    },
+    "noventra/patches/chromium-156-macos/noventra-native-toolbar-resource.patch": {
+      "bytes": 698,
+      "mode": 420,
+      "sha256": "3bc1b880070a2d30e96948b3beb081d793e59c616cc6e2f2cd14987af443dcf8"
+    },
+    "noventra/patches/chromium-156-macos/noventra-onboarding-device-transfer-entry.patch": {
+      "bytes": 5502,
+      "mode": 420,
+      "sha256": "cf6a7c41dc1c32731db96aced2a37c8ddb94897770c8b22f03828365eb03a72f"
+    },
+    "noventra/patches/chromium-156-macos/noventra-pin-close-private-spaces.patch": {
+      "bytes": 10171,
+      "mode": 420,
+      "sha256": "54eaeaca48c72be1ac29e7e75576d024b201d19d8ee57c77b3b16e40a139cf45"
+    },
+    "noventra/patches/chromium-156-macos/noventra-preview-polish.patch": {
+      "bytes": 11964,
+      "mode": 420,
+      "sha256": "7b77f0ae5b0721c58bbae911a6c8f5b5d09a465c181522d544cabeff86fa657c"
+    },
+    "noventra/patches/chromium-156-macos/noventra-responsive-subpages.patch": {
+      "bytes": 1319,
+      "mode": 420,
+      "sha256": "090fd995d90a322659ab1997f07d31fa762c232d90de1447dce7fb0b99799ef3"
+    },
+    "noventra/patches/chromium-156-macos/noventra-settings-media-defaults.patch": {
+      "bytes": 8483,
+      "mode": 420,
+      "sha256": "c44de8e6d1b53068184cc0550b73483c476ccb78e70b97d95961808c312d7633"
+    },
+    "noventra/patches/chromium-156-macos/noventra-shared-cookie-import.patch": {
+      "bytes": 105143,
+      "mode": 420,
+      "sha256": "b6b805a51be7680167525cc89aa34daf936c7b61c55de5b705b728c81f22e3cb"
+    },
+    "noventra/patches/chromium-156-macos/noventra-shared-profile-pin-infrastructure.patch": {
+      "bytes": 352221,
+      "mode": 420,
+      "sha256": "b69f219be798c2914bb0463bf616b1fa1a6b9cd6e90af92358fc00105a91002d"
+    },
+    "noventra/patches/chromium-156-macos/noventra-sidebar-space-capacity-animation.patch": {
+      "bytes": 9311,
+      "mode": 420,
+      "sha256": "f8da0079d1cc1445958a88fa19b3a8973ce1a3f5a4e3920b0f4b6bfe4f7d18a8"
+    },
+    "noventra/patches/chromium-156-macos/noventra-sidebar-split-polish.patch": {
+      "bytes": 78832,
+      "mode": 420,
+      "sha256": "79b7fe8d9c37268914ca83b0ab6153bd369bbc958ff939554da1fd8ca017e816"
+    },
+    "noventra/patches/chromium-156-macos/noventra-toolbar-bookmarks-frameless.patch": {
+      "bytes": 22454,
+      "mode": 420,
+      "sha256": "73014fb83047fc3c15c012f90dada50ca12ea90ca8b0d6ff3198f71d149b2d26"
+    },
+    "noventra/patches/chromium-156-macos/noventra-wayland-modal-position.patch": {
+      "bytes": 615,
+      "mode": 420,
+      "sha256": "aee7e20f0216e7d42135770f180b9368458602820e0c737a034e4ede4b4a2294"
+    },
+    "noventra/patches/chromium-156-macos/series": {
+      "bytes": 623,
+      "mode": 420,
+      "sha256": "3c0cf972e4290d54737c783eab52a5865a9b0a362c7fb3f97c791d863b340a8e"
+    },
+    "noventra/resources/generated/macos/Noventra.iconset/icon_128x128.png": {
+      "bytes": 7851,
+      "mode": 420,
+      "sha256": "2ef39153d19ff0046d01546065e7e9e113292c8ea9e170ddd35ba57294805cab"
+    },
+    "noventra/resources/generated/macos/Noventra.iconset/icon_128x128@2x.png": {
+      "bytes": 23708,
+      "mode": 420,
+      "sha256": "ab282c7220eaf363ddcf68b032349f558e812843134097ba74b267441f09b92a"
+    },
+    "noventra/resources/generated/macos/Noventra.iconset/icon_16x16.png": {
+      "bytes": 525,
+      "mode": 420,
+      "sha256": "223986e5339b39a707a1f0f394c9a6b423f01d46bbdf7e601f48f661e7f7b6dd"
+    },
+    "noventra/resources/generated/macos/Noventra.iconset/icon_16x16@2x.png": {
+      "bytes": 1264,
+      "mode": 420,
+      "sha256": "dca9edf59092307a3d252a90115f43680bf5b255e949405553b910287e9e3ee3"
+    },
+    "noventra/resources/generated/macos/Noventra.iconset/icon_256x256.png": {
+      "bytes": 23708,
+      "mode": 420,
+      "sha256": "ab282c7220eaf363ddcf68b032349f558e812843134097ba74b267441f09b92a"
+    },
+    "noventra/resources/generated/macos/Noventra.iconset/icon_256x256@2x.png": {
+      "bytes": 78725,
+      "mode": 420,
+      "sha256": "175d8be2b55f05184d4c31305bec9e26b1b2883510f3bc2e9903d80e0acce113"
+    },
+    "noventra/resources/generated/macos/Noventra.iconset/icon_32x32.png": {
+      "bytes": 1264,
+      "mode": 420,
+      "sha256": "dca9edf59092307a3d252a90115f43680bf5b255e949405553b910287e9e3ee3"
+    },
+    "noventra/resources/generated/macos/Noventra.iconset/icon_32x32@2x.png": {
+      "bytes": 3054,
+      "mode": 420,
+      "sha256": "18e09cf587157edcf035515f9e19b8ec8433777615a1c92155247549d812eec5"
+    },
+    "noventra/resources/generated/macos/Noventra.iconset/icon_512x512.png": {
+      "bytes": 78725,
+      "mode": 420,
+      "sha256": "175d8be2b55f05184d4c31305bec9e26b1b2883510f3bc2e9903d80e0acce113"
+    },
+    "noventra/resources/generated/macos/Noventra.iconset/icon_512x512@2x.png": {
+      "bytes": 257220,
+      "mode": 420,
+      "sha256": "e29d6051218b8851c69789bb4f91fb5dfbc0ee9bc392fae3c3c5b844c34d07d9"
+    },
+    "noventra/resources/generated/macos/noventra.icns": {
+      "bytes": 474399,
+      "mode": 420,
+      "sha256": "a14b0e1b40c5ade646da11c4b013dc99f56569adc5aa6b6bfce0bcf82bff5a36"
+    },
+    "noventra/resources/initial_preferences.json": {
+      "bytes": 146,
+      "mode": 420,
+      "sha256": "9d272fb18ea4e7d9fc43fa60b2d73f3651b7603a81f1082e7de6e8ac14e25c0d"
+    },
+    "prepared-source-macos/base/features.cc": {
+      "bytes": 11031,
+      "mode": 420,
+      "sha256": "d85f03488e4d2b51605db17b6c262f5bc5bdd82f882ad2ff9083ddf900d97c79"
+    },
+    "prepared-source-macos/chrome/app/access_code_cast_strings.grdp": {
+      "bytes": 5509,
+      "mode": 420,
+      "sha256": "0e2dac30865850f735628cfa2fb6b16fc13f49c72fc166db5af5e6e366d48342"
+    },
+    "prepared-source-macos/chrome/app/actor_strings.grdp": {
+      "bytes": 16014,
+      "mode": 420,
+      "sha256": "aa86d00495506a3aef3446603862766a1706d7159769c2fe4ab3a72a8c0f1152"
+    },
+    "prepared-source-macos/chrome/app/app_management_strings.grdp": {
+      "bytes": 15639,
+      "mode": 420,
+      "sha256": "6aa992504821afaa7279488455c0316d17ba5c58bd889b4a4135c1412931b169"
+    },
+    "prepared-source-macos/chrome/app/certificate_manager.grdp": {
+      "bytes": 22484,
+      "mode": 420,
+      "sha256": "718d8c886ae23cbef715f6249f66cb57840c68d886d349efca6f5cfa6442e6d6"
+    },
+    "prepared-source-macos/chrome/app/chrome_crash_reporter_client.cc": {
+      "bytes": 8258,
+      "mode": 420,
+      "sha256": "1fe51e4c3f4b12865f59d749bcbb32e4a9bbda92508a0ce151c10e63e4472e3e"
+    },
+    "prepared-source-macos/chrome/app/chrome_main_delegate.cc": {
+      "bytes": 81296,
+      "mode": 420,
+      "sha256": "b71e9660af2c2bac4ef7ce9545f3b49d5a2636feeacd9e2a0e05ebe697f69d30"
+    },
+    "prepared-source-macos/chrome/app/chromeos_strings.grdp": {
+      "bytes": 127582,
+      "mode": 420,
+      "sha256": "831f3e35b964576a514472941cd02a3169dab665e8704812040963dcc634d5e9"
+    },
+    "prepared-source-macos/chrome/app/chromium_strings.grd": {
+      "bytes": 271353,
+      "mode": 420,
+      "sha256": "f3aef5596d3e5916f79cebdde0ee24cd228804a5c2704e9c0ad42c1ef8909d1f"
+    },
+    "prepared-source-macos/chrome/app/extensions_strings.grdp": {
+      "bytes": 53359,
+      "mode": 420,
+      "sha256": "45272757bc4c13586ec245543ad5ecde6187e879d836e5a69f6fbe0d392645f3"
+    },
+    "prepared-source-macos/chrome/app/generated_resources.grd": {
+      "bytes": 1450965,
+      "mode": 420,
+      "sha256": "ac374ec6cad7804b16ce704a3eda96c5206e9e382343dd57182143306b52b7a6"
+    },
+    "prepared-source-macos/chrome/app/glic_strings.grdp": {
+      "bytes": 48522,
+      "mode": 420,
+      "sha256": "dffb19f70f13041427f0a03a0dbc93a465744e3cba597915a8d04ac36c224131"
+    },
+    "prepared-source-macos/chrome/app/media_router_strings.grdp": {
+      "bytes": 25026,
+      "mode": 420,
+      "sha256": "d14e74c507f5a5ae80dab8f2b5b3037e5d5c6240edb246281971007b375666b7"
+    },
+    "prepared-source-macos/chrome/app/os_settings_strings.grdp": {
+      "bytes": 595803,
+      "mode": 420,
+      "sha256": "c2cafb63b7fd547446a6d12c26d1f51644837f6779d02deb178e6a3b024f265b"
+    },
+    "prepared-source-macos/chrome/app/password_manager_ui_strings.grdp": {
+      "bytes": 104470,
+      "mode": 420,
+      "sha256": "d036f81a343018da28a39308fd8d6e14e815b6446a6da4e367ca0bf51e772768"
+    },
+    "prepared-source-macos/chrome/app/profiles_strings.grdp": {
+      "bytes": 123129,
+      "mode": 420,
+      "sha256": "7a9d9b8174b7f0c67e8f45c3b9c7c8eb184b349c9eb2928135a9d65d4cc652bf"
+    },
+    "prepared-source-macos/chrome/app/settings_chromium_strings.grdp": {
+      "bytes": 42910,
+      "mode": 420,
+      "sha256": "7eb4da2208430ce7e5af13fe80c0cec2cc7be8dee1b9fb541cbad920d874884a"
+    },
+    "prepared-source-macos/chrome/app/settings_strings.grdp": {
+      "bytes": 423520,
+      "mode": 420,
+      "sha256": "19d17adc63d0f31ee6a1da7eb896af1362af553a174bd4878957a4e04eea2c47"
+    },
+    "prepared-source-macos/chrome/app/shared_settings_strings.grdp": {
+      "bytes": 32584,
+      "mode": 420,
+      "sha256": "468e2c730dada8c4e818773e11850e9c22283ea47de4bd34ae3cee834fdd68bb"
+    },
+    "prepared-source-macos/chrome/app/skills_strings.grdp": {
+      "bytes": 8627,
+      "mode": 420,
+      "sha256": "5e370bb245c17e89f5b6cc600289fd7b492b88425f5f6dc3be61e5399c783520"
+    },
+    "prepared-source-macos/chrome/app/support_tool_strings.grdp": {
+      "bytes": 17484,
+      "mode": 420,
+      "sha256": "584bdac80fa2938c4b65d714a3f80d8f7742c487182472c70bb7c02226fda58a"
+    },
+    "prepared-source-macos/chrome/app/theme/chromium/BRANDING": {
+      "bytes": 363,
+      "mode": 420,
+      "sha256": "392704ba862c0e76bbd3979a2f4d0e58e10e45711c7d37b424b02be83d4154c3"
+    },
+    "prepared-source-macos/chrome/app/theme/chromium/mac/Assets.xcassets/AppIcon.appiconset/Contents.json": {
+      "bytes": 1237,
+      "mode": 420,
+      "sha256": "8da520f82fd318971fb02478bcfad1ee0899ede74e07355f609482877ac66ff1"
+    },
+    "prepared-source-macos/chrome/app/theme/chromium/mac/Assets.xcassets/AppIcon.appiconset/appicon_1024.png": {
+      "bytes": 257220,
+      "mode": 420,
+      "sha256": "e29d6051218b8851c69789bb4f91fb5dfbc0ee9bc392fae3c3c5b844c34d07d9"
+    },
+    "prepared-source-macos/chrome/app/theme/chromium/mac/Assets.xcassets/AppIcon.appiconset/appicon_128.png": {
+      "bytes": 7851,
+      "mode": 420,
+      "sha256": "2ef39153d19ff0046d01546065e7e9e113292c8ea9e170ddd35ba57294805cab"
+    },
+    "prepared-source-macos/chrome/app/theme/chromium/mac/Assets.xcassets/AppIcon.appiconset/appicon_16.png": {
+      "bytes": 525,
+      "mode": 420,
+      "sha256": "223986e5339b39a707a1f0f394c9a6b423f01d46bbdf7e601f48f661e7f7b6dd"
+    },
+    "prepared-source-macos/chrome/app/theme/chromium/mac/Assets.xcassets/AppIcon.appiconset/appicon_256.png": {
+      "bytes": 23708,
+      "mode": 420,
+      "sha256": "ab282c7220eaf363ddcf68b032349f558e812843134097ba74b267441f09b92a"
+    },
+    "prepared-source-macos/chrome/app/theme/chromium/mac/Assets.xcassets/AppIcon.appiconset/appicon_32.png": {
+      "bytes": 1264,
+      "mode": 420,
+      "sha256": "dca9edf59092307a3d252a90115f43680bf5b255e949405553b910287e9e3ee3"
+    },
+    "prepared-source-macos/chrome/app/theme/chromium/mac/Assets.xcassets/AppIcon.appiconset/appicon_512.png": {
+      "bytes": 78725,
+      "mode": 420,
+      "sha256": "175d8be2b55f05184d4c31305bec9e26b1b2883510f3bc2e9903d80e0acce113"
+    },
+    "prepared-source-macos/chrome/app/theme/chromium/mac/Assets.xcassets/AppIcon.appiconset/appicon_64.png": {
+      "bytes": 3054,
+      "mode": 420,
+      "sha256": "18e09cf587157edcf035515f9e19b8ec8433777615a1c92155247549d812eec5"
+    },
+    "prepared-source-macos/chrome/app/theme/chromium/mac/app.icns": {
+      "bytes": 474399,
+      "mode": 420,
+      "sha256": "a14b0e1b40c5ade646da11c4b013dc99f56569adc5aa6b6bfce0bcf82bff5a36"
+    },
+    "prepared-source-macos/chrome/app/theme/chromium/product_logo.svg": {
+      "bytes": 264833,
+      "mode": 420,
+      "sha256": "d9f5b19660f0dfab823b27aa51ca8720597edfc8b236b65ea22d71098423f96f"
+    },
+    "prepared-source-macos/chrome/app/theme/chromium/product_logo_128.png": {
+      "bytes": 10633,
+      "mode": 420,
+      "sha256": "177ef90a880d8f551aafda6c2251103a778d8207142a7d7c2b131fd7299302ac"
+    },
+    "prepared-source-macos/chrome/app/theme/chromium/product_logo_16.png": {
+      "bytes": 710,
+      "mode": 420,
+      "sha256": "234a414117f8c01de47ad16a51075657d8626f6047a6fd93ac59a8e81fdf3613"
+    },
+    "prepared-source-macos/chrome/app/theme/chromium/product_logo_22_mono.png": {
+      "bytes": 510,
+      "mode": 420,
+      "sha256": "19f77efcf94e7d2fe84a62f9fe2f2cbecc511dd543248b42aaabea3831d9acec"
+    },
+    "prepared-source-macos/chrome/app/theme/chromium/product_logo_24.png": {
+      "bytes": 1219,
+      "mode": 420,
+      "sha256": "0d245e0624849fb9cb283c7465153c137b7a5a915de49bc4c0e1a023c0e0d93b"
+    },
+    "prepared-source-macos/chrome/app/theme/chromium/product_logo_256.png": {
+      "bytes": 27216,
+      "mode": 420,
+      "sha256": "8cd3e32b9693551b82b794d84aade6af2ae7e76a49f27b9f3b73ec38f23cb161"
+    },
+    "prepared-source-macos/chrome/app/theme/chromium/product_logo_48.png": {
+      "bytes": 2944,
+      "mode": 420,
+      "sha256": "db1b8a8df54f22a2e11a37698cd79a74391a73ec7c08f67528c6da6f85006b64"
+    },
+    "prepared-source-macos/chrome/app/theme/chromium/product_logo_64.png": {
+      "bytes": 4196,
+      "mode": 420,
+      "sha256": "d1223a8f4f7af23962e2664b6b0e2eedab1e239fa30f2ebb78f45087b53cd377"
+    },
+    "prepared-source-macos/chrome/app/theme/chromium/product_logo_animation.svg": {
+      "bytes": 264833,
+      "mode": 420,
+      "sha256": "d9f5b19660f0dfab823b27aa51ca8720597edfc8b236b65ea22d71098423f96f"
+    },
+    "prepared-source-macos/chrome/app/theme/chromium/win/chromium.ico": {
+      "bytes": 39468,
+      "mode": 420,
+      "sha256": "01a872022b0a2a77aef4076d1dcea4bd3dac42ee0ff5beced5fc07da363eeb89"
+    },
+    "prepared-source-macos/chrome/app/theme/default_100_percent/chromium/product_logo_16.png": {
+      "bytes": 344,
+      "mode": 420,
+      "sha256": "4cde11e02ee19ff1679aee9c26d9e27c81916df7480a19753cb67f05d551528f"
+    },
+    "prepared-source-macos/chrome/app/theme/default_100_percent/chromium/product_logo_32.png": {
+      "bytes": 825,
+      "mode": 420,
+      "sha256": "77b2a06f2eb5f848902ac7f5a55a8142665eec20754d9c90d0f9009ceb0112db"
+    },
+    "prepared-source-macos/chrome/app/theme/default_100_percent/chromium/product_logo_name_22.png": {
+      "bytes": 510,
+      "mode": 420,
+      "sha256": "19f77efcf94e7d2fe84a62f9fe2f2cbecc511dd543248b42aaabea3831d9acec"
+    },
+    "prepared-source-macos/chrome/app/theme/default_100_percent/chromium/product_logo_name_22_white.png": {
+      "bytes": 557,
+      "mode": 420,
+      "sha256": "cb7646a3cc715710748ebe8c13e0e7245763b51c8e2232e55601f46296f68985"
+    },
+    "prepared-source-macos/chrome/app/theme/default_100_percent/common/favicon_ntp.png": {
+      "bytes": 344,
+      "mode": 420,
+      "sha256": "4cde11e02ee19ff1679aee9c26d9e27c81916df7480a19753cb67f05d551528f"
+    },
+    "prepared-source-macos/chrome/app/theme/default_200_percent/chromium/product_logo_16.png": {
+      "bytes": 825,
+      "mode": 420,
+      "sha256": "77b2a06f2eb5f848902ac7f5a55a8142665eec20754d9c90d0f9009ceb0112db"
+    },
+    "prepared-source-macos/chrome/app/theme/default_200_percent/chromium/product_logo_32.png": {
+      "bytes": 1679,
+      "mode": 420,
+      "sha256": "6c5e66098cfe0e440dbadd1da613e1bc00aa1d6394b61bb6a6b2519d2bdb7ee2"
+    },
+    "prepared-source-macos/chrome/app/theme/default_200_percent/chromium/product_logo_name_22.png": {
+      "bytes": 1238,
+      "mode": 420,
+      "sha256": "51bc24d61f4848d686efa51d0952cd6a70a198a9a01ed0deaec8e1f70c85d43d"
+    },
+    "prepared-source-macos/chrome/app/theme/default_200_percent/chromium/product_logo_name_22_white.png": {
+      "bytes": 1336,
+      "mode": 420,
+      "sha256": "1eb0b86dcd6670c6961451cfa6e885aadaa625f75f2381f59a5f34aa18062b1d"
+    },
+    "prepared-source-macos/chrome/app/theme/default_200_percent/common/favicon_ntp.png": {
+      "bytes": 825,
+      "mode": 420,
+      "sha256": "77b2a06f2eb5f848902ac7f5a55a8142665eec20754d9c90d0f9009ceb0112db"
+    },
+    "prepared-source-macos/chrome/app/vector_icons/browser_logo.icon": {
+      "bytes": 154877,
+      "mode": 420,
+      "sha256": "d38081cca780f3f666be1951a968a60ac4b6dda20f00f660c957a95433e22102"
+    },
+    "prepared-source-macos/chrome/app/vector_icons/browser_logo_old.icon": {
+      "bytes": 154877,
+      "mode": 420,
+      "sha256": "d38081cca780f3f666be1951a968a60ac4b6dda20f00f660c957a95433e22102"
+    },
+    "prepared-source-macos/chrome/app/vector_icons/chrome_product.icon": {
+      "bytes": 154877,
+      "mode": 420,
+      "sha256": "d38081cca780f3f666be1951a968a60ac4b6dda20f00f660c957a95433e22102"
+    },
+    "prepared-source-macos/chrome/browser/BUILD.gn": {
+      "bytes": 165697,
+      "mode": 420,
+      "sha256": "c2f3b212789f8b3232e798bf50db1361070e56bc2a4ba224756a1a63f636cfed"
+    },
+    "prepared-source-macos/chrome/browser/app_controller_mac.mm": {
+      "bytes": 112117,
+      "mode": 420,
+      "sha256": "1fbac6b084e7c0087ccf0c228ca55d9cebdd2fcec83dccc308e166b9f8feb41b"
+    },
+    "prepared-source-macos/chrome/browser/autocomplete/chrome_autocomplete_provider_client.cc": {
+      "bytes": 35093,
+      "mode": 420,
+      "sha256": "2548ac88d2f89808f3646f145b89e36589b3b9807f48291ba84b9ffd44ac8ebe"
+    },
+    "prepared-source-macos/chrome/browser/autocomplete/chrome_autocomplete_scheme_classifier.cc": {
+      "bytes": 5123,
+      "mode": 420,
+      "sha256": "dd20f25c18c4d204871ebea026542994965e50e99fe14708bec6c2977ac65558"
+    },
+    "prepared-source-macos/chrome/browser/browser_process.h": {
+      "bytes": 12543,
+      "mode": 420,
+      "sha256": "07df5bfa44dab7f89eb5efd71d3640533ac719912769d4bd64088896658bb647"
+    },
+    "prepared-source-macos/chrome/browser/browser_process_impl.cc": {
+      "bytes": 77572,
+      "mode": 420,
+      "sha256": "00d970c04415516ac4a89fe9439c6b8b0e6907806fd05ba2001f099cc9b42b0a"
+    },
+    "prepared-source-macos/chrome/browser/browser_process_impl.h": {
+      "bytes": 18924,
+      "mode": 420,
+      "sha256": "7128b871eef5ed3491c56b8e4046ece0e4b9d63026c38c3522123c5099801e4a"
+    },
+    "prepared-source-macos/chrome/browser/chrome_browser_interface_binders_webui_parts_desktop.cc": {
+      "bytes": 33926,
+      "mode": 420,
+      "sha256": "1899feb5cd6e7fffe53240753dadef4c29cf34ad6cf7fe0323f211695de08e01"
+    },
+    "prepared-source-macos/chrome/browser/chrome_browser_main.cc": {
+      "bytes": 94805,
+      "mode": 420,
+      "sha256": "4d09115ed297d9e7b74139ebce8c17ba39e211d3af7d31e3711c58f9b86f9ba7"
+    },
+    "prepared-source-macos/chrome/browser/chrome_content_browser_client.cc": {
+      "bytes": 401239,
+      "mode": 420,
+      "sha256": "3b98e69b2f007cf74963a669ca1b730e582fffbdbaa0015cb5ffe0315373f3d2"
+    },
+    "prepared-source-macos/chrome/browser/chrome_content_browser_client_navigation_throttles.cc": {
+      "bytes": 28684,
+      "mode": 420,
+      "sha256": "9473a83a97481958ff6db092471bbf2f6b14ec09118a3698df9c08558b716629"
+    },
+    "prepared-source-macos/chrome/browser/component_updater/chrome_component_updater_configurator.cc": {
+      "bytes": 14616,
+      "mode": 420,
+      "sha256": "f18edd48ac61186817ea8ec0deb5adc3eb0432e2450680c9b08f1f44d2074396"
+    },
+    "prepared-source-macos/chrome/browser/component_updater/chrome_component_updater_configurator.h": {
+      "bytes": 1338,
+      "mode": 420,
+      "sha256": "dcd661a3ee140ee1f39c3f1daff0eccd5d7bec26f4d992513e736512ff645dbc"
+    },
+    "prepared-source-macos/chrome/browser/component_updater/chrome_component_updater_configurator_unittest.cc": {
+      "bytes": 7226,
+      "mode": 420,
+      "sha256": "2f445f210c9586a4762bce54361269da7ebbd62b449b36e5476f484ca88af15f"
+    },
+    "prepared-source-macos/chrome/browser/component_updater/component_updater_prefs.cc": {
+      "bytes": 1137,
+      "mode": 420,
+      "sha256": "dd0879135502422083a62d24ab7e2b65b41f555b6ceda2f6deabe5c927a42833"
+    },
+    "prepared-source-macos/chrome/browser/component_updater/registration.cc": {
+      "bytes": 11446,
+      "mode": 420,
+      "sha256": "743b5be7de7e408328c4a91bb65f27b255366ff2be6da684b253837461876cd4"
+    },
+    "prepared-source-macos/chrome/browser/component_updater/widevine_cdm_component_installer.cc": {
+      "bytes": 17919,
+      "mode": 420,
+      "sha256": "809e02e96255e300f3f010771800a11e345a8d2a6a80743e3de8f48810193593"
+    },
+    "prepared-source-macos/chrome/browser/component_updater/widevine_cdm_component_installer.h": {
+      "bytes": 1035,
+      "mode": 420,
+      "sha256": "e541112787362f4c107a57256cc65ad3827d018c635cc900b7e6fab4b8605e9d"
+    },
+    "prepared-source-macos/chrome/browser/crash_upload_list/BUILD.gn": {
+      "bytes": 1771,
+      "mode": 420,
+      "sha256": "ec132a1220015e73fa7485ec3ab2a7b69d87ed4ab3707d64377af2d5d29bb551"
+    },
+    "prepared-source-macos/chrome/browser/crash_upload_list/helium_crash_reporting.cc": {
+      "bytes": 6038,
+      "mode": 420,
+      "sha256": "904080f6d50a01908bf58ead3e9f0b15ec2f8420e69ae40f8e37e254e9a41314"
+    },
+    "prepared-source-macos/chrome/browser/crash_upload_list/helium_crash_reporting.h": {
+      "bytes": 1548,
+      "mode": 420,
+      "sha256": "5961c3dec133dae65ded81607a8836f6f6a2be20abe9c69814f53c9a6b5da904"
+    },
+    "prepared-source-macos/chrome/browser/extensions/api/settings_private/prefs_util.cc": {
+      "bytes": 86611,
+      "mode": 420,
+      "sha256": "d3abd2595d78334513a40da3feb827daeb92957de73592c7fbe4212f49ef0d8d"
+    },
+    "prepared-source-macos/chrome/browser/favicon/favicon_utils.cc": {
+      "bytes": 8808,
+      "mode": 420,
+      "sha256": "a24d0913f405f072ff59db00d67a658e7a0cdb8faf873fd776f4850f5e44ab41"
+    },
+    "prepared-source-macos/chrome/browser/helium_flag_entries.h": {
+      "bytes": 5319,
+      "mode": 420,
+      "sha256": "4ecf4cf126c64cd071b8901cdeaa18ea69bde76216e805eb41fe5da69757906b"
+    },
+    "prepared-source-macos/chrome/browser/importer/BUILD.gn": {
+      "bytes": 4861,
+      "mode": 420,
+      "sha256": "057967fcefbf4cc4496ed2d63846ec3babcbf0fd84db6316b130fac4d5c00bd1"
+    },
+    "prepared-source-macos/chrome/browser/importer/chrome_importer_list.cc": {
+      "bytes": 12480,
+      "mode": 420,
+      "sha256": "f5e5c77b392a13fe58430c0e671bcca80d2b3229b3bc659283a77b0d066954b2"
+    },
+    "prepared-source-macos/chrome/browser/importer/external_process_importer_client.cc": {
+      "bytes": 9801,
+      "mode": 420,
+      "sha256": "d09d9b06ef8e50ed9a35b5b0c08b2a35212c286bb7f8009bfe3805001bdbfa1e"
+    },
+    "prepared-source-macos/chrome/browser/importer/external_process_importer_client.h": {
+      "bytes": 6518,
+      "mode": 420,
+      "sha256": "ecbbfbabd5e0b3e52b8971ab65d54982188e2f5a242ad03b6206ce340fff5743"
+    },
+    "prepared-source-macos/chrome/browser/importer/external_process_importer_host.cc": {
+      "bytes": 7159,
+      "mode": 420,
+      "sha256": "d4cc43b07b58a4595cb7ab3070ebd05fa440661b9851400f8003b624fd66aefe"
+    },
+    "prepared-source-macos/chrome/browser/importer/external_process_importer_host.h": {
+      "bytes": 6756,
+      "mode": 420,
+      "sha256": "416981c1a5094558be92f866c83635d33d320272e5db283e6406ee7beaa35e28"
+    },
+    "prepared-source-macos/chrome/browser/importer/importer_list.cc": {
+      "bytes": 11763,
+      "mode": 420,
+      "sha256": "ef1555073e7b042dfe09204427d2666bec27f889d30bb5cf2a58e42a0592ebb5"
+    },
+    "prepared-source-macos/chrome/browser/importer/importer_progress_observer.h": {
+      "bytes": 1375,
+      "mode": 420,
+      "sha256": "0558c2864c3b912f19ead98720607f68a53a49e47390fc387ffa3546fb1d0120"
+    },
+    "prepared-source-macos/chrome/browser/importer/in_process_importer_bridge.cc": {
+      "bytes": 8227,
+      "mode": 420,
+      "sha256": "c0c4aea947c58c562a3b13d111c8c6453ca15754b390221f6c157ea6be992641"
+    },
+    "prepared-source-macos/chrome/browser/importer/in_process_importer_bridge.h": {
+      "bytes": 2663,
+      "mode": 420,
+      "sha256": "15925b976373fe10a2da9aa840e9fac2a9c5315fb9cf664ed0f049b46ee041dd"
+    },
+    "prepared-source-macos/chrome/browser/importer/noventra_cookie_profile_writer.cc": {
+      "bytes": 5641,
+      "mode": 420,
+      "sha256": "2c1ee10af91cf340c92146a7bb813109d3bd59f19b869f36ad623d8f87a076ba"
+    },
+    "prepared-source-macos/chrome/browser/importer/noventra_cookie_profile_writer.h": {
+      "bytes": 820,
+      "mode": 420,
+      "sha256": "e613e08a74e15a9ac736c554492d83f8d750cc1b80fab2884edfed153d6c6a1d"
+    },
+    "prepared-source-macos/chrome/browser/importer/noventra_password_profile_writer.cc": {
+      "bytes": 9822,
+      "mode": 420,
+      "sha256": "54a4bc187d360892431f6ed13edf6e4f9a1873ffaf43214e8d9f6f387660b50d"
+    },
+    "prepared-source-macos/chrome/browser/importer/noventra_password_profile_writer.h": {
+      "bytes": 2215,
+      "mode": 420,
+      "sha256": "23c58ff2889394ef60974bdff3466134f3153d065801910b38e94a0c56321eab"
+    },
+    "prepared-source-macos/chrome/browser/importer/noventra_password_profile_writer_unittest.cc": {
+      "bytes": 10291,
+      "mode": 420,
+      "sha256": "aa13b1ed0b7c052972abd972c2016231eb7f086245d03f5321f0d2465509a6dd"
+    },
+    "prepared-source-macos/chrome/browser/importer/profile_writer.cc": {
+      "bytes": 16234,
+      "mode": 420,
+      "sha256": "553eea91d37e4ba92bf0aee3dbe356a186b439794484dc9d8e8b57fa97a09232"
+    },
+    "prepared-source-macos/chrome/browser/importer/profile_writer.h": {
+      "bytes": 4887,
+      "mode": 420,
+      "sha256": "30a0a522b9f70d9e770c1d5a9d69fa217ea52fb617367b3680bfcebcf25734a5"
+    },
+    "prepared-source-macos/chrome/browser/mac/initial_prefs.mm": {
+      "bytes": 3947,
+      "mode": 420,
+      "sha256": "e1573a51dd05bfbea145c68063602099771e46a96a69e7ce346c1032f60c5542"
+    },
+    "prepared-source-macos/chrome/browser/net/BUILD.gn": {
+      "bytes": 19757,
+      "mode": 420,
+      "sha256": "c3feb023a7e46be7b88cd49560419cc77382ade62700f5cdbf7e58e7a700114e"
+    },
+    "prepared-source-macos/chrome/browser/net/profile_network_context_service.cc": {
+      "bytes": 70029,
+      "mode": 420,
+      "sha256": "086cedc9da709f98a0cb6973e58a235b2a63ca48027429fae7ac593c17723daa"
+    },
+    "prepared-source-macos/chrome/browser/notifications/persistent_notification_handler.cc": {
+      "bytes": 21814,
+      "mode": 420,
+      "sha256": "9b497d25a9492afbed2cee1b4c4c6fdb41d9cd8d292fa92e255226a2820a0be1"
+    },
+    "prepared-source-macos/chrome/browser/performance_manager/policies/memory_saver_mode_policy.cc": {
+      "bytes": 10113,
+      "mode": 420,
+      "sha256": "0f6b723332f04f23b15af9c20a099dc02f92f196f03d55ae72a93fe53967a4c1"
+    },
+    "prepared-source-macos/chrome/browser/policy/configuration_policy_handler_list_factory.cc": {
+      "bytes": 161117,
+      "mode": 420,
+      "sha256": "af40ea4a82378910ceda2727bae2d9b6c9f2269810da6fa815baf3519d62d82d"
+    },
+    "prepared-source-macos/chrome/browser/prefs/browser_prefs.cc": {
+      "bytes": 139277,
+      "mode": 420,
+      "sha256": "97480e27e91419b6360b7f99560504b313f61990c0440fbf13c78cee78cd0018"
+    },
+    "prepared-source-macos/chrome/browser/prefs/session_startup_pref.cc": {
+      "bytes": 6125,
+      "mode": 420,
+      "sha256": "c133ea4094622d96b78276179d713c5e852fcab7bdb50a66d462238901d7def2"
+    },
+    "prepared-source-macos/chrome/browser/profiles/BUILD.gn": {
+      "bytes": 42224,
+      "mode": 420,
+      "sha256": "936957f5d1dc2c14ad65c545b02e87bd65745b1ea2d9b7b5d4e906f1d2044668"
+    },
+    "prepared-source-macos/chrome/browser/profiles/chrome_browser_main_extra_parts_profiles.cc": {
+      "bytes": 82357,
+      "mode": 420,
+      "sha256": "8e78cbd5c3e30f812c4b8012f9b674d52422a089f350576edd1436c2c4c602a2"
+    },
+    "prepared-source-macos/chrome/browser/profiles/noventra_account_spaces.h": {
+      "bytes": 4259,
+      "mode": 420,
+      "sha256": "ad0b831dea820897c466a174c3dd3bb5336f4ce9530548c8259c6c169b91013a"
+    },
+    "prepared-source-macos/chrome/browser/profiles/noventra_space_migration.cc": {
+      "bytes": 23246,
+      "mode": 420,
+      "sha256": "c6faf31960077f68e32e6bd558168f1e944f1c6395c234566875049847dae1d9"
+    },
+    "prepared-source-macos/chrome/browser/profiles/noventra_space_migration.h": {
+      "bytes": 4241,
+      "mode": 420,
+      "sha256": "b16b086fdfc15cd66b9763ebb904d422c68808fedec2acd59423a7569e62c8b4"
+    },
+    "prepared-source-macos/chrome/browser/profiles/noventra_space_migration_unittest.cc": {
+      "bytes": 14358,
+      "mode": 420,
+      "sha256": "6a6e60453ad5ddad4391f47aa8719574ea6cded3100555e7e5b3cbaeaf9116ad"
+    },
+    "prepared-source-macos/chrome/browser/profiles/noventra_space_profile_registry.cc": {
+      "bytes": 30873,
+      "mode": 420,
+      "sha256": "02bd33a8b468ac3a24d8eede74a6a3dffbb91ebbdd5ccdbeac0fcdd0c7fa6f39"
+    },
+    "prepared-source-macos/chrome/browser/profiles/noventra_space_profile_registry.h": {
+      "bytes": 3357,
+      "mode": 420,
+      "sha256": "a90e7e1242714a00fffa17b25b96823e1f36e4ba5d208f127f621d34c63922cf"
+    },
+    "prepared-source-macos/chrome/browser/profiles/noventra_space_startup.cc": {
+      "bytes": 27517,
+      "mode": 420,
+      "sha256": "16a10f5c045e4aad4d5ca9a0bb1252d04e001a55f770ee34fcdbf8cd1d42d67d"
+    },
+    "prepared-source-macos/chrome/browser/profiles/noventra_space_startup.h": {
+      "bytes": 856,
+      "mode": 420,
+      "sha256": "9f086271eca894f38e18cc18798fc2ee39300a101ecac0a7f650df08d95bd18f"
+    },
+    "prepared-source-macos/chrome/browser/profiles/profile_impl.cc": {
+      "bytes": 72965,
+      "mode": 420,
+      "sha256": "f2e5daa0700256d35e422b844306c0eee29641159b273531eb0a797b17055236"
+    },
+    "prepared-source-macos/chrome/browser/profiles/profile_manager.cc": {
+      "bytes": 96289,
+      "mode": 420,
+      "sha256": "b6aeffdbbd5a7367e8fef79527011bf6e3a45ccd1d37ae1065141cc2830c8100"
+    },
+    "prepared-source-macos/chrome/browser/renderer_context_menu/render_view_context_menu.cc": {
+      "bytes": 238532,
+      "mode": 420,
+      "sha256": "6af5644e6aa5d43423dfa3f3e91effcdabb07ce1758349afa3ebdde3e98f4363"
+    },
+    "prepared-source-macos/chrome/browser/resource_coordinator/tab_lifecycle_unit.cc": {
+      "bytes": 21156,
+      "mode": 420,
+      "sha256": "3174d0a39fd5c4c66c35fd107c21eac84d843887f3ecd97122585167b8211df8"
+    },
+    "prepared-source-macos/chrome/browser/resources/components/component.html.ts": {
+      "bytes": 3900,
+      "mode": 420,
+      "sha256": "843216cc5ab123dfabcd29457a7ed98f4e708c84b3a9163b953a7214d02c339a"
+    },
+    "prepared-source-macos/chrome/browser/resources/components/components.ts": {
+      "bytes": 7580,
+      "mode": 420,
+      "sha256": "d03af48a3c75d31a1e69ec80b110749cdc9c7042c6af6690c3dc305d85092b59"
+    },
+    "prepared-source-macos/chrome/browser/resources/new_tab_page/app.css": {
+      "bytes": 19993,
+      "mode": 420,
+      "sha256": "de851c01253ca79163e0ad2dc20406dfb58d6c02ec56b1ca844f5321a42e77b6"
+    },
+    "prepared-source-macos/chrome/browser/resources/new_tab_page/app.html": {
+      "bytes": 2371,
+      "mode": 420,
+      "sha256": "2867873a7863d632fec27da8c4c8633fbd634d533b111337aa081b7f8203fffc"
+    },
+    "prepared-source-macos/chrome/browser/resources/new_tab_page/app.ts": {
+      "bytes": 67099,
+      "mode": 420,
+      "sha256": "9c0304c1afd9c26680996150e9c46fac1158e559ecc8dddeec893296b585b92c"
+    },
+    "prepared-source-macos/chrome/browser/resources/new_tab_page/ntp_searchbox.css": {
+      "bytes": 12039,
+      "mode": 420,
+      "sha256": "e2068a80ec902f3491a05a35e69e6821a5534e36277de6400dc7ccb02072d35a"
+    },
+    "prepared-source-macos/chrome/browser/resources/new_tab_page/ntp_searchbox.ts": {
+      "bytes": 35185,
+      "mode": 420,
+      "sha256": "37b2051dea95619a8add01d1ca59e7e7ecd0ddf86e1a38ac5e4170affccc88c2"
+    },
+    "prepared-source-macos/chrome/browser/resources/new_tab_shared/customize_buttons/customize_buttons.css": {
+      "bytes": 3822,
+      "mode": 420,
+      "sha256": "5d56e8a539fe610b44c8cc8d6cd12dfba83209bb2c5d140df0d6fe0266cbb139"
+    },
+    "prepared-source-macos/chrome/browser/resources/settings/BUILD.gn": {
+      "bytes": 33217,
+      "mode": 420,
+      "sha256": "9c58995f9a60b02108c274ce7d6aec8e3e926ea366abc4cf4568ed2663355a39"
+    },
+    "prepared-source-macos/chrome/browser/resources/settings/about_page/about_page.css": {
+      "bytes": 1829,
+      "mode": 420,
+      "sha256": "99a7b50658a4a8beac8f135da7edf847c0c0ab963c86cda479298b7754a7869a"
+    },
+    "prepared-source-macos/chrome/browser/resources/settings/about_page/about_page.html.ts": {
+      "bytes": 4275,
+      "mode": 420,
+      "sha256": "5d5cdd6908989de9f22eafdc20fb2c3d599aa136ab571f46887cdefe57cc0c84"
+    },
+    "prepared-source-macos/chrome/browser/resources/settings/about_page/about_page.ts": {
+      "bytes": 11742,
+      "mode": 420,
+      "sha256": "c00678408c688163fe154f3234535aa13ea8c22a905fd4cb6f8b0355449f0f5e"
+    },
+    "prepared-source-macos/chrome/browser/resources/settings/appearance_page/appearance_page.css": {
+      "bytes": 17627,
+      "mode": 420,
+      "sha256": "13b15144bf337ce7a90a94e675bceab0d07ed30de79dda54d7b4ec378aaf6c4c"
+    },
+    "prepared-source-macos/chrome/browser/resources/settings/appearance_page/appearance_page.html.ts": {
+      "bytes": 51663,
+      "mode": 420,
+      "sha256": "5bbe5ffcbe3c31e35e4f5a983cb1108b9789ee22c07d5479ed9c9330e97a10b1"
+    },
+    "prepared-source-macos/chrome/browser/resources/settings/appearance_page/appearance_page.ts": {
+      "bytes": 87829,
+      "mode": 420,
+      "sha256": "46bc5d3f24ff444506574fe7cf19e0ab300882f7a28496a0586458f3af8173aa"
+    },
+    "prepared-source-macos/chrome/browser/resources/settings/appearance_page/appearance_page_index.css": {
+      "bytes": 740,
+      "mode": 420,
+      "sha256": "32a58bc6f74499447bd8aaa5a53951dfa88780626328f670a36be4e757a105da"
+    },
+    "prepared-source-macos/chrome/browser/resources/settings/appearance_page/appearance_page_index.html.ts": {
+      "bytes": 1035,
+      "mode": 420,
+      "sha256": "6bb7a96f6dd1b286b8208136edc1ad2be40e7f6c430481c616d2ef06bdc09662"
+    },
+    "prepared-source-macos/chrome/browser/resources/settings/appearance_page/appearance_page_index.ts": {
+      "bytes": 4767,
+      "mode": 420,
+      "sha256": "9030136cad36aee38846b8d7a62a28645707614a0e0c2f6adcc099c7629dec87"
+    },
+    "prepared-source-macos/chrome/browser/resources/settings/appearance_page/noventra_layout_editor.html.ts": {
+      "bytes": 18857,
+      "mode": 420,
+      "sha256": "e0d4ac5ba920fcb74aaa0fc3dae0dbf121c4c10af7410af305b3364b50bd8560"
+    },
+    "prepared-source-macos/chrome/browser/resources/settings/appearance_page/noventra_layout_editor.ts": {
+      "bytes": 71883,
+      "mode": 420,
+      "sha256": "173354654b60454ec877cce058835e2db6643830c2bf0f613784b546c50575b2"
+    },
+    "prepared-source-macos/chrome/browser/resources/settings/appearance_page/noventra_layout_model.ts": {
+      "bytes": 14559,
+      "mode": 420,
+      "sha256": "b2c3dcb8e3afda9d77b7fcd1d919dab8623e49a2eb1d030453c0b95bd027c2cc"
+    },
+    "prepared-source-macos/chrome/browser/resources/settings/appearance_page/noventra_peer_transfer.ts": {
+      "bytes": 19102,
+      "mode": 420,
+      "sha256": "06a1acad1eef703e22d25111356fc602194e4efe76b9c47964d3533abc74a1cd"
+    },
+    "prepared-source-macos/chrome/browser/resources/settings/appearance_page/noventra_transfer.html.ts": {
+      "bytes": 10487,
+      "mode": 420,
+      "sha256": "240160f868e9af93aa9352b846e2d0cb20f037314b0038f67db943a0f7084f3a"
+    },
+    "prepared-source-macos/chrome/browser/resources/settings/appearance_page/noventra_transfer.ts": {
+      "bytes": 19662,
+      "mode": 420,
+      "sha256": "fbda44934f21aef7cccba5ad824c5dca1eb88340af01b17be5689f596700de31"
+    },
+    "prepared-source-macos/chrome/browser/resources/settings/icons.html.ts": {
+      "bytes": 217800,
+      "mode": 420,
+      "sha256": "74e90ca4d691856a6c5e937bc8c9a1cdd9d1b5c86a5a0feb1cb3cd7e555a0505"
+    },
+    "prepared-source-macos/chrome/browser/resources/settings/languages_page/spell_check_page.html.ts": {
+      "bytes": 5421,
+      "mode": 420,
+      "sha256": "4701c4d76dd0101754445bd5beaea3ef0c8cc85903a206ffb35375c2b167f100"
+    },
+    "prepared-source-macos/chrome/browser/resources/settings/languages_page/spell_check_page.ts": {
+      "bytes": 15461,
+      "mode": 420,
+      "sha256": "33e50565fd1e007dd8e96894aa58e864055170c8c1ca97f13334031314d325a2"
+    },
+    "prepared-source-macos/chrome/browser/resources/settings/noventra_navigation_guard.ts": {
+      "bytes": 1869,
+      "mode": 420,
+      "sha256": "6d18abedde2f271683dbcb917c7a5d9cb311baa9090b8703cf2e1645e99c048d"
+    },
+    "prepared-source-macos/chrome/browser/resources/settings/people_page/import_data_browser_proxy.ts": {
+      "bytes": 2175,
+      "mode": 420,
+      "sha256": "ed19f77a30c3af03ad1763a18a38716bb6fdd7ef99277c4a28f0a1d1c9060ab6"
+    },
+    "prepared-source-macos/chrome/browser/resources/settings/people_page/import_data_dialog.html.ts": {
+      "bytes": 5491,
+      "mode": 420,
+      "sha256": "92816d6e4ae25ffc9e47c38d919e10ea33bc0f41c4f31c444ba1b8c35bbdbcbb"
+    },
+    "prepared-source-macos/chrome/browser/resources/settings/people_page/import_data_dialog.ts": {
+      "bytes": 8353,
+      "mode": 420,
+      "sha256": "b839bfb8272680acddeb2a7c112176ba6b9c0de718bd98718481f6684274f42f"
+    },
+    "prepared-source-macos/chrome/browser/resources/settings/people_page/people_page.html.ts": {
+      "bytes": 3578,
+      "mode": 420,
+      "sha256": "20f46ae4ad338cdc2d84a2d4c5637bb0570d42b7464c0aac5897d0ebff034942"
+    },
+    "prepared-source-macos/chrome/browser/resources/settings/people_page/people_page.ts": {
+      "bytes": 16748,
+      "mode": 420,
+      "sha256": "c0a6764c05c2ce36ef0004f782ac56911b9690806ee3d37f12193679d07f71f1"
+    },
+    "prepared-source-macos/chrome/browser/resources/settings/privacy_page/services_page.html": {
+      "bytes": 7834,
+      "mode": 420,
+      "sha256": "e455459986c2db004653174884c5a6a7db393c008e2194c019f76aaed781cf8b"
+    },
+    "prepared-source-macos/chrome/browser/resources/settings/privacy_page/services_page.ts": {
+      "bytes": 6089,
+      "mode": 420,
+      "sha256": "d65a1cb8ce34d9d229c126e1473fb3ff0a161a6312e81641f3515ba7750b95a0"
+    },
+    "prepared-source-macos/chrome/browser/resources/settings/route.ts": {
+      "bytes": 13298,
+      "mode": 420,
+      "sha256": "7aad1d53218214106fecb1f81334bf13d484ddb0419f1f364672b89dbe0aedbc"
+    },
+    "prepared-source-macos/chrome/browser/resources/settings/router.ts": {
+      "bytes": 18232,
+      "mode": 420,
+      "sha256": "c2d843530cea27500bd639451e873be573092746b5853fce0028a317d21a46bf"
+    },
+    "prepared-source-macos/chrome/browser/resources/settings/settings_main/settings_main.html": {
+      "bytes": 7129,
+      "mode": 420,
+      "sha256": "1259826ce1631793cbc70a936497c1c71a53857732bf1fd7df725418d97aef22"
+    },
+    "prepared-source-macos/chrome/browser/resources/settings/settings_main/settings_main.ts": {
+      "bytes": 11475,
+      "mode": 420,
+      "sha256": "17d2fa7293e5e4d750afaacb15adb8724c030caec8f61385c3d8645ddda2209f"
+    },
+    "prepared-source-macos/chrome/browser/resources/settings/settings_menu/settings_menu.html": {
+      "bytes": 9632,
+      "mode": 420,
+      "sha256": "369d67ea72111a0fd548e92adce621154a81d5988367dce70b5ae535f5919ba9"
+    },
+    "prepared-source-macos/chrome/browser/resources/settings/settings_menu/settings_menu.ts": {
+      "bytes": 6853,
+      "mode": 420,
+      "sha256": "5d383968268c75f8e8d659f996faacca6606663de0ba9b4ad61b68d6926bcc73"
+    },
+    "prepared-source-macos/chrome/browser/resources/settings/settings_page/settings_section.css": {
+      "bytes": 1406,
+      "mode": 420,
+      "sha256": "5fc468c4564f31091a04546128a1549bcdb01a08d0b1e596dd43bd30f94d4a3f"
+    },
+    "prepared-source-macos/chrome/browser/resources/settings/settings_page/settings_subpage.css": {
+      "bytes": 2567,
+      "mode": 420,
+      "sha256": "8d0e4adbb134a4eaa28e29fff39f61b240f1c4e3c2df0b71afb0c1cf81551aaa"
+    },
+    "prepared-source-macos/chrome/browser/resources/settings/settings_shared_lit.css": {
+      "bytes": 9736,
+      "mode": 420,
+      "sha256": "67f63cfe68cb41eacd91ac24dc32488968a523ed1f051d74a577ffb96c6b8ff1"
+    },
+    "prepared-source-macos/chrome/browser/resources/settings/settings_ui/settings_ui.html": {
+      "bytes": 5159,
+      "mode": 420,
+      "sha256": "7ebdfbe850ceda69ae954d2221a1bcfe90674523cc8bfe3d21ee8256dca2f327"
+    },
+    "prepared-source-macos/chrome/browser/resources/settings/settings_vars.css": {
+      "bytes": 1782,
+      "mode": 420,
+      "sha256": "698120a664c674a1926ca4441696928aca2a1ab237244f7176a3a12f90f4e66b"
+    },
+    "prepared-source-macos/chrome/browser/resources/settings/site_settings/protected_content_page.html": {
+      "bytes": 3992,
+      "mode": 420,
+      "sha256": "e7c12ea69668cffa00fdbb8daabc40c8176079199e864a0d2a3023ea23b1345b"
+    },
+    "prepared-source-macos/chrome/browser/resources/settings/system_page/browser_shortcuts_page.html": {
+      "bytes": 8142,
+      "mode": 420,
+      "sha256": "6c2ec2facb46ececc6feddeb45177994c65d26190cc44cabac78fc2f8db6df61"
+    },
+    "prepared-source-macos/chrome/browser/resources/side_panel/bookmarks/power_bookmark_row_item.css": {
+      "bytes": 1464,
+      "mode": 420,
+      "sha256": "cf4681b4e669411f1e52a7c7a94f0f3259623be9172c3f37d678b21e1d4bd9d3"
+    },
+    "prepared-source-macos/chrome/browser/resources/side_panel/bookmarks/power_bookmarks_list.css": {
+      "bytes": 4278,
+      "mode": 420,
+      "sha256": "cf4f060b5bf9141554f2ca24dd9554e636b72151a3327e6f9a761bd8a2f081f8"
+    },
+    "prepared-source-macos/chrome/browser/resources/side_panel/bookmarks/power_bookmarks_list.html.ts": {
+      "bytes": 7470,
+      "mode": 420,
+      "sha256": "d68a9f41aa3cfa7d9cc08aac017d9be5da96c1c2901ec02476ce4d90d78cd9b2"
+    },
+    "prepared-source-macos/chrome/browser/resources/side_panel/bookmarks/power_bookmarks_list.ts": {
+      "bytes": 44189,
+      "mode": 420,
+      "sha256": "4f1303f4abc2cbede8b9977e973e181f4483609f0c4f468ea070a00e32d2c9e0"
+    },
+    "prepared-source-macos/chrome/browser/resources/side_panel/customize_chrome/app.html.ts": {
+      "bytes": 4578,
+      "mode": 420,
+      "sha256": "dfedb0052c93e29fe041fb90d706531cb6ef2a692c130513b57a0c27b96a5352"
+    },
+    "prepared-source-macos/chrome/browser/resources/side_panel/customize_chrome/appearance.html.ts": {
+      "bytes": 1956,
+      "mode": 420,
+      "sha256": "344df48d9452390fb506f6fd50c25280a0982460b23d52dbe2d9851b58843d9f"
+    },
+    "prepared-source-macos/chrome/browser/resources/side_panel/customize_chrome/appearance.ts": {
+      "bytes": 12248,
+      "mode": 420,
+      "sha256": "4afb021c4a868b96723a5e612d1ffc437c250d7f46869c7c4a495eca87860034"
+    },
+    "prepared-source-macos/chrome/browser/resources/side_panel/customize_chrome/customize_toolbar/toolbar.css": {
+      "bytes": 821,
+      "mode": 420,
+      "sha256": "bd6b100d35bfd57d3aa50defc005855335b310aa8b48683a463322bc1a1adb11"
+    },
+    "prepared-source-macos/chrome/browser/resources/side_panel/customize_chrome/customize_toolbar/toolbar.html.ts": {
+      "bytes": 1049,
+      "mode": 420,
+      "sha256": "73854c16f806fc4e90a8cada0c8ff187ffa6e5d897adc5887910d060068b1719"
+    },
+    "prepared-source-macos/chrome/browser/resources/side_panel/customize_chrome/customize_toolbar/toolbar.ts": {
+      "bytes": 1269,
+      "mode": 420,
+      "sha256": "9211e98b5ac9f99f231e02c98075aa92294f80fb8634d197c83d19ac862cd4f7"
+    },
+    "prepared-source-macos/chrome/browser/resources/tab_search/tab_search_item.ts": {
+      "bytes": 7441,
+      "mode": 420,
+      "sha256": "d38ae68d5877676ef43e0ae6fb62c4bd7db3628fff4d13af69df25857e0e19e0"
+    },
+    "prepared-source-macos/chrome/browser/resources/tab_search/tab_search_split_item.css": {
+      "bytes": 4109,
+      "mode": 420,
+      "sha256": "027270f020992feff54c2646227bb5f9ca3cf704c48e65217177ab3baaa14977"
+    },
+    "prepared-source-macos/chrome/browser/resources/tab_search/tab_search_split_item.html.ts": {
+      "bytes": 2659,
+      "mode": 420,
+      "sha256": "7d4afd319a282054795b071493817e81329f5525faace28ca8860857f9abdacc"
+    },
+    "prepared-source-macos/chrome/browser/sessions/BUILD.gn": {
+      "bytes": 11757,
+      "mode": 420,
+      "sha256": "0032d88d23f288a3cecaf21ea5df3da44aca954d3babcee07a7a8047bb753080"
+    },
+    "prepared-source-macos/chrome/browser/sessions/chrome_tab_restore_service_client.cc": {
+      "bytes": 5352,
+      "mode": 420,
+      "sha256": "5d56a8992719b4a9423a5f421afaf5ae4b75976b5387cca105bf9e23ea3bc30d"
+    },
+    "prepared-source-macos/chrome/browser/sessions/chrome_tab_restore_service_client.h": {
+      "bytes": 2232,
+      "mode": 420,
+      "sha256": "46ae97161c1a9a02c8f435290e316983cff368c8edb6d39bfdb1af971dc1f2db"
+    },
+    "prepared-source-macos/chrome/browser/sessions/session_restore.cc": {
+      "bytes": 82669,
+      "mode": 420,
+      "sha256": "c72dd97dc9216594335b9961a37665eb115632f2c23724775c11a0a0a704f094"
+    },
+    "prepared-source-macos/chrome/browser/sessions/session_restore.h": {
+      "bytes": 8269,
+      "mode": 420,
+      "sha256": "c8975287d819fefc6f214c32d881c198e35af59938e5525143cb3ac2757b39b9"
+    },
+    "prepared-source-macos/chrome/browser/sessions/session_service.cc": {
+      "bytes": 30806,
+      "mode": 420,
+      "sha256": "03c38861f036c987170db75d6e33d23a617745adcd55b49e0c070904b9a7292d"
+    },
+    "prepared-source-macos/chrome/browser/sessions/session_service.h": {
+      "bytes": 13669,
+      "mode": 420,
+      "sha256": "772b47fdd387260677d8aa8ea2bf99194c7b962c7d7a14b28b6de5c24f86b75b"
+    },
+    "prepared-source-macos/chrome/browser/sessions/session_service_base.cc": {
+      "bytes": 40644,
+      "mode": 420,
+      "sha256": "b23eaa43839fa63591979e859520572cf6a7832e4961003414d93b7ebb3a7c90"
+    },
+    "prepared-source-macos/chrome/browser/spellchecker/spellcheck_hunspell_dictionary.cc": {
+      "bytes": 18849,
+      "mode": 420,
+      "sha256": "1e615fddfe8530e4d46ef27e25f891f51d2a1fc9c91d69b5bad3e5bd0b5d541b"
+    },
+    "prepared-source-macos/chrome/browser/themes/theme_service.cc": {
+      "bytes": 47885,
+      "mode": 420,
+      "sha256": "d7a627d681ecf64c5ed44f10ccdc6a72b5e36ce270a8f739e3c03e76271fef16"
+    },
+    "prepared-source-macos/chrome/browser/ui/BUILD.gn": {
+      "bytes": 231416,
+      "mode": 420,
+      "sha256": "0880182a027450576c2a7f1e03f3e8f469930a1f20c74bbc1580863ba6470c35"
+    },
+    "prepared-source-macos/chrome/browser/ui/accelerator_table.cc": {
+      "bytes": 20070,
+      "mode": 420,
+      "sha256": "54b60158ee74b27e464d41d78d33c4b2c787977d05b086837e5c887921a3adfd"
+    },
+    "prepared-source-macos/chrome/browser/ui/animation/browser_animation_controller.cc": {
+      "bytes": 34147,
+      "mode": 420,
+      "sha256": "456bfee156b0940b310b9abaf0ad6bfcb134c1eb5cc64602f4b6e2d9f77104e9"
+    },
+    "prepared-source-macos/chrome/browser/ui/animation/browser_animation_controller_unittest.cc": {
+      "bytes": 79536,
+      "mode": 420,
+      "sha256": "0020509a446e385ac48d9d5aae6b24138fcc2924667661d77b00dda5d1cd6cc8"
+    },
+    "prepared-source-macos/chrome/browser/ui/browser.cc": {
+      "bytes": 37802,
+      "mode": 420,
+      "sha256": "3fcc4e1a6c0ca8755553fdc26fc3ec0f7e6a0e06cf2611f4fa70fe749c631677"
+    },
+    "prepared-source-macos/chrome/browser/ui/browser_actions.cc": {
+      "bytes": 216860,
+      "mode": 420,
+      "sha256": "d8bc34433af515cc6f3c240522769a565636630b6fc3b41c91ce74e8a87e377d"
+    },
+    "prepared-source-macos/chrome/browser/ui/browser_command_controller.cc": {
+      "bytes": 123305,
+      "mode": 420,
+      "sha256": "9e11a0e77ad33b5c12be8ee384888b6d738a2c0623eeeb6966ea5ecea82d1352"
+    },
+    "prepared-source-macos/chrome/browser/ui/browser_commands.cc": {
+      "bytes": 142548,
+      "mode": 420,
+      "sha256": "d6eb96d50e058273a668d19d25dba3024c43442fe4c0cbf2bcdcc8f70d966b52"
+    },
+    "prepared-source-macos/chrome/browser/ui/browser_live_tab_context.cc": {
+      "bytes": 27451,
+      "mode": 420,
+      "sha256": "e655af7e41efc93d903182600b1586ffc5c9a7249089084e6e55c22d0364b38d"
+    },
+    "prepared-source-macos/chrome/browser/ui/browser_live_tab_context.h": {
+      "bytes": 6403,
+      "mode": 420,
+      "sha256": "2b8408dad609d6f98d519f2109b5f7c1ef47bd960e586803ffbcfa1a4663e33c"
+    },
+    "prepared-source-macos/chrome/browser/ui/browser_shortcuts/BUILD.gn": {
+      "bytes": 555,
+      "mode": 420,
+      "sha256": "8f613085b02b5adc33c0531fcfd35c1c638a43ec1e64bce019875cad4cc07202"
+    },
+    "prepared-source-macos/chrome/browser/ui/browser_shortcuts/browser_shortcut_metadata.cc": {
+      "bytes": 15529,
+      "mode": 420,
+      "sha256": "0a6430ed4b6e1026bbb9ad8bff30f45f93b6fcdfdffb8e957aa339c3895f7cb3"
+    },
+    "prepared-source-macos/chrome/browser/ui/browser_shortcuts/browser_shortcut_service.cc": {
+      "bytes": 19730,
+      "mode": 420,
+      "sha256": "c23651bb6f4f6e8a91d4e3d2b9d68fc1ffe7f56d4c0202c0976de56460a8f441"
+    },
+    "prepared-source-macos/chrome/browser/ui/browser_tab_strip_model_delegate.cc": {
+      "bytes": 22230,
+      "mode": 420,
+      "sha256": "17a0ee2b03705302026c4eabe71c2c5ecba6ede7eb081a5951a12fa14278a546"
+    },
+    "prepared-source-macos/chrome/browser/ui/browser_tabrestore.cc": {
+      "bytes": 16309,
+      "mode": 420,
+      "sha256": "e7b376718b0200c0f72d70fb10675d10d636b143c03b178555e58df2e68d196a"
+    },
+    "prepared-source-macos/chrome/browser/ui/browser_ui_prefs.cc": {
+      "bytes": 15991,
+      "mode": 420,
+      "sha256": "9e3bbfd82863eccb6287839b5a6f3c4808a1a6012bf6369682182b4098e5fa66"
+    },
+    "prepared-source-macos/chrome/browser/ui/browser_view_prefs.cc": {
+      "bytes": 1469,
+      "mode": 420,
+      "sha256": "dfbff230139ae05084db93df85e25c112fd498f4af90ee5696df642b8bce9c8c"
+    },
+    "prepared-source-macos/chrome/browser/ui/browser_web_contents_delegate/browser_web_contents_delegate.cc": {
+      "bytes": 63037,
+      "mode": 420,
+      "sha256": "97aee32e2089cfa5bb920ab40da12798f02d00f52858e46dfb6973a8dcb32c0b"
+    },
+    "prepared-source-macos/chrome/browser/ui/browser_web_contents_delegate/browser_web_contents_delegate.h": {
+      "bytes": 14075,
+      "mode": 420,
+      "sha256": "4774b9442eee6678fb079f53382f2b88c18a69b96720afc4e5babb15211d3eb6"
+    },
+    "prepared-source-macos/chrome/browser/ui/browser_window/internal/browser_window_features.cc": {
+      "bytes": 62009,
+      "mode": 420,
+      "sha256": "9bbff4167ebf6e02354932820543e0a304c0be2c4299bfcd246a49764a9e6570"
+    },
+    "prepared-source-macos/chrome/browser/ui/color/chrome_color_mixers.cc": {
+      "bytes": 9500,
+      "mode": 420,
+      "sha256": "c8be34dfa5457c260eb0e6a1140a2fad40b236ccc23a1ff29662a643b8d9828f"
+    },
+    "prepared-source-macos/chrome/browser/ui/color/material_new_tab_page_color_mixer.cc": {
+      "bytes": 15781,
+      "mode": 420,
+      "sha256": "3c88ae43687cfee3ca1b232d411851e6adfe88b972778a6b0cbcdb20cb028652"
+    },
+    "prepared-source-macos/chrome/browser/ui/layout_constants.cc": {
+      "bytes": 9566,
+      "mode": 420,
+      "sha256": "c41ccfda7ea45724a331953790ee94021f9d17c2345c9845d97e4c8f15b410ab"
+    },
+    "prepared-source-macos/chrome/browser/ui/location_bar/location_bar.h": {
+      "bytes": 10403,
+      "mode": 420,
+      "sha256": "1d901689bab20c0813cc37dcb1658c5397830f7609817f4957f8d696afb605e5"
+    },
+    "prepared-source-macos/chrome/browser/ui/navigator/browser_navigator.cc": {
+      "bytes": 61181,
+      "mode": 420,
+      "sha256": "2b969928fc340fff4f420a5681f524a43d03673baaf6475bcece0f488f80abbc"
+    },
+    "prepared-source-macos/chrome/browser/ui/noventra/BUILD.gn": {
+      "bytes": 891,
+      "mode": 420,
+      "sha256": "83f66a30210a020b370699151e01e8dd57d1bf9a484f1ef129fd203aec201bea"
+    },
+    "prepared-source-macos/chrome/browser/ui/noventra/incognito_space_host.cc": {
+      "bytes": 57560,
+      "mode": 420,
+      "sha256": "98322f41f966d3a9e3ac2c2c6b5f51b1ce0eddf93781efadfb8c6e2d34db2203"
+    },
+    "prepared-source-macos/chrome/browser/ui/noventra/incognito_space_host.h": {
+      "bytes": 5383,
+      "mode": 420,
+      "sha256": "e9d62ca64c507e8c22777489712065dc7a80da670f4ecfb0943df9fea623191b"
+    },
+    "prepared-source-macos/chrome/browser/ui/noventra/internal_urls_probe.cc": {
+      "bytes": 5073,
+      "mode": 420,
+      "sha256": "2b573ddbbd67a2e56e67e021c95fa151b09757dc3262c50b41758641b4a08991"
+    },
+    "prepared-source-macos/chrome/browser/ui/noventra/layout_model.cc": {
+      "bytes": 37271,
+      "mode": 420,
+      "sha256": "20ef965093fb3a9e17183f8417c3b2c15649e9fa301b57476cf1f69f16587236"
+    },
+    "prepared-source-macos/chrome/browser/ui/noventra/layout_model.h": {
+      "bytes": 2326,
+      "mode": 420,
+      "sha256": "f88496ac9dc9d1572a213baa992c815e70f41c53e6ebb618b5160f983a516581"
+    },
+    "prepared-source-macos/chrome/browser/ui/noventra/lock_metrics_policy_probe.cc": {
+      "bytes": 4307,
+      "mode": 420,
+      "sha256": "356966ad93d0dbb1a843b0da45fcf8e2fb7223d76cba90807a6db44dcd8bbabd"
+    },
+    "prepared-source-macos/chrome/browser/ui/noventra/pinned_tab_state.cc": {
+      "bytes": 9686,
+      "mode": 420,
+      "sha256": "21da08840a41d2677ad457243469602594d7a90c495bdb3537b6bcdaa51c250b"
+    },
+    "prepared-source-macos/chrome/browser/ui/noventra/pinned_tab_state.h": {
+      "bytes": 2992,
+      "mode": 420,
+      "sha256": "9b14e787ceac89dbefdc70332494c85fdf6bc2631faa91e7e3a698ff15de4fe9"
+    },
+    "prepared-source-macos/chrome/browser/ui/noventra/portable_data.cc": {
+      "bytes": 52886,
+      "mode": 420,
+      "sha256": "d633da9c4a82b78f9ede48fe8a137406a4fb056ec1c4f3f7e41e7af8a72e3551"
+    },
+    "prepared-source-macos/chrome/browser/ui/noventra/portable_data.h": {
+      "bytes": 2818,
+      "mode": 420,
+      "sha256": "d36812736f5f6c3ae6aa80b2b23445c6064a65179814a5b43c52dc863ddb0c52"
+    },
+    "prepared-source-macos/chrome/browser/ui/noventra/portable_data_unittest.cc": {
+      "bytes": 11939,
+      "mode": 420,
+      "sha256": "63f28c789a62b946aedaaf3c74f10feffa85eab45b6aa3dcabe11076f23fe10f"
+    },
+    "prepared-source-macos/chrome/browser/ui/noventra/portable_passwords.cc": {
+      "bytes": 14937,
+      "mode": 420,
+      "sha256": "34e084c4add82a68d4eb3cbc99ec5367ae9ec5395f8b75365ce2943832dcc347"
+    },
+    "prepared-source-macos/chrome/browser/ui/noventra/portable_passwords.h": {
+      "bytes": 4831,
+      "mode": 420,
+      "sha256": "b1a517cbddfc4eb128b2dedd239696a8fec4a1fd1c9a99f3d35a169e48ab8179"
+    },
+    "prepared-source-macos/chrome/browser/ui/noventra/portable_transfer_codec.cc": {
+      "bytes": 5114,
+      "mode": 420,
+      "sha256": "3a0470c2dcf662dce4293a377b4a52fb3427a1d34ffba1c0a1dc70872b96a035"
+    },
+    "prepared-source-macos/chrome/browser/ui/noventra/portable_transfer_codec.h": {
+      "bytes": 2354,
+      "mode": 420,
+      "sha256": "9a5dc138c2609b5997de070cae68a548d2a1816a4d393f513b85ee4fd6caf0e6"
+    },
+    "prepared-source-macos/chrome/browser/ui/noventra/portable_transfer_codec_unittest.cc": {
+      "bytes": 6499,
+      "mode": 420,
+      "sha256": "b0ce7d13d4945013ccba38dd6dd77872df4cec5d03c9dde27fd411abc8b0641c"
+    },
+    "prepared-source-macos/chrome/browser/ui/noventra/window_mirror_service.cc": {
+      "bytes": 58051,
+      "mode": 420,
+      "sha256": "a6b66556c476b51a68b82c59a4801e0daf5da0e3b2b1e4d9829a4aaffc8e1345"
+    },
+    "prepared-source-macos/chrome/browser/ui/noventra/window_mirror_service.h": {
+      "bytes": 5960,
+      "mode": 420,
+      "sha256": "ea11b369f78d07b542612f80fd0cbf9fb53602002b6b95fdb1122ca517b435f6"
+    },
+    "prepared-source-macos/chrome/browser/ui/noventra/workspace_routes.cc": {
+      "bytes": 7545,
+      "mode": 420,
+      "sha256": "eba555e4e1552f1e962ebef88800b7c3a850996376a582d790bc051ff9318aa2"
+    },
+    "prepared-source-macos/chrome/browser/ui/noventra/workspace_routes.h": {
+      "bytes": 1964,
+      "mode": 420,
+      "sha256": "d94f2801b55853627013385af0a6746c9a76c8b50d5271b732d230b79cd96745"
+    },
+    "prepared-source-macos/chrome/browser/ui/noventra/workspace_sync_document.cc": {
+      "bytes": 9743,
+      "mode": 420,
+      "sha256": "499b21cd34bed9513db580850602ab1ae94e921b82cdc2d280b19ac1d632647a"
+    },
+    "prepared-source-macos/chrome/browser/ui/noventra/workspace_sync_document.h": {
+      "bytes": 4156,
+      "mode": 420,
+      "sha256": "96a057a84133e281a70ee1532f2c0bd22b34fbcc7f74480d32d146a32fddd799"
+    },
+    "prepared-source-macos/chrome/browser/ui/noventra/workspace_sync_document_unittest.cc": {
+      "bytes": 17369,
+      "mode": 420,
+      "sha256": "768f3b1985797f22728a7c2c5014945de71756831496ae9362b73afe98b4c70e"
+    },
+    "prepared-source-macos/chrome/browser/ui/noventra/workspace_sync_service.cc": {
+      "bytes": 65216,
+      "mode": 420,
+      "sha256": "987ea4ea0c0423f4f67dba494de3924191822287560866ea1d9cdb3f1f87c4bb"
+    },
+    "prepared-source-macos/chrome/browser/ui/noventra/workspace_sync_service.h": {
+      "bytes": 3878,
+      "mode": 420,
+      "sha256": "1d1b454cd9e5c3568bd437d05226b3658bfb5032867a44c436a4f29bc06eec28"
+    },
+    "prepared-source-macos/chrome/browser/ui/noventra/workspace_sync_transport.cc": {
+      "bytes": 16570,
+      "mode": 420,
+      "sha256": "74e15c0bd05e09a60a7750cda5b22c63fc0fead588a43a4e80931019805a1408"
+    },
+    "prepared-source-macos/chrome/browser/ui/noventra/workspace_sync_transport.h": {
+      "bytes": 3845,
+      "mode": 420,
+      "sha256": "9dd4ca5f10b83b46109cd9be57e8824be7bffd476bb7108ec2f4bcef32cbf542"
+    },
+    "prepared-source-macos/chrome/browser/ui/noventra/workspace_sync_transport_unittest.cc": {
+      "bytes": 5215,
+      "mode": 420,
+      "sha256": "7aeb01f1f4a6a7e4186cf04d8e4559d5e7b4e2d5ce2469b6fe0d7a2d253c9368"
+    },
+    "prepared-source-macos/chrome/browser/ui/noventra_commands.h": {
+      "bytes": 4157,
+      "mode": 420,
+      "sha256": "16910fb5e91d8b2077087633693244ea452614d473193b2e9ce1aac55d26f375"
+    },
+    "prepared-source-macos/chrome/browser/ui/startup/helium_crash_dialog_controller.cc": {
+      "bytes": 6019,
+      "mode": 420,
+      "sha256": "7b461c110f93080d2fa05aee6fc7ff3aef28138b52f85cbeb49f555df444a79b"
+    },
+    "prepared-source-macos/chrome/browser/ui/startup/startup_browser_creator_impl.cc": {
+      "bytes": 37909,
+      "mode": 420,
+      "sha256": "c926cc52df19735ac2528af1bfd432d33b9ec484c9894dd9f07f2c0ee1231ad9"
+    },
+    "prepared-source-macos/chrome/browser/ui/startup/startup_tab.h": {
+      "bytes": 1389,
+      "mode": 420,
+      "sha256": "dc42039ea5c19edc3a84f0c20109b53b19142c1131a025e23b0f1efed54b7de4"
+    },
+    "prepared-source-macos/chrome/browser/ui/startup/startup_tab_provider.cc": {
+      "bytes": 13009,
+      "mode": 420,
+      "sha256": "14498c2d9ac2844db6b518b4dcc1ea878785af74aede62d3fe5935ddbfc2110d"
+    },
+    "prepared-source-macos/chrome/browser/ui/tab_helpers.cc": {
+      "bytes": 31836,
+      "mode": 420,
+      "sha256": "6a2ba46b4141bed73bea20dac629d6d33ab95ccfa62d9ce985daf0d1e33a440f"
+    },
+    "prepared-source-macos/chrome/browser/ui/tab_ui_helper.cc": {
+      "bytes": 18728,
+      "mode": 420,
+      "sha256": "f41d306d7379b0e034195eb9de5d5a4b6a7495d1618199d8d7b529c4db2d20e2"
+    },
+    "prepared-source-macos/chrome/browser/ui/tabs/BUILD.gn": {
+      "bytes": 33857,
+      "mode": 420,
+      "sha256": "191e869f7c52aa4d7781f242a1111af92895ab65a6117730feac82e27d75e5ed"
+    },
+    "prepared-source-macos/chrome/browser/ui/tabs/existing_tab_group_sub_menu_model.cc": {
+      "bytes": 12528,
+      "mode": 420,
+      "sha256": "cffc0ee648660c574a3fd142d8bd680ef22c06cc7e5882b436d438ea09b7a8d8"
+    },
+    "prepared-source-macos/chrome/browser/ui/tabs/pinned_tab_codec.cc": {
+      "bytes": 5180,
+      "mode": 420,
+      "sha256": "90d43300f351e256fbe32f3e3272b70a9abc64391bd4bc18b6d9676220620a27"
+    },
+    "prepared-source-macos/chrome/browser/ui/tabs/split_tab_menu_model.cc": {
+      "bytes": 15282,
+      "mode": 420,
+      "sha256": "e906c4ce20da575e8f99b5a66e66c56a20661d94d15e8ac2038a98439e3ff26e"
+    },
+    "prepared-source-macos/chrome/browser/ui/tabs/split_tab_menu_model.h": {
+      "bytes": 3369,
+      "mode": 420,
+      "sha256": "37d476b16e4f56b2f675d2d85982241509b615dce42e7012fd069fd53736afff"
+    },
+    "prepared-source-macos/chrome/browser/ui/tabs/split_tab_metrics.cc": {
+      "bytes": 4995,
+      "mode": 420,
+      "sha256": "309c479552b062a2d191a7e116c8f55903a94d7fe2e4c3cbee548a41bfe6d01e"
+    },
+    "prepared-source-macos/chrome/browser/ui/tabs/split_tab_swap_menu_model.cc": {
+      "bytes": 6059,
+      "mode": 420,
+      "sha256": "359a33247813c8f8fc16c3f1294f983473fb67c8bd5d44f238fce49f64c77240"
+    },
+    "prepared-source-macos/chrome/browser/ui/tabs/split_tab_util.cc": {
+      "bytes": 3127,
+      "mode": 420,
+      "sha256": "54259e8bf43b452a49356c99f86464a75c8fced113337688c7275ca7e6dd75b9"
+    },
+    "prepared-source-macos/chrome/browser/ui/tabs/split_view_layout_menu_model.cc": {
+      "bytes": 3829,
+      "mode": 420,
+      "sha256": "1ac9d1825d3ea829a64ec5b8c466f57fd4710be6ffac7338cf40591d973f3f15"
+    },
+    "prepared-source-macos/chrome/browser/ui/tabs/split_view_layout_menu_model.h": {
+      "bytes": 1748,
+      "mode": 420,
+      "sha256": "1e17698636246e7cbe136ba3213dea63be2dc93043a83aa09eb519e593fe3e82"
+    },
+    "prepared-source-macos/chrome/browser/ui/tabs/tab_list_bridge.cc": {
+      "bytes": 25415,
+      "mode": 420,
+      "sha256": "f070dc12c9d5b99fe3094b09d58649c544445f6cc3cfb69e45f8355b69915a90"
+    },
+    "prepared-source-macos/chrome/browser/ui/tabs/tab_menu_model.cc": {
+      "bytes": 41782,
+      "mode": 420,
+      "sha256": "4c98f2d48d64235bba92206f647d25374bb15c4d4c6662677283c9a600ae9f08"
+    },
+    "prepared-source-macos/chrome/browser/ui/tabs/tab_model.cc": {
+      "bytes": 16037,
+      "mode": 420,
+      "sha256": "85ccbb4635c240d01d22581f89f4504bc4464929e19bb782c46a8831ba304571"
+    },
+    "prepared-source-macos/chrome/browser/ui/tabs/tab_strip_model.cc": {
+      "bytes": 251581,
+      "mode": 420,
+      "sha256": "11dbfc0a71845a0a9942c2c5b76914459d1b6d3f02f222f835f2fceceb076bb8"
+    },
+    "prepared-source-macos/chrome/browser/ui/tabs/tab_strip_model.h": {
+      "bytes": 72290,
+      "mode": 420,
+      "sha256": "feaf2e47491392e72b748ad170d9acd5e74b414a855d3f08808f757c8990a9ce"
+    },
+    "prepared-source-macos/chrome/browser/ui/tabs/tab_strip_prefs.cc": {
+      "bytes": 2632,
+      "mode": 420,
+      "sha256": "b25a43b0448b26882bf1386727348468bc0a6ad32e010d2fced299e7c59dd371"
+    },
+    "prepared-source-macos/chrome/browser/ui/tabs/tab_style.cc": {
+      "bytes": 12166,
+      "mode": 420,
+      "sha256": "4867826176d147d94b924015d55c87ae938010d92a9f2d0da5a762143821a006"
+    },
+    "prepared-source-macos/chrome/browser/ui/tabs/vertical_tab_strip_state.h": {
+      "bytes": 955,
+      "mode": 420,
+      "sha256": "cc73ed7a077d87e94ac8c1e4452684781563fa3a57a45e38558aed55a750eb89"
+    },
+    "prepared-source-macos/chrome/browser/ui/tabs/vertical_tab_strip_state_controller_impl.cc": {
+      "bytes": 17427,
+      "mode": 420,
+      "sha256": "ceb76e71a2d15e9b979c88ad846821ab17774cfd9b488ab10a85b30560a389cb"
+    },
+    "prepared-source-macos/chrome/browser/ui/tabs/vertical_tab_strip_state_controller_unittest.cc": {
+      "bytes": 16968,
+      "mode": 420,
+      "sha256": "cd5c041a319b94802649106321f9bf3674b1365721a2a62c350f59ae2b652514"
+    },
+    "prepared-source-macos/chrome/browser/ui/toolbar/app_menu_model.cc": {
+      "bytes": 93851,
+      "mode": 420,
+      "sha256": "17f6208bc019d03f971eb2c8f5e628faf467b3d969a767facf8ae1e5b8126588"
+    },
+    "prepared-source-macos/chrome/browser/ui/toolbar/app_menu_model.h": {
+      "bytes": 16495,
+      "mode": 420,
+      "sha256": "bccd6816c6e42fe5d4f76501e5b78b7025362dca51aec19672008dd775404549"
+    },
+    "prepared-source-macos/chrome/browser/ui/toolbar/pinned_toolbar/pinned_toolbar_actions_model.cc": {
+      "bytes": 12548,
+      "mode": 420,
+      "sha256": "74f2b34b743761783e9fc6e451309734e3fd9104c5f1818e8e02eac870c20f66"
+    },
+    "prepared-source-macos/chrome/browser/ui/unload_controller.cc": {
+      "bytes": 50830,
+      "mode": 420,
+      "sha256": "990a372a3b7d2ee4ebc6c38d3d36d97095e5fe4570f814454e9faff228b9dd5e"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/animations/tab_strip_animations.cc": {
+      "bytes": 6858,
+      "mode": 420,
+      "sha256": "e79c5c43f17d0e6b2bbf1e8a9adad03de320db1f39caef94de56e8a08dc8bb5c"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/bookmarks/bookmark_bar_view.cc": {
+      "bytes": 86775,
+      "mode": 420,
+      "sha256": "d4dee84d8d7db1628483460901b296e283656c34100a56e341da59cc9e01310f"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/bookmarks/bookmark_menu_delegate.cc": {
+      "bytes": 53430,
+      "mode": 420,
+      "sha256": "75b3666aa8d6d76b2a2d245adade3f93447dd6364af126941b976fbb3436c15f"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/bookmarks/bookmark_menu_delegate.h": {
+      "bytes": 17523,
+      "mode": 420,
+      "sha256": "7731f4ed23ede911219aa93af4900047fe3a85b6e8be50d19325850df63041a5"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/chrome_javascript_app_modal_view_factory_views.cc": {
+      "bytes": 4703,
+      "mode": 420,
+      "sha256": "daac5fe502a2fbe95eaed0b434cd661c2ae6043bda170ea08ea0fde97b630df2"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/extensions/extension_popup.cc": {
+      "bytes": 16250,
+      "mode": 420,
+      "sha256": "d37f603cb6c58d9d6c217edaca8be07dc5927975e95a0516a142c44a0f899fc9"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/extensions/extensions_toolbar_button.cc": {
+      "bytes": 8360,
+      "mode": 420,
+      "sha256": "868bf90f5498daab7cd8fd486c5437572945fe3ba0970805b2465a41b5e8f66c"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/extensions/extensions_toolbar_desktop.cc": {
+      "bytes": 52372,
+      "mode": 420,
+      "sha256": "24c8d295c7339da933fd7f891ae71e938e232b6bb727d676f7bc392e0e215b35"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/extensions/extensions_toolbar_desktop_browsertest.cc": {
+      "bytes": 58880,
+      "mode": 420,
+      "sha256": "97fd24964d9aba951ffbc197fa167041e0a95414b8201edebf3daacb059ea517"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/frame/BUILD.gn": {
+      "bytes": 79296,
+      "mode": 420,
+      "sha256": "b8892abc51fbc3a3a9dbc44416cb07b9b027bee4dd4adae3d045bac0460e03cd"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/frame/base_tab_strip_region_view.cc": {
+      "bytes": 23916,
+      "mode": 420,
+      "sha256": "5c44d016426399155f26ff81054991cd5e83516949c9fb725a18c7d4e7a23c91"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/frame/browser_desktop_window_tree_host_win.cc": {
+      "bytes": 30325,
+      "mode": 420,
+      "sha256": "3e1847a427f0603ea3c09bd088ca6939d2205bb692792be3a40a72288935fd72"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/frame/browser_desktop_window_tree_host_win.h": {
+      "bytes": 5064,
+      "mode": 420,
+      "sha256": "df1f2200a297ffdf084fb43162f4c4b403d303acfb2afd1fc4adb4a7d227bc0e"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/frame/browser_frame_view_factory_views.cc": {
+      "bytes": 5457,
+      "mode": 420,
+      "sha256": "5b5dbf01b6e125a05a3d5a6ee1ec17af1e23aa296562ba9174ed49a6978f5caf"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/frame/browser_frame_view_win.cc": {
+      "bytes": 34172,
+      "mode": 420,
+      "sha256": "38911f157e9cb09b1bcf0115fff5eb35e6873fa581efdcfdf15d1aee71d20d60"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/frame/browser_native_widget.h": {
+      "bytes": 3917,
+      "mode": 420,
+      "sha256": "b6c09c61f0049118457970bb0b8f383b8d6232cbfe2869c3e85b64c16d069603"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/frame/browser_native_widget_aura.cc": {
+      "bytes": 4871,
+      "mode": 420,
+      "sha256": "ccac252ab2513bf3d8ad72a13e92da5260451bd1c8e592641dbca30cff4d5bde"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/frame/browser_native_widget_aura.h": {
+      "bytes": 3180,
+      "mode": 420,
+      "sha256": "1b325558078d328dd55608844aa70b3f9f842c2682883b91d443802d58a388b5"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/frame/browser_native_widget_mac.mm": {
+      "bytes": 33660,
+      "mode": 420,
+      "sha256": "e4e70644dd86a3152fe13e7e213ee2b25260d91ec66ec08e8d26f7ef428df774"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/frame/browser_view.cc": {
+      "bytes": 283163,
+      "mode": 420,
+      "sha256": "860bffee629499b37b86d357370379586017f7550777f8bf3a2a0fc1ae32f3aa"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/frame/browser_view.h": {
+      "bytes": 65521,
+      "mode": 420,
+      "sha256": "5e43dbdf0ba31fb91eb5c44cfd7110f30f36719f209eb50e07ceff1dc19d4643"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/frame/browser_widget.cc": {
+      "bytes": 27802,
+      "mode": 420,
+      "sha256": "30c268d760fbb22bc54a75009548ec5ea671b32d77e2adac5224f921d61309bc"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/frame/browser_widget.h": {
+      "bytes": 7281,
+      "mode": 420,
+      "sha256": "d517ed5c6b31923a6e2091bbe0f83155a28759f5b3d574110e0fb580688801ff"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/frame/contents_container_view.cc": {
+      "bytes": 33101,
+      "mode": 420,
+      "sha256": "7fd66e51c6fe52d0936a580ceebf5daa79d052c47e2d2f3a9665564afe015387"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/frame/contents_container_view.h": {
+      "bytes": 9636,
+      "mode": 420,
+      "sha256": "f5c10362462ea72debc88fb9e355cc7d6ac3a9607d5ae358faf26afbb54bd2b9"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/frame/contents_web_view.cc": {
+      "bytes": 16588,
+      "mode": 420,
+      "sha256": "24d3adee50aa43f8046e3c1359d689872b080bffb4af0f45c34110d314b5bf5a"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/frame/contents_web_view.h": {
+      "bytes": 4488,
+      "mode": 420,
+      "sha256": "cbd644a99f8bab9a1ee43d69bc942f7e69944c74be6b9b3d5c014d9cf725c865"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/frame/horizontal_tab_strip_region_view.cc": {
+      "bytes": 46471,
+      "mode": 420,
+      "sha256": "290fd35d8009b31d68e5183776f4ee7e20b4134efb5ada0b200d297aa26ab857"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/frame/layout/browser_view_layout_impl.cc": {
+      "bytes": 17348,
+      "mode": 420,
+      "sha256": "3b561d8d02006b5ab8669cb5d8df3ae295e55cf91c03f87e13d3cb10451313ab"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc": {
+      "bytes": 87690,
+      "mode": 420,
+      "sha256": "765e9a292cc8f20cecf88bc00387bf2479cd515267daf58f12d2968a3dd94d90"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/frame/multi_contents_resize_area.cc": {
+      "bytes": 10054,
+      "mode": 420,
+      "sha256": "4168e4482409a8d42bcd9ea452b3260ce31eb870fbec4dc98ee1faf2b2fc0afa"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/frame/multi_contents_resize_area.h": {
+      "bytes": 4084,
+      "mode": 420,
+      "sha256": "89a32a70ed19be4941581f523ed0c1da3eed231b2129314f81c264432d606d5d"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/frame/multi_contents_view.cc": {
+      "bytes": 62674,
+      "mode": 420,
+      "sha256": "9f31b636cef625e85009f74c8f37040e48205b6f84756f2ae6e89bd126dc8e09"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/frame/multi_contents_view.h": {
+      "bytes": 15943,
+      "mode": 420,
+      "sha256": "758d21409696e4eab78bf9e006858218aa81a7f27aeda5c4fdc9bb264a3db0b1"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/frame/multi_contents_view_delegate.cc": {
+      "bytes": 9132,
+      "mode": 420,
+      "sha256": "d3c58266a6c6a071a6dece523662a7a0c343d3721d08f7ba5bea5c29f296df07"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/frame/multi_contents_view_delegate.h": {
+      "bytes": 2649,
+      "mode": 420,
+      "sha256": "54794d77243854c6ce9bb0825199b6bfd6c2066522d891bb6c79f97c0887acd8"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/frame/multi_contents_view_drop_target_controller.cc": {
+      "bytes": 23174,
+      "mode": 420,
+      "sha256": "4b2aedec785f7b09ade9e72a960667a45ef0461dbaa82f746386b309f954027b"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/frame/multi_contents_view_drop_target_controller.h": {
+      "bytes": 8381,
+      "mode": 420,
+      "sha256": "c6e23fcb56749b6993066115294d261fac0df3306db871b24e7b69cf90183267"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/frame/multi_contents_view_drop_target_controller_unittest.cc": {
+      "bytes": 51318,
+      "mode": 420,
+      "sha256": "0c333083ce5586157ac29e09442f153e4b7c0d39d6f0cc029593fb9360ef9bbb"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/frame/noventra_bookmarks_view.cc": {
+      "bytes": 60850,
+      "mode": 420,
+      "sha256": "bb4ab4dc557ac56dbb690731f7381037e725153d50491f50384cb1a4a56cc5f6"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/frame/noventra_bookmarks_view.h": {
+      "bytes": 4924,
+      "mode": 420,
+      "sha256": "1e71a107603934b6b42b52fdfe78cae13f1581e42e3d2d9975d28efba63149e3"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/frame/noventra_dock_controller.cc": {
+      "bytes": 44152,
+      "mode": 420,
+      "sha256": "37f090cabff0f63d1bad549ba9f6c5b1b9784b7cb0c5d909e2edb71b39adcd90"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/frame/noventra_dock_controller.h": {
+      "bytes": 5032,
+      "mode": 420,
+      "sha256": "e7726a8e421ac1e637148612463e3a9737b2785cf301523952f99fd7ce7b49ea"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/frame/noventra_dock_view.cc": {
+      "bytes": 46905,
+      "mode": 420,
+      "sha256": "065186ce829cbdf80fb864d233fad8238c975a6a749cc36ec84949c777c3b51c"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/frame/noventra_dock_view.h": {
+      "bytes": 3756,
+      "mode": 420,
+      "sha256": "c7ed9863f205178b5b41d085b6a3a3cdfde0730c8ac5fc1064fedd56cbd04c99"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/frame/noventra_window_mirror_view.cc": {
+      "bytes": 38424,
+      "mode": 420,
+      "sha256": "78abe0c7920b053c2ab9090eccb9619183089277bfec12a2a6923bdec4f8f128"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/frame/noventra_window_mirror_view.h": {
+      "bytes": 1421,
+      "mode": 420,
+      "sha256": "2830732fdeec56454c59a1a3f601e1bec0c47927ff9e1dbf09f8af06e097bb3b"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/frame/opaque_browser_frame_view.cc": {
+      "bytes": 40020,
+      "mode": 420,
+      "sha256": "e404fe50637015065944ce9af4d807432579eccba0b4969d6acc8ddd3b872a9c"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/frame/tab_modal_dialog_host.cc": {
+      "bytes": 7773,
+      "mode": 420,
+      "sha256": "a3696ccb570342bb45dc452a033dbb04f86fda5f7978519b32f5b0919037ff7a"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc": {
+      "bytes": 85443,
+      "mode": 420,
+      "sha256": "fdebbe540f98642884f23e4a0d5aaeb3dfbe4b0ecee0a506ffdca7ede65b9f7e"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h": {
+      "bytes": 14362,
+      "mode": 420,
+      "sha256": "3b3f411c1f1a0f5c8155c4e048dd3292aacff11ae4636cd549682b0c7630c95d"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/frame/vertical_tab_strip_region_view_browsertest.cc": {
+      "bytes": 78127,
+      "mode": 420,
+      "sha256": "5c2c09949bda74ddf2ba412b01ffbd13043bd75be8f0e38a72ae0b7cac0df96c"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/helium/BUILD.gn": {
+      "bytes": 733,
+      "mode": 420,
+      "sha256": "83fb89f90e7d9068a1aff931469c2731c7b7bef98ab3417fc214d265dafabb54"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/helium/native_frame_materials.cc": {
+      "bytes": 3546,
+      "mode": 420,
+      "sha256": "4fe0ce91a593ef4142f1eaf2cf01db6cf8fb5a34acf7be0643daa563c30bb4c4"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/helium/native_frame_materials.h": {
+      "bytes": 1138,
+      "mode": 420,
+      "sha256": "55661a53d6bee18ffa95a4cc155968b2f00231d476a8236b2e57a9a39ebedf2a"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/helium/native_frame_materials_mac.mm": {
+      "bytes": 4573,
+      "mode": 420,
+      "sha256": "efeb127f8db132c4aadba348adcfe08a819a2bc2cdaf1a1694acf97110507426"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/javascript_tab_modal_dialog_view_views.cc": {
+      "bytes": 8395,
+      "mode": 420,
+      "sha256": "feebffbaf801be3102fb5cb92626e830397de17a950e6a49767fb67f02ae9003"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/location_bar/location_bar_view.cc": {
+      "bytes": 107528,
+      "mode": 420,
+      "sha256": "f0f86ce6a2430bad13b2fb4f5350d9a0b5699e84ab707bbc8472d0165dfd14b0"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/location_bar/location_bar_view.h": {
+      "bytes": 27031,
+      "mode": 420,
+      "sha256": "8423d8df5a1f337cf92b195e20ed3c09145c0eab7a5ca096ead1cf3df627ba99"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/location_bar/location_icon_view.cc": {
+      "bytes": 17578,
+      "mode": 420,
+      "sha256": "4657c493959167f6d710f7835191ba96a4b950fa95830761a9d922f4ff8759cd"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/noventra_link_preview.cc": {
+      "bytes": 36279,
+      "mode": 420,
+      "sha256": "093e3615a2f2f0c079bb7ee9d9c3ed271321177b2e31064ef9a5a4a32a1310f8"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/noventra_link_preview.h": {
+      "bytes": 3341,
+      "mode": 420,
+      "sha256": "eac7e5c6541890906abf1bd32c861f3dde8e064476001534f984a21976808e61"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/omnibox/omnibox_popup_view_views.cc": {
+      "bytes": 35777,
+      "mode": 420,
+      "sha256": "e6959239e0a02fff953bb5b3ada604f7a8b46ce30f3d5351b525adc98da969f7"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/omnibox/omnibox_view_views.cc": {
+      "bytes": 104273,
+      "mode": 420,
+      "sha256": "c5fd5aeb27868a4701cba620e13070ce877905eba7fdc52eaf0a6a1f8e0adb91"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/omnibox/rounded_omnibox_results_frame.cc": {
+      "bytes": 19759,
+      "mode": 420,
+      "sha256": "72892bf33a2a7b4f4636067594dc184ad1d11e07cb96a32628a1a19e71ab9500"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/omnibox/rounded_omnibox_results_frame.h": {
+      "bytes": 3371,
+      "mode": 420,
+      "sha256": "cb3a7be4336be186035f0b129be57aaa5d4214f994426619cda8b945d1fd2665"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/profiles/profile_menu_view_base.cc": {
+      "bytes": 37867,
+      "mode": 420,
+      "sha256": "d8b375a0af72863e7ef2f7c2612d368907045fc55fbccb36de1f05231d9fc72c"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/tabs/common/BUILD.gn": {
+      "bytes": 9451,
+      "mode": 420,
+      "sha256": "bec15f1fdfcdc0f8b2132549cb55e7f7c02c1bc47831c2a4aa5fbdbfd2715095"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/tabs/common/noventra_space_visibility.h": {
+      "bytes": 1342,
+      "mode": 420,
+      "sha256": "92f75e494034c004cf8efe3baaeedb90d74f38433fe4011ed4d913d988e19fca"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/tabs/common/pinned_tab_container_view.cc": {
+      "bytes": 19319,
+      "mode": 420,
+      "sha256": "e8d83b8d4329fe791f4f4ce42289e1db5de3ca53d9e69aa09c2b574c10cbaf83"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/tabs/common/split_tab_view.cc": {
+      "bytes": 12738,
+      "mode": 420,
+      "sha256": "63875c0cdbcf44099db29fafdb71edd6959af70abaf26a7352c3edac8300da3b"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/tabs/common/tab_strip_layout_utils.cc": {
+      "bytes": 8876,
+      "mode": 420,
+      "sha256": "753f55ab0968792ab1704abb6f9c01b7cfe87c9f67da8c93265fd9aa28035e45"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/tabs/common/tab_strip_layout_utils.h": {
+      "bytes": 3430,
+      "mode": 420,
+      "sha256": "8a858172c77c3b7aa75c55eecc10d90af2de3c1f4c52cc259e53a07f5c71611f"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/tabs/common/tab_strip_view.cc": {
+      "bytes": 34661,
+      "mode": 420,
+      "sha256": "b9b4fe0881247a741f0f39c5462b365a6cb3e0ca223eb6609dd0016c6d9f7b08"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/tabs/common/tab_strip_view.h": {
+      "bytes": 7900,
+      "mode": 420,
+      "sha256": "ae9d08f0aca28f3a765cbbd3219e30611e8f177ebb3806bcd79416b88970f78e"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/tabs/common/tab_strip_view_layout.cc": {
+      "bytes": 19770,
+      "mode": 420,
+      "sha256": "6dd40c7f4df27045f5d5f90c030148ea0bb4fa5f3fe6bf323a2dd7352d173187"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/tabs/common/tab_view.cc": {
+      "bytes": 73126,
+      "mode": 420,
+      "sha256": "2630794ad583697826b5ee9db016f3b76bcd4110ea59db93d73a72abc225384c"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/tabs/common/tab_view.h": {
+      "bytes": 11294,
+      "mode": 420,
+      "sha256": "5a4f60444d32d886784aaa9fd2955bf9c8034ae7a731259f4fceb814e10dfcb7"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/tabs/common/tab_view_vertical_layout.cc": {
+      "bytes": 8754,
+      "mode": 420,
+      "sha256": "4723d7c086e416116e77e651a7fb0d12e22700382b9371b12b6ef54055bde8b8"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view_layout.cc": {
+      "bytes": 16648,
+      "mode": 420,
+      "sha256": "6cff6057501964539d3a7264e98b293db3c1bf804b08f8f37426e74c2818bd69"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/tabs/common/vertical_tab_style_views.cc": {
+      "bytes": 12332,
+      "mode": 420,
+      "sha256": "ccaf57084beaf1dc21a04b321ef4cd8cf70e7509a85f690e020b4a78e57bf99b"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/tabs/dragging/tab_drag_controller.cc": {
+      "bytes": 133311,
+      "mode": 420,
+      "sha256": "a01bb0a7081a141d22075f1aa8a65f68c0970898cc859d74bc93d4c5fcbc3c5a"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/tabs/dragging/tab_drag_controller.h": {
+      "bytes": 32752,
+      "mode": 420,
+      "sha256": "70538a7f9e4b6304b099646be844cd00c99605ff909668b96962e1fe33d6cec4"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/tabs/tab.cc": {
+      "bytes": 75292,
+      "mode": 420,
+      "sha256": "643f3e05112df0bc5bcaa11e46cb31259f418c2b2f7a43df2f341f250a6905e2"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/tabs/tab.h": {
+      "bytes": 15093,
+      "mode": 420,
+      "sha256": "9f7fbfe7faaead439752aae036552a6ef1c1160934d8e8fc1b1a4c0008acb042"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/tabs/tab/tab_accessibility.cc": {
+      "bytes": 9969,
+      "mode": 420,
+      "sha256": "abab718fc6802349c102d11f1dbd7569ffd82a0e63cc7bf3291eee3cadb6789d"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/tabs/tab/tab_icon.cc": {
+      "bytes": 24205,
+      "mode": 420,
+      "sha256": "fa8a8f22a97ecf0612a2f55d8baf29722a258038971c716178d7d0cd5488c2ab"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/tabs/tab/tab_icon.h": {
+      "bytes": 9352,
+      "mode": 420,
+      "sha256": "c6daf60628bd2eb4a69b2b31ca521a8cb6893b6d6960398922e4a41533f15948"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/toolbar/BUILD.gn": {
+      "bytes": 26818,
+      "mode": 420,
+      "sha256": "e590e5d9eaf409de072e63681b56fc6c1d853b5dfc862fb0ade1ad4b945e5393"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/toolbar/browser_app_menu_button.cc": {
+      "bytes": 11064,
+      "mode": 420,
+      "sha256": "04058a9e9aa76257bc92528b3fd9d895904ec62860fa14eb25ed98aad0772033"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/toolbar/browser_app_menu_button.h": {
+      "bytes": 3791,
+      "mode": 420,
+      "sha256": "1188e86f28b03a820d938ba51a9b0c9e460fcfe3ec31fefe854dbb27d2b60403"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/toolbar/pinned_action_toolbar_button.cc": {
+      "bytes": 17103,
+      "mode": 420,
+      "sha256": "77ce6fdb48532cbacd0d09130f70865a6e299a2642ac7cea240cef912f9839fa"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/toolbar/pinned_action_toolbar_button.h": {
+      "bytes": 5710,
+      "mode": 420,
+      "sha256": "06dff39dc992ef2a1d719082e1a29d871fda4acf79c8e923d762b9c98b1783ce"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/toolbar/pinned_toolbar_actions_container.cc": {
+      "bytes": 36323,
+      "mode": 420,
+      "sha256": "6521eec3504843de0eb3a0b6e074f3f37e5f7c961227bbee8173546ff97674f7"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/toolbar/pinned_toolbar_actions_container.h": {
+      "bytes": 8593,
+      "mode": 420,
+      "sha256": "945fbad90018e45456c14a87bca9d9fda43fa34a9f5438c81f3f12201f360cce"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/toolbar/split_tabs_button.cc": {
+      "bytes": 14304,
+      "mode": 420,
+      "sha256": "c326cc9aa4351771cf3c9f5edeefdc8a6437d272fff2fca1c032a6ff14a82f4c"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/toolbar/toolbar_button.cc": {
+      "bytes": 29315,
+      "mode": 420,
+      "sha256": "403046b289631428897aa944cfb7e80906964497255023139327c18c22ad0d81"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/toolbar/toolbar_icon_container_view.cc": {
+      "bytes": 11161,
+      "mode": 420,
+      "sha256": "930eb732d5fdc2fe8b59a88109596b909f186181e941a2616b6520b90b6d20cf"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/toolbar/toolbar_view.cc": {
+      "bytes": 122896,
+      "mode": 420,
+      "sha256": "8e99ea71e2f9f066c4db5e2eee6b6977d32459c2072c402ff95c4037c6b8a7e2"
+    },
+    "prepared-source-macos/chrome/browser/ui/views/toolbar/toolbar_view.h": {
+      "bytes": 24565,
+      "mode": 420,
+      "sha256": "7bb26b180dcbbd160175d7d0a923e3ae890b6308e812a8b60934c1b5890ed7f6"
+    },
+    "prepared-source-macos/chrome/browser/ui/webui/BUILD.gn": {
+      "bytes": 32170,
+      "mode": 420,
+      "sha256": "4d18bde56365bd365e95c98b075f8430c8e77297da28ec7aef4c2d440ff9d1b6"
+    },
+    "prepared-source-macos/chrome/browser/ui/webui/components/BUILD.gn": {
+      "bytes": 1145,
+      "mode": 420,
+      "sha256": "0a3c6fb2cf5e4bdf6db33003855cfdae856e9c9a897319d317d02e2388f477a2"
+    },
+    "prepared-source-macos/chrome/browser/ui/webui/components/components_handler.cc": {
+      "bytes": 10890,
+      "mode": 420,
+      "sha256": "c6b3f4303571930208e3b8ae2857e78a14f2a85e9432f54f0e443c4808c3de02"
+    },
+    "prepared-source-macos/chrome/browser/ui/webui/components/components_handler.h": {
+      "bytes": 2542,
+      "mode": 420,
+      "sha256": "85f71a1579c2e7e19d806cb10ef957f0e7a646b9c2836c93f50a519f1c9cf1a7"
+    },
+    "prepared-source-macos/chrome/browser/ui/webui/components/components_handler_unittest.cc": {
+      "bytes": 2887,
+      "mode": 420,
+      "sha256": "e27aaea4d19fc8aac7b088068d5b356cbf6a400d9a7cc416e9c8122c2fbb2bd1"
+    },
+    "prepared-source-macos/chrome/browser/ui/webui/components/components_ui.cc": {
+      "bytes": 3881,
+      "mode": 420,
+      "sha256": "0de749cac0e8a7cc253658ef0b365054ea6c683dae1f5c12a51b1b136e7d25fd"
+    },
+    "prepared-source-macos/chrome/browser/ui/webui/crashes/crashes_ui.cc": {
+      "bytes": 9163,
+      "mode": 420,
+      "sha256": "6880bbfcb59010302b402a89a4adb40c74f21c52db06a02b5e0874ac7e9ce700"
+    },
+    "prepared-source-macos/chrome/browser/ui/webui/customize_buttons/customize_buttons_handler.cc": {
+      "bytes": 6331,
+      "mode": 420,
+      "sha256": "effb1eb6c4fa9282e3065897261fd5b2db464016cc251a5e9cd40bdbf323459c"
+    },
+    "prepared-source-macos/chrome/browser/ui/webui/help/version_updater_basic.cc": {
+      "bytes": 5544,
+      "mode": 420,
+      "sha256": "38bf5ebcf6690eb0422aab7b019c6851d2e4a1c7e6387f6e4fcfbd29264d1866"
+    },
+    "prepared-source-macos/chrome/browser/ui/webui/new_tab_page/BUILD.gn": {
+      "bytes": 10831,
+      "mode": 420,
+      "sha256": "0d49c9743ae55629f08d675e6174d1a5cb5c9f022f7cacf8d7a4e5ea95a9dc22"
+    },
+    "prepared-source-macos/chrome/browser/ui/webui/new_tab_page/new_tab_page.mojom": {
+      "bytes": 11260,
+      "mode": 420,
+      "sha256": "165948ebcdd1c4c49bd67c804b3f85ac50067986a1c7b455ac5eefb12d7c8588"
+    },
+    "prepared-source-macos/chrome/browser/ui/webui/new_tab_page/new_tab_page_handler.cc": {
+      "bytes": 60156,
+      "mode": 420,
+      "sha256": "adb9d540be6e94c84a0540ef034bfbe4fadf82884a17b8a80af0543911b2e4fb"
+    },
+    "prepared-source-macos/chrome/browser/ui/webui/new_tab_page/new_tab_page_handler.h": {
+      "bytes": 14106,
+      "mode": 420,
+      "sha256": "42d329f458fcf834a929bbb4f83e9ff902b00398d037534e3b01740f516f46a1"
+    },
+    "prepared-source-macos/chrome/browser/ui/webui/new_tab_page/new_tab_page_ui.cc": {
+      "bytes": 78452,
+      "mode": 420,
+      "sha256": "5890c6563352b94c7a77841a877f3d6c25a4e4460c7605e5294bc12dab88eb71"
+    },
+    "prepared-source-macos/chrome/browser/ui/webui/new_tab_page/new_tab_page_ui.h": {
+      "bytes": 18384,
+      "mode": 420,
+      "sha256": "90dea8bef773e7558d8e1261529266ad7c35174f17078f9d4748b6bce0cdfe39"
+    },
+    "prepared-source-macos/chrome/browser/ui/webui/onboarding/onboarding_page_ui.cc": {
+      "bytes": 2999,
+      "mode": 420,
+      "sha256": "fbc779a7ac97761771f2386c572ad8736dcaccb9c1dd700de0a53cc60681becc"
+    },
+    "prepared-source-macos/chrome/browser/ui/webui/settings/BUILD.gn": {
+      "bytes": 27796,
+      "mode": 420,
+      "sha256": "bf29c23ac61c74ac8d5fc396d0e433342443dfa4ec49a775702fb3332bed5080"
+    },
+    "prepared-source-macos/chrome/browser/ui/webui/settings/appearance_handler.cc": {
+      "bytes": 30174,
+      "mode": 420,
+      "sha256": "cfb66a7c77698383161d51987063216bd2f7f2274e7421b0b9d57282d763972e"
+    },
+    "prepared-source-macos/chrome/browser/ui/webui/settings/appearance_handler.h": {
+      "bytes": 3275,
+      "mode": 420,
+      "sha256": "af6f230cf5b7c3f76bc5c2a3d82650f9b439168bb214407d034354d500759354"
+    },
+    "prepared-source-macos/chrome/browser/ui/webui/settings/brave_full_disk_access_confirm_dialog_delegate_mac.mm": {
+      "bytes": 2674,
+      "mode": 420,
+      "sha256": "3fe578effd06f7ac5fbdcafbc498e18db95fae689e7b0f97eda6ac138e347e13"
+    },
+    "prepared-source-macos/chrome/browser/ui/webui/settings/brave_import_data_handler.cc": {
+      "bytes": 14441,
+      "mode": 420,
+      "sha256": "eb1b8cdc33f0b97db78faa41acc4cea9e2e355e9b8965f99eb6300dc03b83e24"
+    },
+    "prepared-source-macos/chrome/browser/ui/webui/settings/brave_import_data_handler.h": {
+      "bytes": 4399,
+      "mode": 420,
+      "sha256": "6e3cf36e9bb8cba441e0a19c4b4f250d367c43b52ede4bc258c60336f2c8734e"
+    },
+    "prepared-source-macos/chrome/browser/ui/webui/settings/brave_importer_observer.cc": {
+      "bytes": 3049,
+      "mode": 420,
+      "sha256": "df7f36cd9bf5230428024eb72bb0d968c413c44a0cd1c4fd711892811ff88712"
+    },
+    "prepared-source-macos/chrome/browser/ui/webui/settings/brave_importer_observer.h": {
+      "bytes": 2082,
+      "mode": 420,
+      "sha256": "9075348092bea8592ca1fb10e985a26e9d00436360f42815794fdd0daaa1c281"
+    },
+    "prepared-source-macos/chrome/browser/ui/webui/settings/helium_crash_reporting_handler.cc": {
+      "bytes": 3030,
+      "mode": 420,
+      "sha256": "a9702b9885fd156036df2079f5d37da28474f8ead3407fe05a61e3510d40e784"
+    },
+    "prepared-source-macos/chrome/browser/ui/webui/settings/import_data_handler.cc": {
+      "bytes": 12970,
+      "mode": 420,
+      "sha256": "9a5b6a036f418a1d2a6f3ccca11de6b7e64a1dd21d4fecfa43af9ce8e32a30c8"
+    },
+    "prepared-source-macos/chrome/browser/ui/webui/settings/import_data_handler.h": {
+      "bytes": 3194,
+      "mode": 420,
+      "sha256": "ebffd41ccd1e1ce98252118fbaf5217cf7ab46a3918d9b0ab791ed07e949ddf8"
+    },
+    "prepared-source-macos/chrome/browser/ui/webui/settings/portable_transfer_handler.cc": {
+      "bytes": 16749,
+      "mode": 420,
+      "sha256": "99c353b4f2fb20e28505df426bac8f187e212ef038d5d849276951a3f32cd5c9"
+    },
+    "prepared-source-macos/chrome/browser/ui/webui/settings/portable_transfer_handler.h": {
+      "bytes": 2255,
+      "mode": 420,
+      "sha256": "30f2d54db10ac8e1dcd3c4b45b876a0d8cfc8ee3f6c84f8120dc05bb534254e8"
+    },
+    "prepared-source-macos/chrome/browser/ui/webui/settings/settings_clear_browsing_data_handler.cc": {
+      "bytes": 21043,
+      "mode": 420,
+      "sha256": "1096eb78664669c3e88e99df9a89eb7b648e29b4e1bc3e32f2ea1eeadba87b40"
+    },
+    "prepared-source-macos/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc": {
+      "bytes": 251753,
+      "mode": 420,
+      "sha256": "4ff981fd0cb206542735cb0ff0ef30f0acca7bf8541777d020e9ffeef97d9ad7"
+    },
+    "prepared-source-macos/chrome/browser/ui/webui/settings/settings_ui.cc": {
+      "bytes": 43383,
+      "mode": 420,
+      "sha256": "09c4d82087418cb3c73a96479e302dc48818e076ca49aecb89afe14cfb9b5835"
+    },
+    "prepared-source-macos/chrome/browser/ui/webui/settings/settings_ui.h": {
+      "bytes": 8686,
+      "mode": 420,
+      "sha256": "13fd8a45ae94dc3f27a40e630a25c9a43e74b7cf1237d9a87d393b285372d450"
+    },
+    "prepared-source-macos/chrome/browser/ui/webui/side_panel/customize_chrome/customize_chrome_ui.cc": {
+      "bytes": 26422,
+      "mode": 420,
+      "sha256": "4b6e89e613cc091aa1175daad8fccedda508e8c480878f3c834d5c97cf792680"
+    },
+    "prepared-source-macos/chrome/browser/ui/webui/tab_search/tab_search.mojom": {
+      "bytes": 8788,
+      "mode": 420,
+      "sha256": "a2373a076c4b6c3e4ff75c4356c0acf2ece593b6de9acb8ce32ca9f4b4c6aa4e"
+    },
+    "prepared-source-macos/chrome/browser/ui/webui/tab_search/tab_search_page_handler.cc": {
+      "bytes": 42518,
+      "mode": 420,
+      "sha256": "8cbeb9c5524d2ee5c8c5d8a182bda289f33954a1e78c9c8534e571181570fd5e"
+    },
+    "prepared-source-macos/chrome/browser/ui/webui/tab_strip_internals/tab_strip_internals.mojom": {
+      "bytes": 10863,
+      "mode": 420,
+      "sha256": "aa20e3c5d61a83bf2ac4dfcfcb30ae75bb387ee22f1dacabff9114751340d9d4"
+    },
+    "prepared-source-macos/chrome/browser/ui/webui/tab_strip_internals/tab_strip_internals_util.cc": {
+      "bytes": 17020,
+      "mode": 420,
+      "sha256": "ed9f42ca5f2fbc50db21ae765abe378f10bae513437605bfa422480a6343b865"
+    },
+    "prepared-source-macos/chrome/browser/ui/webui/version/version_ui.cc": {
+      "bytes": 13909,
+      "mode": 420,
+      "sha256": "d9ca93d23726604c9c8e4c9667b1171ebd8d9bd8486bf4fd7bfd9e6feaf02846"
+    },
+    "prepared-source-macos/chrome/browser/ui/window_metadata/BUILD.gn": {
+      "bytes": 1795,
+      "mode": 420,
+      "sha256": "652dda4b47a0cf7edf117bf4f166d0b2e0076b7d2c8c1eed1afba364e339397b"
+    },
+    "prepared-source-macos/chrome/browser/ui/window_metadata/window_metadata_controller.cc": {
+      "bytes": 11643,
+      "mode": 420,
+      "sha256": "9408ce00c2bafb7edee322c4c4237054deab9741653fe2a4032a283f5820bf5a"
+    },
+    "prepared-source-macos/chrome/browser/web_applications/commands/garbage_collect_storage_partitions_command.cc": {
+      "bytes": 4505,
+      "mode": 420,
+      "sha256": "cd7b3e5de69ff4c2cba409d6d981baa8d0b5849eac5108b5faa5c6528399b5af"
+    },
+    "prepared-source-macos/chrome/common/chrome_paths_mac.mm": {
+      "bytes": 7274,
+      "mode": 420,
+      "sha256": "5248daf4d48e500c1a8c21a5e5eeeef534e6202a666c94c6581e302ff68cbe33"
+    },
+    "prepared-source-macos/chrome/common/importer/BUILD.gn": {
+      "bytes": 4541,
+      "mode": 420,
+      "sha256": "55a71b62753a8f58abed68b19253fa104dbe50de7c6a80da776bc9f89d65f0ba"
+    },
+    "prepared-source-macos/chrome/common/importer/chrome_importer_utils.cc": {
+      "bytes": 10438,
+      "mode": 420,
+      "sha256": "c500128739cd0cb1b0e6c6bd5bef0e8355a8f97979aaa6f05dfed25e353c7799"
+    },
+    "prepared-source-macos/chrome/common/importer/firefox_importer_utils.cc": {
+      "bytes": 17427,
+      "mode": 420,
+      "sha256": "3ebbac59262f6846326b6aa456cc43a4e4b781e578cc2ffb03b8235bc9859ef4"
+    },
+    "prepared-source-macos/chrome/common/importer/importer_bridge.h": {
+      "bytes": 3309,
+      "mode": 420,
+      "sha256": "5ba7abb4b62cbfaa017f64acc4b33805ff0024269ae498755b66e3dc7c1e5b6b"
+    },
+    "prepared-source-macos/chrome/common/importer/mock_importer_bridge.h": {
+      "bytes": 1842,
+      "mode": 420,
+      "sha256": "b8469b6af9269355dfe6e8fe6516e7ef5f0de06e587e5ccd35aafd053e1c2531"
+    },
+    "prepared-source-macos/chrome/common/importer/noventra_browser_discovery_unittest.cc": {
+      "bytes": 5349,
+      "mode": 420,
+      "sha256": "1ec034771a68eb3de8359e37d6031962c17a6ffe73886424e60a20beee1ae3aa"
+    },
+    "prepared-source-macos/chrome/common/importer/profile_import.mojom": {
+      "bytes": 3458,
+      "mode": 420,
+      "sha256": "feaf2bf980c00999cab879eaf22ad3ba84353899320822ac1ee4f8becc052f4f"
+    },
+    "prepared-source-macos/chrome/common/importer/scoped_copy_file.cc": {
+      "bytes": 5654,
+      "mode": 420,
+      "sha256": "b631ba74ccf00b77bcaf47d4324323b4547409e72349b3d694908c3d8137d195"
+    },
+    "prepared-source-macos/chrome/common/importer/scoped_copy_file.h": {
+      "bytes": 1716,
+      "mode": 420,
+      "sha256": "bf96ca012efd4f696041438f31b235d97f947b830e9f575e472073e4105e056a"
+    },
+    "prepared-source-macos/chrome/common/importer/scoped_copy_file_unittest.cc": {
+      "bytes": 6527,
+      "mode": 420,
+      "sha256": "92b33f48939c4584222da2f4559a54e44dc401018be346cd33129324a450c49e"
+    },
+    "prepared-source-macos/chrome/renderer/BUILD.gn": {
+      "bytes": 16077,
+      "mode": 420,
+      "sha256": "7e9cab5afdaa3c7950b3600f7a5ca1cc95a83340bc879a2e29d088b557715d1d"
+    },
+    "prepared-source-macos/chrome/renderer/accessibility/ax_tree_distiller.cc": {
+      "bytes": 12526,
+      "mode": 420,
+      "sha256": "cdcf6ea6a12cb86370df5a5ced2bf8b8caf73a95a7fa1614ca4e6673a9168aa7"
+    },
+    "prepared-source-macos/chrome/renderer/accessibility/ax_tree_distiller.h": {
+      "bytes": 5699,
+      "mode": 420,
+      "sha256": "e9c17ac9cab91fefc66f6b02ae40258b50273745b48887a01952e2aab9f887b9"
+    },
+    "prepared-source-macos/chrome/renderer/accessibility/read_anything/read_anything_node_utils.cc": {
+      "bytes": 11682,
+      "mode": 420,
+      "sha256": "94079ec733de3fe37d58583fe7efbd959139a14972ced3407c2c27c0391a4de9"
+    },
+    "prepared-source-macos/chrome/renderer/chrome_render_frame_observer.cc": {
+      "bytes": 35400,
+      "mode": 420,
+      "sha256": "eec8111207917256db2ff530def15025f15a605c4d3dc2e4f08fca175c5d5faf"
+    },
+    "prepared-source-macos/chrome/services/noventra_ubo/BUILD.gn": {
+      "bytes": 1100,
+      "mode": 420,
+      "sha256": "83e5c7b129bc3ad192198914fd8a5f6ac6cf11295cd911bd7de534e5c4d3bd9d"
+    },
+    "prepared-source-macos/chrome/services/noventra_ubo/assets.h": {
+      "bytes": 7509,
+      "mode": 420,
+      "sha256": "abdd5af768667a87f899ecaa4da298fdf9da5410b7199935931ad081bcabb9b1"
+    },
+    "prepared-source-macos/chrome/services/noventra_ubo/isolate_task_runner.h": {
+      "bytes": 1923,
+      "mode": 420,
+      "sha256": "0c2e5eda20554c0f1a810404a42321bbccebac4b7214fb9cd24e13155a6f5195"
+    },
+    "prepared-source-macos/chrome/services/noventra_ubo/isolate_task_runner_unittest.cc": {
+      "bytes": 5001,
+      "mode": 420,
+      "sha256": "907fcad16869221afca6cfbda8da2f10038c7a6a341fe28e52e9ccea68413407"
+    },
+    "prepared-source-macos/chrome/services/noventra_ubo/probe_client.cc": {
+      "bytes": 7425,
+      "mode": 420,
+      "sha256": "e57bbe286af530f043a20d43dd0b46873d88667ad40ae1e697b30fc4a5bacd66"
+    },
+    "prepared-source-macos/chrome/services/noventra_ubo/probe_client.h": {
+      "bytes": 1146,
+      "mode": 420,
+      "sha256": "56cc6de4ee81d99743d4b5ed583d7bc496ab3692f3c887b2692faea076d9a9b0"
+    },
+    "prepared-source-macos/chrome/services/noventra_ubo/service.cc": {
+      "bytes": 17048,
+      "mode": 420,
+      "sha256": "935cc5da7d60690a680ba4da279ee74a19013a2804bbba58e32cfa1ed5d2aab2"
+    },
+    "prepared-source-macos/chrome/services/noventra_ubo/service.h": {
+      "bytes": 981,
+      "mode": 420,
+      "sha256": "a68bc5efde03fa821d287e3b31ebae59a3536d16cebfd3659a66bd3a9c495943"
+    },
+    "prepared-source-macos/chrome/services/noventra_ubo/ubo_service.mojom": {
+      "bytes": 473,
+      "mode": 420,
+      "sha256": "faed248525bb002e664cea92748d3fd6e99258e7ed3b833ce9bd376216c0dd7d"
+    },
+    "prepared-source-macos/chrome/utility/BUILD.gn": {
+      "bytes": 11608,
+      "mode": 420,
+      "sha256": "dd4f1e5bc78664ebd0ac9e24ef758d84d04f43124acf8d1aa9c19e2a39e18e2f"
+    },
+    "prepared-source-macos/chrome/utility/importer/bookmarks_file_importer.cc": {
+      "bytes": 5292,
+      "mode": 420,
+      "sha256": "8187fa8919c007426870b2e46ec8c27b1539ba90b5f2629f07eb71dd52b0fd68"
+    },
+    "prepared-source-macos/chrome/utility/importer/bookmarks_file_importer_unittest.cc": {
+      "bytes": 13300,
+      "mode": 420,
+      "sha256": "3b3c532a94fb3f625f58d945722d674048596165f8f8e68cd8fdb71661854646"
+    },
+    "prepared-source-macos/chrome/utility/importer/chrome_importer.cc": {
+      "bytes": 14292,
+      "mode": 420,
+      "sha256": "79af8d4a8664bd555b9cd139628d97c4398f49d9acd8a80e5444dd0872dbc10a"
+    },
+    "prepared-source-macos/chrome/utility/importer/chrome_importer.h": {
+      "bytes": 2320,
+      "mode": 420,
+      "sha256": "924372c3381952eef1acaaa1916a0c409df248e5683f508a791658ac5d511f0f"
+    },
+    "prepared-source-macos/chrome/utility/importer/chrome_password_importer.cc": {
+      "bytes": 14000,
+      "mode": 420,
+      "sha256": "7cdff1ef97cb65ecbca13c4efba0fbb83ae7c774f4f4ab30bb4c4bcee2ad0669"
+    },
+    "prepared-source-macos/chrome/utility/importer/chrome_password_importer.h": {
+      "bytes": 1980,
+      "mode": 420,
+      "sha256": "ff0266847b5d92f08d8acbcdac7bfd315bb10ff253e944556d56cf68b9c3c659"
+    },
+    "prepared-source-macos/chrome/utility/importer/chrome_password_importer_unittest.cc": {
+      "bytes": 9858,
+      "mode": 420,
+      "sha256": "2e0683d4d64171b041b7521ddf7c4d15d97a9464c82ff9c3f1a1b18b19cacbcc"
+    },
+    "prepared-source-macos/chrome/utility/importer/external_process_importer_bridge.cc": {
+      "bytes": 8314,
+      "mode": 420,
+      "sha256": "fc75e96172c844c42aaf46bf7edeba664d15ac085d94728b458ad8b7dbe2db99"
+    },
+    "prepared-source-macos/chrome/utility/importer/external_process_importer_bridge.h": {
+      "bytes": 3524,
+      "mode": 420,
+      "sha256": "17579a3abf553f2e4aa23b1662db95baa61262d11739bf3a138f0d208a1a9c8f"
+    },
+    "prepared-source-macos/chrome/utility/importer/firefox_importer.cc": {
+      "bytes": 27947,
+      "mode": 420,
+      "sha256": "ad15190f5c358ba2648e4449d432b8a294e4cac31547642f0a6e2438eacbc4e4"
+    },
+    "prepared-source-macos/chrome/utility/importer/firefox_importer.h": {
+      "bytes": 6421,
+      "mode": 420,
+      "sha256": "42bcf1047fc6bfa0c98b82d14350a5ba96629fe5e32071968b680d3db43af034"
+    },
+    "prepared-source-macos/chrome/utility/importer/firefox_importer_unittest.cc": {
+      "bytes": 17068,
+      "mode": 420,
+      "sha256": "60e4f56eb594eaec640c98f6ba6cf6edb4736cde6a2174e9a62f18632df521ac"
+    },
+    "prepared-source-macos/chrome/utility/importer/importer.cc": {
+      "bytes": 602,
+      "mode": 420,
+      "sha256": "d07dbead5c2850670389f5087520edcaf07ca28ef6dc6516843dbdd90aa90733"
+    },
+    "prepared-source-macos/chrome/utility/importer/importer.h": {
+      "bytes": 1945,
+      "mode": 420,
+      "sha256": "1f3823696d342db5f2fc825038e06206afc1777056398c3a70e7e5dd2ccb1614"
+    },
+    "prepared-source-macos/chrome/utility/importer/noventra_cookie_importer.cc": {
+      "bytes": 15883,
+      "mode": 420,
+      "sha256": "56de6301d5690413658c458f663946a8cfd754b42211e37c2ee7f38f3c32a809"
+    },
+    "prepared-source-macos/chrome/utility/importer/noventra_cookie_importer.h": {
+      "bytes": 1215,
+      "mode": 420,
+      "sha256": "e2afd9ee276d7a01df6b74a1c6656201ad68352623903bfd972fbfcd4aff7836"
+    },
+    "prepared-source-macos/chrome/utility/services.cc": {
+      "bytes": 23728,
+      "mode": 420,
+      "sha256": "6c9c611a711d2ab09f9511a2e615809455ec64716f637de5534f5474bd1f0e05"
+    },
+    "prepared-source-macos/components/autofill_payments_strings.grdp": {
+      "bytes": 166462,
+      "mode": 420,
+      "sha256": "34f06fde1ad068760de91fd25dfacdd645e042f34da52dc017f691c81e995ae3"
+    },
+    "prepared-source-macos/components/autofill_strings.grdp": {
+      "bytes": 229480,
+      "mode": 420,
+      "sha256": "1edc0507f7aeeee4de86f9d4e94e738c1159853d4a5ab36395cb99911d803aeb"
+    },
+    "prepared-source-macos/components/browser_apis/tab_strip/tab_strip_api_data_model.mojom": {
+      "bytes": 3049,
+      "mode": 420,
+      "sha256": "5145ecc18f3341b3bef4ad5a4928ee1390e5f288d2fc6af8b42bc450e9c30b3c"
+    },
+    "prepared-source-macos/components/browser_apis/tab_strip/types/split_tab_visual_data_mojom_traits.cc": {
+      "bytes": 2079,
+      "mode": 420,
+      "sha256": "4158712cbb6644bf7697bcc8d12a15a0480e7d219aaed2ec66ec09e19ec1e5da"
+    },
+    "prepared-source-macos/components/browser_apis/tab_strip/types/split_tab_visual_data_mojom_traits.h": {
+      "bytes": 1569,
+      "mode": 420,
+      "sha256": "ae5585b57e51fa82efde662947539525f72165b0bd98a30cd4745c780dde3421"
+    },
+    "prepared-source-macos/components/browser_apis/tab_strip/types/tab_strip_service_mojom_traits_unittest.cc": {
+      "bytes": 3754,
+      "mode": 420,
+      "sha256": "e71c87f09c90a894d10945230e883634704f932ace54a4c7dc3e004a6d1c5a59"
+    },
+    "prepared-source-macos/components/browsing_data_strings.grdp": {
+      "bytes": 22822,
+      "mode": 420,
+      "sha256": "94118376e18733e424f9b8748604d7484b3e225b7e4173f73fabfc417b67320d"
+    },
+    "prepared-source-macos/components/collaboration_strings.grdp": {
+      "bytes": 18480,
+      "mode": 420,
+      "sha256": "d9541b7da866f57b3467540f540045fe4a155c8ffd94db123e201cd90c741c93"
+    },
+    "prepared-source-macos/components/commerce_strings.grdp": {
+      "bytes": 35883,
+      "mode": 420,
+      "sha256": "6bd3de0eff04fc1e2b99726c48698dc89321db567a10c53dea1255b3ed92303f"
+    },
+    "prepared-source-macos/components/components_chromium_strings.grd": {
+      "bytes": 23990,
+      "mode": 420,
+      "sha256": "f0acb0dee06f77b6e3ab5ac9e795150187a81817dfe775fd1762f9d65e210d44"
+    },
+    "prepared-source-macos/components/components_google_chrome_strings.grd": {
+      "bytes": 24113,
+      "mode": 420,
+      "sha256": "decf7e7557e1c73f61a9617378b4810b6d97b19478ae836819a6a2606dbd85f9"
+    },
+    "prepared-source-macos/components/contextual_cueing_strings.grdp": {
+      "bytes": 3935,
+      "mode": 420,
+      "sha256": "9d301ab1262036f78bb38933ebc0c14b49a5d6fb2d6c7d5c9a53c510de1f9aba"
+    },
+    "prepared-source-macos/components/crash/core/app/crash_reporter_client.cc": {
+      "bytes": 4920,
+      "mode": 420,
+      "sha256": "603c3655dfa57579897cacfb20cd1d9f09c4e631e4a2f88e562a222ae704f375"
+    },
+    "prepared-source-macos/components/crash/core/browser/crashes_ui_util.h": {
+      "bytes": 2965,
+      "mode": 420,
+      "sha256": "d9ed0b04337b66f118e0b9f3457c042a2e2a079c87e673c270bf29b04b2cb293"
+    },
+    "prepared-source-macos/components/crash/core/browser/resources/crashes.html": {
+      "bytes": 2404,
+      "mode": 420,
+      "sha256": "48b1946f322703fa2ed333d3ac81de25603fac412d02cff1dfbb60164239d2d7"
+    },
+    "prepared-source-macos/components/crash/core/browser/resources/crashes.ts": {
+      "bytes": 7249,
+      "mode": 420,
+      "sha256": "ebf0ea2ec0fd0729a828cb18afe088f8ba1eb75b82c82cb8266fc387b500bba1"
+    },
+    "prepared-source-macos/components/enterprise_strings.grdp": {
+      "bytes": 9350,
+      "mode": 420,
+      "sha256": "ed1ed7ba3a8bb2205b67deef507e886beafcf0cf5d3c1a66297f2da966d0af8f"
+    },
+    "prepared-source-macos/components/error_page_strings.grdp": {
+      "bytes": 36307,
+      "mode": 420,
+      "sha256": "4be052db7578ea3612221880ee31cf7b79063d0496ba721761b39070035e87fb"
+    },
+    "prepared-source-macos/components/extstore_fixups/chrome-webstore.js": {
+      "bytes": 2359,
+      "mode": 420,
+      "sha256": "ff65f8b8b65acab3099d8dbfe2c6df303c98adbd773d07650715b50c320304f6"
+    },
+    "prepared-source-macos/components/facilitated_payments_strings.grdp": {
+      "bytes": 21031,
+      "mode": 420,
+      "sha256": "8375deb87be7ff19cbca4c30fc5a85b47cce19cd5bcccf65309453dd990fb53b"
+    },
+    "prepared-source-macos/components/heavy_ad_intervention_strings.grdp": {
+      "bytes": 790,
+      "mode": 420,
+      "sha256": "2601ddf549da7f86f1928ebf2d291bde7542c410d5fc9703085ebb899b582692"
+    },
+    "prepared-source-macos/components/helium_onboarding/BUILD.gn": {
+      "bytes": 4513,
+      "mode": 420,
+      "sha256": "5088aa89cb7974b306dc3e1ecb81c286aec1f94771f8d6397db10efacec0d16a"
+    },
+    "prepared-source-macos/components/helium_onboarding/helium_onboarding_strings.grdp": {
+      "bytes": 17610,
+      "mode": 420,
+      "sha256": "6644dba7ee1bef65e8aef2c2b02b526366ae5484ef2826475ca50c850e6f1698"
+    },
+    "prepared-source-macos/components/helium_onboarding/index.html": {
+      "bytes": 433,
+      "mode": 420,
+      "sha256": "86b09dba652560e02da587f146561adadc056c86c6ee352b3e27e913b49a79ed"
+    },
+    "prepared-source-macos/components/helium_onboarding/public/favicon.png": {
+      "bytes": 825,
+      "mode": 420,
+      "sha256": "77b2a06f2eb5f848902ac7f5a55a8142665eec20754d9c90d0f9009ceb0112db"
+    },
+    "prepared-source-macos/components/helium_onboarding/src/App.svelte": {
+      "bytes": 119,
+      "mode": 420,
+      "sha256": "52d273d553c1da4630b2ffc449d39dbf0c7030a300e78db1aab6b84a987a9be4"
+    },
+    "prepared-source-macos/components/helium_onboarding/src/NoventraOnboarding.svelte": {
+      "bytes": 50217,
+      "mode": 420,
+      "sha256": "e2b8532587e91fd22bcc16f6d2129e771530c57576eaf7c1941e47b90d8e17ff"
+    },
+    "prepared-source-macos/components/helium_onboarding/src/app.css": {
+      "bytes": 263,
+      "mode": 420,
+      "sha256": "18819f11d3644581ef46ba29b8e878e15f4f5c1da66ab1f845269c821908f65e"
+    },
+    "prepared-source-macos/components/helium_onboarding/src/components/HeliumPartner.svelte": {
+      "bytes": 896,
+      "mode": 420,
+      "sha256": "e6160360590dfb3811ffe8c598a4c2ca53f201fd87bd9bd28fa7f6febc79d3f8"
+    },
+    "prepared-source-macos/components/helium_onboarding/src/components/NoventraLogo.svelte": {
+      "bytes": 444,
+      "mode": 420,
+      "sha256": "c147722743badf985e41d09d03617cfb4c8ac1a545f3a38536985da3cfa1e1a2"
+    },
+    "prepared-source-macos/components/helium_onboarding/src/components/NoventraPasswordManagers.svelte": {
+      "bytes": 9340,
+      "mode": 420,
+      "sha256": "880cebeec60d57708e87fc2852872855bf90a0145a7eb563a4a8c0fff7ac9c5c"
+    },
+    "prepared-source-macos/components/helium_onboarding/src/lib/cr/import_data_browser_proxy.ts": {
+      "bytes": 2528,
+      "mode": 420,
+      "sha256": "2d7532bff739420704ff542eaff68d524966b36c3e5eeda12077d27110e2043e"
+    },
+    "prepared-source-macos/components/helium_onboarding/src/main.ts": {
+      "bytes": 698,
+      "mode": 420,
+      "sha256": "0b1b2d6a86f6284ced4641360dac9db221eec5dc2be04ab56d57c1389fd2e92a"
+    },
+    "prepared-source-macos/components/helium_onboarding/src/pages/Finish.svelte": {
+      "bytes": 2000,
+      "mode": 420,
+      "sha256": "6dbaaa8c8d00fdb69219e0b06812af0789fa22a6253897a223875c62a3ed080f"
+    },
+    "prepared-source-macos/components/helium_onboarding/src/pages/HeliumServices.svelte": {
+      "bytes": 3579,
+      "mode": 420,
+      "sha256": "af17fcaf62b2c059e86ddbf073e8ab5ed7311d47a2c98a96652e81be62d231a3"
+    },
+    "prepared-source-macos/components/helium_onboarding/src/pages/Welcome.svelte": {
+      "bytes": 7979,
+      "mode": 420,
+      "sha256": "443799741270d5db88ef18b1b36e2b12f30366d0d186e97aa7ab2a11de1affb2"
+    },
+    "prepared-source-macos/components/helium_onboarding/src/vite-env.d.ts": {
+      "bytes": 330,
+      "mode": 420,
+      "sha256": "00312e6449774bc90c56a567a36a4a5a803aff6bdac3495efaebb0aff34f8b47"
+    },
+    "prepared-source-macos/components/helium_onboarding/util/strings.ts.in": {
+      "bytes": 2621,
+      "mode": 420,
+      "sha256": "34c10566970a8e8c5264bc5829036f4bb28a3debcdac996913824de27dda1e11"
+    },
+    "prepared-source-macos/components/helium_services/helium_services_helpers.cc": {
+      "bytes": 6697,
+      "mode": 420,
+      "sha256": "882941b56a4af7b83f728caca0fac00789214047bd48f94f927fa9bf74ac3c3d"
+    },
+    "prepared-source-macos/components/helium_services/helium_services_helpers.h": {
+      "bytes": 2163,
+      "mode": 420,
+      "sha256": "3cff19231d06d2fa965242c5895787594c7cc82026afbd39c71cf66146d5c86b"
+    },
+    "prepared-source-macos/components/helium_services/pref_names.h": {
+      "bytes": 1747,
+      "mode": 420,
+      "sha256": "b0259260ece2698151abcede1225a7fe62d650ed50ae809997550553b7ff1666"
+    },
+    "prepared-source-macos/components/helium_services/schema.cc": {
+      "bytes": 1512,
+      "mode": 420,
+      "sha256": "57f92d0a8ec70b4d5c5e12ebf661b21b303b89b6b670e3097526cbcd80001a4b"
+    },
+    "prepared-source-macos/components/history_strings.grdp": {
+      "bytes": 30936,
+      "mode": 420,
+      "sha256": "37bedf2ba0fe995dc48ce1e14f0344e9e5418ccec93c9640515bd35b02042257"
+    },
+    "prepared-source-macos/components/management_strings.grdp": {
+      "bytes": 45784,
+      "mode": 420,
+      "sha256": "114643583a955372772c539da3fa2ffc9a314ba985f54cd17038d076adf52f11"
+    },
+    "prepared-source-macos/components/new_or_sad_tab_strings.grdp": {
+      "bytes": 20140,
+      "mode": 420,
+      "sha256": "e5cab0fe380dec9e7fdc93722a83864c8078e6bc768e89be8261efd77f2f4a3f"
+    },
+    "prepared-source-macos/components/noventra_sync_vault/BUILD.gn": {
+      "bytes": 1194,
+      "mode": 420,
+      "sha256": "07f81f6404bb7a20a53380033a1d92eda376b6ff2fe39b5a13f1a13aa899fb18"
+    },
+    "prepared-source-macos/components/noventra_sync_vault/README.md": {
+      "bytes": 1548,
+      "mode": 420,
+      "sha256": "2a514c4f593a97ac15be8d8a91d4d11df19ff32defcf31703fb4a318adf83b3b"
+    },
+    "prepared-source-macos/components/noventra_sync_vault/sync_vault.proto": {
+      "bytes": 1477,
+      "mode": 420,
+      "sha256": "94fc4a4217d69b5d9df21cace27b5586add2dfe8d48aa2dddb5a7b4437044b67"
+    },
+    "prepared-source-macos/components/noventra_sync_vault/sync_vault_compatibility_unittest.cc": {
+      "bytes": 1775,
+      "mode": 420,
+      "sha256": "3aa474246e52857839bbe73820e9f3e922fef4704681d22768e2730f759ee952"
+    },
+    "prepared-source-macos/components/noventra_sync_vault/sync_vault_cryptographer.cc": {
+      "bytes": 5175,
+      "mode": 420,
+      "sha256": "674ba0207f33c0549a721bcb3378c9d8e149353144066f4fdb7179b32d1bea7f"
+    },
+    "prepared-source-macos/components/noventra_sync_vault/sync_vault_cryptographer.h": {
+      "bytes": 2394,
+      "mode": 420,
+      "sha256": "c3f2688bdab911238f8f013a6284a474bd9d6e1a1c0093e0d047574fe0294571"
+    },
+    "prepared-source-macos/components/noventra_sync_vault/sync_vault_format.cc": {
+      "bytes": 15316,
+      "mode": 420,
+      "sha256": "c156ecad2b1cc47a27ab8ca1f15bc431cb97710311c8d99e74eab433b3c807cc"
+    },
+    "prepared-source-macos/components/noventra_sync_vault/sync_vault_format.h": {
+      "bytes": 4839,
+      "mode": 420,
+      "sha256": "6e7c21577b99f4e2aef392db189902b4f27b9e37777f564cb8f1d7397eb99f8a"
+    },
+    "prepared-source-macos/components/noventra_sync_vault/sync_vault_limits.h": {
+      "bytes": 1515,
+      "mode": 420,
+      "sha256": "e5f9f0d626baacec3531a3983ac7a0dcd489e141e6fe8754e4649b4977f15fa2"
+    },
+    "prepared-source-macos/components/noventra_sync_vault/sync_vault_state_codec.h": {
+      "bytes": 1895,
+      "mode": 420,
+      "sha256": "35e2a052f84f52af2ebc0bfdf107989685fb0abe03ff01eb525abfdbb9cd89d5"
+    },
+    "prepared-source-macos/components/noventra_sync_vault/sync_vault_store.cc": {
+      "bytes": 50217,
+      "mode": 420,
+      "sha256": "5aaac5b72d5eafb179b27b28f592ab0e4a4b387463332fd8570c749382023a2b"
+    },
+    "prepared-source-macos/components/noventra_sync_vault/sync_vault_store.h": {
+      "bytes": 7423,
+      "mode": 420,
+      "sha256": "9ee4af78203ba5344e9184ca5764e3aa029b0c6f89e2cce2f589012c901432ae"
+    },
+    "prepared-source-macos/components/noventra_sync_vault/sync_vault_store_unittest.cc": {
+      "bytes": 18564,
+      "mode": 420,
+      "sha256": "96aca0757e944c04c07fe3f2e138f9888db013dcbb92a0a71650716b89c1983a"
+    },
+    "prepared-source-macos/components/noventra_sync_vault/sync_vault_transport.h": {
+      "bytes": 2653,
+      "mode": 420,
+      "sha256": "6479186c17481daf8bb1e00d9d771fb0ff57db24f269c4c7bfb9e38ae059e4b2"
+    },
+    "prepared-source-macos/components/omnibox/browser/omnibox_text_util.cc": {
+      "bytes": 10472,
+      "mode": 420,
+      "sha256": "8d539f242b20507c5af12013a24575fa713d9cc87f2b02a25a32b89d3218d96e"
+    },
+    "prepared-source-macos/components/omnibox/browser/vector_icons/chrome_product.icon": {
+      "bytes": 154877,
+      "mode": 420,
+      "sha256": "d38081cca780f3f666be1951a968a60ac4b6dda20f00f660c957a95433e22102"
+    },
+    "prepared-source-macos/components/omnibox/browser/vector_icons/product_chrome_refresh.icon": {
+      "bytes": 154877,
+      "mode": 420,
+      "sha256": "d38081cca780f3f666be1951a968a60ac4b6dda20f00f660c957a95433e22102"
+    },
+    "prepared-source-macos/components/omnibox/browser/vector_icons/product_chrome_refresh_old.icon": {
+      "bytes": 154877,
+      "mode": 420,
+      "sha256": "d38081cca780f3f666be1951a968a60ac4b6dda20f00f660c957a95433e22102"
+    },
+    "prepared-source-macos/components/omnibox/browser/vector_icons/product_old.icon": {
+      "bytes": 154877,
+      "mode": 420,
+      "sha256": "d38081cca780f3f666be1951a968a60ac4b6dda20f00f660c957a95433e22102"
+    },
+    "prepared-source-macos/components/omnibox_pedal_ui_strings.grdp": {
+      "bytes": 50268,
+      "mode": 420,
+      "sha256": "ad3c1cc7f817f81755c24a8c6ad5186488bc5404d7f6ef0e93428c412ae59482"
+    },
+    "prepared-source-macos/components/omnibox_strings.grdp": {
+      "bytes": 70474,
+      "mode": 420,
+      "sha256": "c9f95b4f14b08be41989cd3365239c0eefbf5893a93c1dd3008da49fb6c6f273"
+    },
+    "prepared-source-macos/components/os_crypt/async/browser/freedesktop_secret_key_provider.cc": {
+      "bytes": 30564,
+      "mode": 420,
+      "sha256": "c8f8e1c095cf1cf00edbe7bbf1afc1ba397f2d4ae833f1eb786b7b7eb4baae13"
+    },
+    "prepared-source-macos/components/os_crypt/async/browser/freedesktop_secret_key_provider.h": {
+      "bytes": 11437,
+      "mode": 420,
+      "sha256": "c60a2a524260ec8d7e60333c1cd84f3884e85e87501a10020c1bc3a5d51891eb"
+    },
+    "prepared-source-macos/components/os_crypt/async/browser/freedesktop_secret_key_provider_unittest.cc": {
+      "bytes": 48507,
+      "mode": 420,
+      "sha256": "c979937e023bc1ac58a40db38bfcb33666f1985d8d97c16a3d7d6924a4386b09"
+    },
+    "prepared-source-macos/components/os_crypt/async/common/encryptor.cc": {
+      "bytes": 10445,
+      "mode": 420,
+      "sha256": "fcee5d9774005a66cbca50fc20bf1a6818eb01c5607159ee1b1b1fa880babba8"
+    },
+    "prepared-source-macos/components/os_crypt/async/common/encryptor.h": {
+      "bytes": 9113,
+      "mode": 420,
+      "sha256": "66b74f7a9d222195426d55b0f0ea38146b74f2373e18024448b34b7c786309d9"
+    },
+    "prepared-source-macos/components/os_crypt/common/keychain_password_mac.mm": {
+      "bytes": 4031,
+      "mode": 420,
+      "sha256": "de82f00403ea3bfab38e268c3e0dc37a572b3a94d32fc9d8d6ffb2671c99aa1d"
+    },
+    "prepared-source-macos/components/page_info_strings.grdp": {
+      "bytes": 84739,
+      "mode": 420,
+      "sha256": "16fd41949847766a3e41b724ec084060603b966bad3d9cf18b22c2b78a974461"
+    },
+    "prepared-source-macos/components/password_manager_strings.grdp": {
+      "bytes": 31560,
+      "mode": 420,
+      "sha256": "5c119f6ae722b9603dc7120faffec3a40a2a035a2f7ea6e8b5001fada28a1033"
+    },
+    "prepared-source-macos/components/payments_strings.grdp": {
+      "bytes": 47126,
+      "mode": 420,
+      "sha256": "d14fd7016ded9d168d07d76e20b95073be18fb8a0d673c617f72785de13d1be4"
+    },
+    "prepared-source-macos/components/permissions/permission_manager_unittest.cc": {
+      "bytes": 54713,
+      "mode": 420,
+      "sha256": "a03e5df89e2805d6c34c907514d5283725107609b75efe4e5bda51aa1ace5e6e"
+    },
+    "prepared-source-macos/components/permissions/permission_util.cc": {
+      "bytes": 31755,
+      "mode": 420,
+      "sha256": "414b3292f23a711201e497da6fb8dfeeb9920b0278b37783d6a9be3764b0f093"
+    },
+    "prepared-source-macos/components/permissions_strings.grdp": {
+      "bytes": 56254,
+      "mode": 420,
+      "sha256": "1ffc6fb3f9ee61223c767acb438c06b1f12873d080b94e1d2dbdb78e3ab8eec6"
+    },
+    "prepared-source-macos/components/personal_context_strings.grdp": {
+      "bytes": 5566,
+      "mode": 420,
+      "sha256": "e8738edb9862f19518cb12e51fead5f078c73e773368658502228fb41ddcd206"
+    },
+    "prepared-source-macos/components/policy/core/common/policy_paths.cc": {
+      "bytes": 1064,
+      "mode": 420,
+      "sha256": "98705e18ccc19fba4d4b816e6b913b5fbe21bdc397f3fa2a70b6e1f770cb3454"
+    },
+    "prepared-source-macos/components/policy_strings.grdp": {
+      "bytes": 124868,
+      "mode": 420,
+      "sha256": "f48c3597d4c348ce0a6f4bfa519da17e2f440630caa5f1f5586a25a6780df116"
+    },
+    "prepared-source-macos/components/privacy_sandbox_strings.grd": {
+      "bytes": 37166,
+      "mode": 420,
+      "sha256": "49b8bb6847e152e713aade45cdc8f3dda777a9b6f8774514b6fd28da416c1b66"
+    },
+    "prepared-source-macos/components/reset_password_strings.grdp": {
+      "bytes": 3740,
+      "mode": 420,
+      "sha256": "74b64557c6da249ba3da22d3fc2f50800bc8c5b951ea829d2bc31947502b4d12"
+    },
+    "prepared-source-macos/components/resources/default_100_percent/chromium/product_logo.png": {
+      "bytes": 825,
+      "mode": 420,
+      "sha256": "77b2a06f2eb5f848902ac7f5a55a8142665eec20754d9c90d0f9009ceb0112db"
+    },
+    "prepared-source-macos/components/resources/default_100_percent/chromium/product_logo_white.png": {
+      "bytes": 850,
+      "mode": 420,
+      "sha256": "739e4515ab986662161222f8123da0fff23bd7c583b394a517fdd24a9349b618"
+    },
+    "prepared-source-macos/components/resources/default_200_percent/chromium/product_logo.png": {
+      "bytes": 1829,
+      "mode": 420,
+      "sha256": "89df11c60fa53166972a979d517ef3ff14a15c3c8bafa411249e9c477ae3b32c"
+    },
+    "prepared-source-macos/components/resources/default_200_percent/chromium/product_logo_white.png": {
+      "bytes": 2169,
+      "mode": 420,
+      "sha256": "c72473c0ac339792e73490221b9affb26f178f70a49d261c37af0ae79334653e"
+    },
+    "prepared-source-macos/components/search_engine_choice_strings.grdp": {
+      "bytes": 29177,
+      "mode": 420,
+      "sha256": "958d3f9930abf2481280fae48eb0d6a7302b63d3706fdfc9450ed257d024f5f1"
+    },
+    "prepared-source-macos/components/search_engines/template_url_bang_manager.cc": {
+      "bytes": 7041,
+      "mode": 420,
+      "sha256": "098d255d2945b44a4b217f0e00bd33e4cb122a7ec341c76998aae02a2a4990b9"
+    },
+    "prepared-source-macos/components/security_interstitials_strings.grdp": {
+      "bytes": 58910,
+      "mode": 420,
+      "sha256": "743011b1ec52ae617d1e2f8ca3704e402af5eab5fcfe2a16fb429e0f6e826846"
+    },
+    "prepared-source-macos/components/send_tab_to_self_strings.grdp": {
+      "bytes": 5928,
+      "mode": 420,
+      "sha256": "1aca36c6809730c0f56febab645ad5c42c95a6bf59fb9b5773e1d83aec75542d"
+    },
+    "prepared-source-macos/components/sessions/BUILD.gn": {
+      "bytes": 7645,
+      "mode": 420,
+      "sha256": "61941f0627fff70662f3746f9178d98e2ab6cfb9bd1756591e2c186ec41e3309"
+    },
+    "prepared-source-macos/components/sessions/content/content_platform_specific_tab_data.cc": {
+      "bytes": 1270,
+      "mode": 420,
+      "sha256": "1dc6adcb0ba41306e118382bec01bd11c5b821e357e41039c7fb73d667882722"
+    },
+    "prepared-source-macos/components/sessions/core/live_tab_context.h": {
+      "bytes": 5967,
+      "mode": 420,
+      "sha256": "376601482f24bba5af1eb38294f6dadd81eb20007e4bbb35d996da24f379d7d4"
+    },
+    "prepared-source-macos/components/sessions/core/session_service_commands.cc": {
+      "bytes": 55587,
+      "mode": 420,
+      "sha256": "ea7b4720261d051604b0e9e217b6f5eaf904c22cc75b3ef31a520213ef260e9c"
+    },
+    "prepared-source-macos/components/sessions/core/session_service_commands_unittest.cc": {
+      "bytes": 7075,
+      "mode": 420,
+      "sha256": "e9a582ecc446e19fc37baa98de204d8ef1131d7880163d67a171731ea2d961b4"
+    },
+    "prepared-source-macos/components/sessions/core/tab_restore_service_client.h": {
+      "bytes": 3820,
+      "mode": 420,
+      "sha256": "99c01e8b0217db2234e98dce01ee33a774358cfd95b5d84c711b0b14d02d4e97"
+    },
+    "prepared-source-macos/components/sessions/core/tab_restore_service_helper.cc": {
+      "bytes": 66298,
+      "mode": 420,
+      "sha256": "947541750232b87b89787de0d61b71d759e1cd697bf10a3d926cf27fb54cf0d1"
+    },
+    "prepared-source-macos/components/sessions/core/tab_restore_service_helper.h": {
+      "bytes": 13631,
+      "mode": 420,
+      "sha256": "d815cc4c9dfe6bde4bcaad35366d9127cf811a01b7129f78bab4f51e4a1820cd"
+    },
+    "prepared-source-macos/components/sessions/core/tab_restore_service_helper_unittest.cc": {
+      "bytes": 6314,
+      "mode": 420,
+      "sha256": "de9a028cbc2355dba7354ecbcbcd6b075f20633d55990797190c851860f3197b"
+    },
+    "prepared-source-macos/components/sessions/core/tab_restore_service_impl.cc": {
+      "bytes": 74478,
+      "mode": 420,
+      "sha256": "7b57cc8fcc3777f058f1a261839c6756d3ee1363d12b1717377feca3676fb112"
+    },
+    "prepared-source-macos/components/smart_tab_sharing.grdp": {
+      "bytes": 7796,
+      "mode": 420,
+      "sha256": "04f6ea6191671a540a9636fc9e1bb6de023a9322af0bb7692ed8b23955a11854"
+    },
+    "prepared-source-macos/components/split_tabs/split_tab_visual_data.h": {
+      "bytes": 2496,
+      "mode": 420,
+      "sha256": "d302a7608e24d0edba39dd8fc3e37c631984ed60a7bed65bcc92013be565698f"
+    },
+    "prepared-source-macos/components/ssl_errors_strings.grdp": {
+      "bytes": 17944,
+      "mode": 420,
+      "sha256": "7ce96eac7e9f2e91ad778af6a6f74d0015f217f176bc254e8262ef4e03509790"
+    },
+    "prepared-source-macos/components/tabs/impl/tab_strip_collection.cc": {
+      "bytes": 29902,
+      "mode": 420,
+      "sha256": "0fce129d5a325436e7f4622bc355c3633c5dc83d42e459ed9816509bc6c45883"
+    },
+    "prepared-source-macos/components/url_formatter/url_fixer.cc": {
+      "bytes": 27226,
+      "mode": 420,
+      "sha256": "5187791be53180f84fb1d74e362ea8a34e151f4c73e6086f95e75072aa7ff681"
+    },
+    "prepared-source-macos/components/url_formatter/url_formatter.cc": {
+      "bytes": 35574,
+      "mode": 420,
+      "sha256": "0387ece3ae477f35bce1e3aa57f116201916e1dede5f5c8c891827685672cf1d"
+    },
+    "prepared-source-macos/components/user_data_importer/common/importer_data_types.h": {
+      "bytes": 3732,
+      "mode": 420,
+      "sha256": "f0e5048198b0ceef9a10e3ab27a3a2d148ac54998044e2e0ef212a36b52e678c"
+    },
+    "prepared-source-macos/components/vector_icons/chromium/product.icon": {
+      "bytes": 154877,
+      "mode": 420,
+      "sha256": "d38081cca780f3f666be1951a968a60ac4b6dda20f00f660c957a95433e22102"
+    },
+    "prepared-source-macos/components/vector_icons/chromium/product_refresh.icon": {
+      "bytes": 154877,
+      "mode": 420,
+      "sha256": "d38081cca780f3f666be1951a968a60ac4b6dda20f00f660c957a95433e22102"
+    },
+    "prepared-source-macos/components/webui/version/resources/BUILD.gn": {
+      "bytes": 902,
+      "mode": 420,
+      "sha256": "fda94d88f45b31aea276f38905732f0007dd3573816b59ec004758572a16e911"
+    },
+    "prepared-source-macos/components/webui/version/resources/about_version.css": {
+      "bytes": 3145,
+      "mode": 420,
+      "sha256": "b09c3e6ae8fc8df24f982defe148c4bd4ce1c24881a392cd580ef31294b88e79"
+    },
+    "prepared-source-macos/components/webui/version/resources/about_version.html": {
+      "bytes": 7391,
+      "mode": 420,
+      "sha256": "e498e9f1321959cd8fa67f9a02f9befed11853a87cab625168a8a4b7649bb9d5"
+    },
+    "prepared-source-macos/components/webui/version/resources/about_version.ts": {
+      "bytes": 8095,
+      "mode": 420,
+      "sha256": "315eafadb2d7f132b580506badf0442f08d54f8422ae973b4ffe3455bdac7394"
+    },
+    "prepared-source-macos/content/browser/browsing_instance.cc": {
+      "bytes": 14337,
+      "mode": 420,
+      "sha256": "88a1bf28690d7ce70dd88ebd600f86f9c1275c362e6cc71b646d400411dcde70"
+    },
+    "prepared-source-macos/content/browser/notifications/blink_notification_service_impl.cc": {
+      "bytes": 17369,
+      "mode": 420,
+      "sha256": "4e26817d3e6860c7912137ebb55596b3eb5b0bc171bc7a98c1b2958035666dd7"
+    },
+    "prepared-source-macos/content/browser/notifications/blink_notification_service_impl_unittest.cc": {
+      "bytes": 40872,
+      "mode": 420,
+      "sha256": "401ae5046caaeb2debc53fd1b97b6e0ae4111ae8ec91c62de1edb4f7373ed38f"
+    },
+    "prepared-source-macos/content/browser/notifications/devtools_event_logging.cc": {
+      "bytes": 5319,
+      "mode": 420,
+      "sha256": "61205f036dc032ffa4b7dd0022ded789c246ca754dbc250efcc79cba1fccb2b7"
+    },
+    "prepared-source-macos/content/browser/notifications/devtools_event_logging.h": {
+      "bytes": 1352,
+      "mode": 420,
+      "sha256": "aedcee50a4e6ec284ffa4ae9593f66f8257e5d908a1ffe7dc46df7440d26d713"
+    },
+    "prepared-source-macos/content/browser/notifications/notification_event_dispatcher_impl.cc": {
+      "bytes": 28449,
+      "mode": 420,
+      "sha256": "8f7ed836f727a86a0e88f1aff65cbb3d9038cb1378b86a3ddcd88288153d7e07"
+    },
+    "prepared-source-macos/content/browser/notifications/notification_event_dispatcher_impl_unittest.cc": {
+      "bytes": 24750,
+      "mode": 420,
+      "sha256": "3391fb65e4efcb5488a5d40b51a291b80210eab9f3654acd42d7050ada4e361a"
+    },
+    "prepared-source-macos/content/browser/notifications/notification_id_generator.cc": {
+      "bytes": 6195,
+      "mode": 420,
+      "sha256": "5e748a5f4ee88c73c52a419dc694990676b94a5c557b0431c953e21ae369eda1"
+    },
+    "prepared-source-macos/content/browser/notifications/notification_id_generator.h": {
+      "bytes": 4820,
+      "mode": 420,
+      "sha256": "72a538d8d2bbe4c6f9e69a5daa206869d2898ecd90da82dd0d82e4727e09b759"
+    },
+    "prepared-source-macos/content/browser/notifications/notification_id_generator_unittest.cc": {
+      "bytes": 13915,
+      "mode": 420,
+      "sha256": "3a7e412e6e3db6616580e7052e29b28060bc0926f82e0aa2220c332ace42df06"
+    },
+    "prepared-source-macos/content/browser/notifications/platform_notification_context_impl.cc": {
+      "bytes": 54887,
+      "mode": 420,
+      "sha256": "af032d379dea69bbe00931eab8c150d48d921bea473c4d3c089bd3d765428c8d"
+    },
+    "prepared-source-macos/content/browser/notifications/platform_notification_service_proxy.cc": {
+      "bytes": 6078,
+      "mode": 420,
+      "sha256": "9cfda90c58bf4b74e2bde22160f5f6ab9e4755b6ae6d3fa072f4f7eeefa99576"
+    },
+    "prepared-source-macos/content/browser/renderer_host/navigation_controller_impl.cc": {
+      "bytes": 261617,
+      "mode": 420,
+      "sha256": "89eeb7ae936d764beef6608e995a6cf969148ab869391bb48a6b3494af02e962"
+    },
+    "prepared-source-macos/content/browser/renderer_host/navigation_controller_impl.h": {
+      "bytes": 59657,
+      "mode": 420,
+      "sha256": "a4ce86339d159a4b85c82630c903cd3128e201176a404d5d21bf146aca057bcf"
+    },
+    "prepared-source-macos/content/browser/renderer_host/navigator.cc": {
+      "bytes": 80547,
+      "mode": 420,
+      "sha256": "974c05e8025bd5c8caf16e4e07f8b08b11e221ac0a4e8ac87e4d3ff6f09b759b"
+    },
+    "prepared-source-macos/content/browser/renderer_host/navigator.h": {
+      "bytes": 12674,
+      "mode": 420,
+      "sha256": "9cf0bf6af2bb10c5ab7bd842299d647ced9746cf794d323d1be68ebc16f56822"
+    },
+    "prepared-source-macos/content/browser/renderer_host/render_frame_proxy_host.cc": {
+      "bytes": 54647,
+      "mode": 420,
+      "sha256": "3a2605fd4126e68439abb55bcc716673cdb7548a4fe5d1704519b8be1bd4b272"
+    },
+    "prepared-source-macos/content/browser/renderer_host/render_widget_host_unittest.cc": {
+      "bytes": 148030,
+      "mode": 420,
+      "sha256": "595cfb4a3f3ec2bbf989afb00eda7904edef7ead03f3cec51668d653cd340990"
+    },
+    "prepared-source-macos/content/browser/renderer_host/render_widget_host_view_base.cc": {
+      "bytes": 43337,
+      "mode": 420,
+      "sha256": "21f85530633574086619acd2d385343ffdd6ce86ce36ac2057eff1c5669ca7df"
+    },
+    "prepared-source-macos/content/browser/renderer_host/spare_render_process_host_manager_impl.cc": {
+      "bytes": 48289,
+      "mode": 420,
+      "sha256": "3d5d8ef6cd1e2ee2a0382fbec3e7150c249b3b0c1fd11dabdf015d34166d5489"
+    },
+    "prepared-source-macos/content/browser/site_instance_impl_unittest.cc": {
+      "bytes": 128320,
+      "mode": 420,
+      "sha256": "94ae2011a493059f9b735dfec0682b8ca67e7769cc1a90d2382dd8094263697f"
+    },
+    "prepared-source-macos/content/browser/storage_partition_impl_map.cc": {
+      "bytes": 19318,
+      "mode": 420,
+      "sha256": "279b54cc3599b4427f7b283063cdfb0802d0a2dad6b5e62aecd4e1435612955a"
+    },
+    "prepared-source-macos/content/browser/storage_partition_impl_map.h": {
+      "bytes": 3885,
+      "mode": 420,
+      "sha256": "b1fd4ecbad6e07c9b3de23edba1567352f02d0d41c25c083fe88406b92e558cb"
+    },
+    "prepared-source-macos/content/browser/web_contents/web_contents_impl.cc": {
+      "bytes": 523552,
+      "mode": 420,
+      "sha256": "65be72ad15f537069f59655bb98a7458b739affe68d935a7c96841b754f2258c"
+    },
+    "prepared-source-macos/content/browser/webui/web_ui_impl.cc": {
+      "bytes": 18113,
+      "mode": 420,
+      "sha256": "fd8ea1086e2fa75a6d04d2c56e223d3a0c348c97335838b6b0b91fb977e6703e"
+    },
+    "prepared-source-macos/content/browser/webui/web_ui_impl_unittest.cc": {
+      "bytes": 16845,
+      "mode": 420,
+      "sha256": "435cf78c9a2219863eef15db09f6e85c71357eab8dc8d2a80bc51645af8cf7d0"
+    },
+    "prepared-source-macos/content/common/frame.mojom": {
+      "bytes": 42155,
+      "mode": 420,
+      "sha256": "b19ef7e8c2317e8011197265327ffecaf7c6b02a18ad73785b0262e4eb848d78"
+    },
+    "prepared-source-macos/content/public/browser/BUILD.gn": {
+      "bytes": 25794,
+      "mode": 420,
+      "sha256": "4200f849e39d42b49ff189b354c66da0ca54153f7df81dbf9044a1c36f1638d8"
+    },
+    "prepared-source-macos/content/public/browser/notification_event_dispatcher.h": {
+      "bytes": 3357,
+      "mode": 420,
+      "sha256": "9719e326e61db8fc8871cb929656ba514ad06e9e0f6c5b20b6ef01a3ea4066a4"
+    },
+    "prepared-source-macos/content/public/browser/storage_partition_path.h": {
+      "bytes": 680,
+      "mode": 420,
+      "sha256": "86e7348352fc1cf66eaaffb7c0d16e045496b36b414fc644cdc8ffc3550e41d1"
+    },
+    "prepared-source-macos/content/renderer/render_frame_impl.cc": {
+      "bytes": 315910,
+      "mode": 420,
+      "sha256": "1f917aff9dc7feeecc1a013e732e07340ac13298217fc51287995fec6837cbfd"
+    },
+    "prepared-source-macos/content/renderer/render_frame_impl.h": {
+      "bytes": 77522,
+      "mode": 420,
+      "sha256": "63903665fd2785a4792cfb968a5c7e1bc0345af9a6a201309cc9f685c1e1252d"
+    },
+    "prepared-source-macos/content/renderer/render_view_browsertest.cc": {
+      "bytes": 143592,
+      "mode": 420,
+      "sha256": "8cfc2acbe6351ba93edc643a0e02d8024e9a41ce1f7c99f14c39f10a36100fb7"
+    },
+    "prepared-source-macos/crypto/subtle_passkey.h": {
+      "bytes": 3319,
+      "mode": 420,
+      "sha256": "f0994378a90c5e457f7fb9932928bf8ebb0908b85c2e07c205d15991c7e13468"
+    },
+    "prepared-source-macos/extensions/browser/extension_prefs.cc": {
+      "bytes": 102385,
+      "mode": 420,
+      "sha256": "9e768aa528b2c05abe929c377158e164a90cc41bc96c68fa6b09f59bec177c13"
+    },
+    "prepared-source-macos/extensions/browser/updater/extension_downloader_unittest.cc": {
+      "bytes": 45815,
+      "mode": 420,
+      "sha256": "d30c998c5517bcf0c7dac6ba0da54bbcfb070a06a79f2b59ab69b4cff70fb847"
+    },
+    "prepared-source-macos/extensions/browser/updater/manifest_fetch_data.cc": {
+      "bytes": 12742,
+      "mode": 420,
+      "sha256": "6552a9e40250a7a7b596a3bbd39b0ffeb481f0a88652cdaf23faf944d0bdb390"
+    },
+    "prepared-source-macos/extensions/browser/webstore_installer.cc": {
+      "bytes": 25483,
+      "mode": 420,
+      "sha256": "5380be1ff40d25b3141e6d181dd913d75eaaa942bbb300f83eb38aad1564eb2d"
+    },
+    "prepared-source-macos/extensions/common/extension_urls.cc": {
+      "bytes": 6551,
+      "mode": 420,
+      "sha256": "afc01fd2d2c8b19b7743932a8c711de8320afd5d554bea8bfba7b762fa0ced71"
+    },
+    "prepared-source-macos/extensions/common/extension_urls.h": {
+      "bytes": 6433,
+      "mode": 420,
+      "sha256": "8c7182467cbf34842d34ff545926dbd018aa32755ffe8759b5aeb356215639fc"
+    },
+    "prepared-source-macos/extensions/common/extension_urls_unittest.cc": {
+      "bytes": 2706,
+      "mode": 420,
+      "sha256": "d41aa71a51cda04110250eafefb7d0fbc3278249b17bfab72f4dec450a929007"
+    },
+    "prepared-source-macos/extensions/strings/extensions_chromium_strings.grdp": {
+      "bytes": 1459,
+      "mode": 420,
+      "sha256": "ecaacc7423a1afc9fc8a490ba7d4a4f8dda29db02e7e2b24ed82978e458081e9"
+    },
+    "prepared-source-macos/extensions/strings/extensions_strings.grd": {
+      "bytes": 48817,
+      "mode": 420,
+      "sha256": "fc334d3d72cea7948adfdbc877acc9fa1658dd5d719cd13102fa2bcc8ed1a5c9"
+    },
+    "prepared-source-macos/media/gfx/BUILD.gn": {
+      "bytes": 4005,
+      "mode": 420,
+      "sha256": "d9d454d356cf16fcc77d6da8436337126052c6114d272a1fdf928e85c29b75c4"
+    },
+    "prepared-source-macos/media/gfx/video_resource_updater.cc": {
+      "bytes": 56718,
+      "mode": 420,
+      "sha256": "c36681fa0610abe11a03f7a15f769398ceb7881fc12290deccda6497d590e835"
+    },
+    "prepared-source-macos/media/gfx/video_resource_updater_unittest.cc": {
+      "bytes": 51078,
+      "mode": 420,
+      "sha256": "f9e4e97ceeb4c8849e94fdfc5812331d3f00bc7b65ef81b9cfd3d5ea1a4f8aaf"
+    },
+    "prepared-source-macos/third_party/blink/public/mojom/frame/remote_frame.mojom": {
+      "bytes": 27536,
+      "mode": 420,
+      "sha256": "f40e765abdd2974a10f408f648d1d5081618b56c5943d6ef9acf6d870d90b2ae"
+    },
+    "prepared-source-macos/third_party/blink/public/web/web_local_frame_client.h": {
+      "bytes": 39979,
+      "mode": 420,
+      "sha256": "35fe02895d5fad852dc38ea47d9baf57820ef5afa7fd44a932bd36847cac142f"
+    },
+    "prepared-source-macos/third_party/blink/renderer/core/exported/web_view_test.cc": {
+      "bytes": 350463,
+      "mode": 420,
+      "sha256": "34ef0dc8eb3924cbdf59e155eab62b774cc35b0884eddf3629ae2b74d519541b"
+    },
+    "prepared-source-macos/third_party/blink/renderer/core/frame/frame_test_helpers.cc": {
+      "bytes": 51152,
+      "mode": 420,
+      "sha256": "5ac4ed1dad0dfc9c5f48a01f9e44c304a2fb6b3e378ce7e2d122c84435ff5189"
+    },
+    "prepared-source-macos/third_party/blink/renderer/core/frame/frame_test_helpers.h": {
+      "bytes": 28368,
+      "mode": 420,
+      "sha256": "70fe543ea91e4e331b025647ebd9d4e66f9c4b22786fcd49603c3df27ece75af"
+    },
+    "prepared-source-macos/third_party/blink/renderer/core/frame/remote_frame.cc": {
+      "bytes": 49146,
+      "mode": 420,
+      "sha256": "b56b714b5ce44dd6da415a0a84391177649f7f0c88aa4840d4a7bac353e4ae56"
+    },
+    "prepared-source-macos/third_party/blink/renderer/core/frame/web_frame_test.cc": {
+      "bytes": 640522,
+      "mode": 420,
+      "sha256": "0c29a45127c734566034b0352e11d369b3b3879321d119f4c91170b4192ff8bc"
+    },
+    "prepared-source-macos/third_party/blink/renderer/core/frame/web_frame_widget_impl.cc": {
+      "bytes": 235386,
+      "mode": 420,
+      "sha256": "bc3da2056e08aacf46e0516c6e23ae9c759030e3f7b693e5787de63b3456c029"
+    },
+    "prepared-source-macos/third_party/blink/renderer/core/page/chrome_client_impl.cc": {
+      "bytes": 60550,
+      "mode": 420,
+      "sha256": "acf662521a6b2ebff74375918c1afd0367c8278ac26d9a53984e9d56dae2381b"
+    },
+    "prepared-source-macos/third_party/blink/renderer/core/page/chrome_client_impl_test.cc": {
+      "bytes": 23148,
+      "mode": 420,
+      "sha256": "eba6170717624b636b74ed3c3508f7e642070d1a8fff886696d1c01119cb03a8"
+    },
+    "prepared-source-macos/third_party/blink/renderer/core/page/context_menu_controller.cc": {
+      "bytes": 40789,
+      "mode": 420,
+      "sha256": "6ab4c105dac3e3daf33c50ad2b0da884f59fcd0ab9e76d0a0fda95a281987fbf"
+    },
+    "prepared-source-macos/third_party/ublock/assets/assets.json": {
+      "bytes": 33978,
+      "mode": 420,
+      "sha256": "089427168bb284f16acc91a52106a8fd2641bc50b39c6d4529ce57adfda68af8"
+    },
+    "prepared-source-macos/third_party/ublock/js/about.js": {
+      "bytes": 1206,
+      "mode": 420,
+      "sha256": "e5bbfd8304d8feb86c9582ffe83c8c19c2f0ead113d9d827e1a0fe49b7805db6"
+    },
+    "prepared-source-macos/third_party/wayland-protocols/BUILD.gn": {
+      "bytes": 7513,
+      "mode": 420,
+      "sha256": "719796af420b3a69bff5de8cba5f20907a06c67d8615d55bd9872ef010279957"
+    },
+    "prepared-source-macos/tools/licenses/licenses.py": {
+      "bytes": 56452,
+      "mode": 420,
+      "sha256": "d81617a6f1d1c19e405eac98ded00f72ab7000c18591cc6e892bc05a404bf2c5"
+    },
+    "prepared-source-macos/tools/metrics/histograms/metadata/tab/enums.xml": {
+      "bytes": 24500,
+      "mode": 420,
+      "sha256": "8763ccc105039827d453fdd60d7b7fae97f701721fb9f63941e45659a11dd5a5"
+    },
+    "prepared-source-macos/ui/base/themed_vector_icon.cc": {
+      "bytes": 3023,
+      "mode": 420,
+      "sha256": "ff7a3fa0a4b720dcb0fd97680ebe45ad06fade16abdb142bf1bf4b8856b03781"
+    },
+    "prepared-source-macos/ui/gfx/BUILD.gn": {
+      "bytes": 27637,
+      "mode": 420,
+      "sha256": "b95cb5c86261fe364052d21f8f6704bda6828f4ff9f5a897e9a99af91d532224"
+    },
+    "prepared-source-macos/ui/gfx/noventra_logo.h": {
+      "bytes": 348,
+      "mode": 420,
+      "sha256": "3cb9983024e3e2bfb1c84b588fda82d6b54eba059e27b58888ff341d9eaebd18"
+    },
+    "prepared-source-macos/ui/gfx/noventra_logo_data.h": {
+      "bytes": 17372,
+      "mode": 420,
+      "sha256": "667a3972ab02b1e0c99ddc3826c4cf88a0c15d3557c18e11844d17c28f245112"
+    },
+    "prepared-source-macos/ui/gfx/paint_vector_icon.cc": {
+      "bytes": 17438,
+      "mode": 420,
+      "sha256": "b99d9154080fb6300599a0dd80abe2cbd3aab18a46e2796e39cd78a215c365cc"
+    },
+    "prepared-source-macos/ui/message_center/vector_icons/chrome_product.icon": {
+      "bytes": 154877,
+      "mode": 420,
+      "sha256": "d38081cca780f3f666be1951a968a60ac4b6dda20f00f660c957a95433e22102"
+    },
+    "prepared-source-macos/ui/message_center/vector_icons/product_old.icon": {
+      "bytes": 154877,
+      "mode": 420,
+      "sha256": "d38081cca780f3f666be1951a968a60ac4b6dda20f00f660c957a95433e22102"
+    },
+    "prepared-source-macos/ui/ozone/platform/wayland/BUILD.gn": {
+      "bytes": 23383,
+      "mode": 420,
+      "sha256": "dd6edc81ee9fba916e13bdabe2b99f173d3178ca9e5426d2a78b8238055e2cd6"
+    },
+    "prepared-source-macos/ui/ozone/platform/wayland/common/wayland_object.cc": {
+      "bytes": 12120,
+      "mode": 420,
+      "sha256": "d501500500d20b070b26421613ec4da5911c88ba172b31f520aaf6476697d0b9"
+    },
+    "prepared-source-macos/ui/ozone/platform/wayland/common/wayland_object.h": {
+      "bytes": 9684,
+      "mode": 420,
+      "sha256": "a79e1735faaef50fdd706bf5027d126d969cc2110af4b3265e6669d5ecb45b08"
+    },
+    "prepared-source-macos/ui/ozone/platform/wayland/gpu/vulkan_implementation_wayland.cc": {
+      "bytes": 4727,
+      "mode": 420,
+      "sha256": "46525a492459ea81142cf5e6adbd92e0bb25048a253bd06bef6f1a9d826d2c46"
+    },
+    "prepared-source-macos/ui/ozone/platform/wayland/gpu/wayland_surface_factory.cc": {
+      "bytes": 12208,
+      "mode": 420,
+      "sha256": "dfaa72498df619200d02ccff57776929c79e6a8b51847a529728293e1075d136"
+    },
+    "prepared-source-macos/ui/ozone/platform/wayland/host/background_effect_manager.cc": {
+      "bytes": 3979,
+      "mode": 420,
+      "sha256": "f31a13fbe499228b4d412a25f80b85cfab8a9b46a6cc47353d8a299a06069d6b"
+    },
+    "prepared-source-macos/ui/ozone/platform/wayland/host/background_effect_manager.h": {
+      "bytes": 2303,
+      "mode": 420,
+      "sha256": "c1c7dc826d8f9aceeb9fc94276a73ca5ffc5059806014188d53ee854603e84ab"
+    },
+    "prepared-source-macos/ui/ozone/platform/wayland/host/wayland_connection.cc": {
+      "bytes": 34203,
+      "mode": 420,
+      "sha256": "1ec1812aa7c9494b96d1735aef24c8673627ab6b3e6d69e1efd5c5106c6ff968"
+    },
+    "prepared-source-macos/ui/ozone/platform/wayland/host/wayland_connection.h": {
+      "bytes": 19500,
+      "mode": 420,
+      "sha256": "ef296abd540fb5cfbfe858fd65193891ec13fe736b7ef727b0fbe3679085389b"
+    },
+    "prepared-source-macos/ui/ozone/platform/wayland/host/wayland_surface.cc": {
+      "bytes": 37201,
+      "mode": 420,
+      "sha256": "8e1e1219f58a3e63aec536a36ed4ff97c20080520853dd280623426d63b85fde"
+    },
+    "prepared-source-macos/ui/ozone/platform/wayland/host/wayland_surface.h": {
+      "bytes": 18023,
+      "mode": 420,
+      "sha256": "fb1d56b5c5dec07caec629069458ca5d570a9d341449d4c6130b0bc7a5bf616d"
+    },
+    "prepared-source-macos/ui/ozone/platform/wayland/host/wayland_window.cc": {
+      "bytes": 63786,
+      "mode": 420,
+      "sha256": "c160a7df3a48fe006846a02ba084f5f559713cc8d306964bc6d23e668d4a9079"
+    },
+    "prepared-source-macos/ui/ozone/platform/wayland/host/wayland_window.h": {
+      "bytes": 32756,
+      "mode": 420,
+      "sha256": "62ae0e609387fc19530df88f683245fefbd2314b8ab790482d518f8448cc0cad"
+    },
+    "prepared-source-macos/ui/platform_window/extensions/wayland_extension.h": {
+      "bytes": 4258,
+      "mode": 420,
+      "sha256": "0a4e6b09d4b4877afd0f546e95b3ee54003926d955a811f919b0ba12fac24015"
+    },
+    "prepared-source-macos/ui/strings/ui_strings.grd": {
+      "bytes": 66762,
+      "mode": 420,
+      "sha256": "7b797775001ccfcd8d4e67af9bffe482463e95e33365ad8c2f23619e07dafcd6"
+    },
+    "prepared-source-macos/ui/views/BUILD.gn": {
+      "bytes": 60932,
+      "mode": 420,
+      "sha256": "90457cfe992e800b6471049146342f58134967152cbe8a02bd8c5f07ed2c6e3e"
+    },
+    "prepared-source-macos/ui/views/bubble/bubble_dialog_delegate_view.cc": {
+      "bytes": 52588,
+      "mode": 420,
+      "sha256": "c41d9b7c7c514b948f2635a299ff726aba9da7aea4401c243fa982d63c622f6f"
+    },
+    "prepared-source-macos/ui/views/bubble/edge_anchor.h": {
+      "bytes": 490,
+      "mode": 420,
+      "sha256": "29156a2d02421bff2bae066fa3c299e9c88d92ce45de6b56c2d7dd0853997db1"
+    },
+    "prepared-source-macos/ui/views/controls/menu/menu_config.cc": {
+      "bytes": 3171,
+      "mode": 420,
+      "sha256": "3ea1188e3f82301e191ba4bafaa5ba6b4013f2409627731bf6d53fb95bf1c1a1"
+    },
+    "prepared-source-macos/ui/views/focus/focus_manager.cc": {
+      "bytes": 24751,
+      "mode": 420,
+      "sha256": "44270fa337685e30a40ac27368c0365eef7746cfb1f1fee435f80127394ddd5d"
+    },
+    "prepared-source-macos/ui/views/focus/focus_manager_properties.h": {
+      "bytes": 737,
+      "mode": 420,
+      "sha256": "f42bd68443bf563e0cf83edbde49a3ec48507df1fe642fb0c2caff35f22b8ba0"
+    },
+    "prepared-source-macos/ui/views/layout/layout_provider.cc": {
+      "bytes": 9556,
+      "mode": 420,
+      "sha256": "66107a2868ccf1a97b82e3712b1173a7a355cfc588d449d8b4b9e1a742a4bac6"
+    },
+    "prepared-source-macos/ui/webui/resources/cr_components/most_visited/most_visited.css": {
+      "bytes": 10684,
+      "mode": 420,
+      "sha256": "26d3abd1115ba2110d2abd17ba6253cd07782e0d32ce2791560cc7f0feb2a916"
+    },
+    "prepared-source-macos/ui/webui/resources/cr_components/most_visited/most_visited.html.ts": {
+      "bytes": 6764,
+      "mode": 420,
+      "sha256": "d861d340d53bd83a34dcb0ba59d0d14e894b97cd109974caa820f8017dbc2b0e"
+    },
+    "prepared-source-macos/ui/webui/resources/cr_components/searchbox/icons/chrome_product_cr23.svg": {
+      "bytes": 2391,
+      "mode": 420,
+      "sha256": "a8b007ca4d0a67c33a2426b2db320d5561ba960cab8f2baa46500c1af65ba803"
+    },
+    "prepared-source-macos/ui/webui/resources/cr_components/searchbox/icons/chrome_product_cr23_old.svg": {
+      "bytes": 2391,
+      "mode": 420,
+      "sha256": "a8b007ca4d0a67c33a2426b2db320d5561ba960cab8f2baa46500c1af65ba803"
+    },
+    "prepared-source-macos/ui/webui/resources/cr_components/searchbox/searchbox_action.css": {
+      "bytes": 2611,
+      "mode": 420,
+      "sha256": "becdedaf8687f67f1b77f924260a1115466281697080bb769af89220b351a42f"
+    },
+    "prepared-source-macos/ui/webui/resources/cr_components/searchbox/searchbox_icon.css": {
+      "bytes": 4116,
+      "mode": 420,
+      "sha256": "c2350277f43cc2728c8defc6fb2bf761ccfe1fe48912099ee10eaa0f715740f6"
+    },
+    "prepared-source-macos/ui/webui/resources/cr_components/searchbox/searchbox_icon.html.ts": {
+      "bytes": 1320,
+      "mode": 420,
+      "sha256": "9515ccf402b28528e3dc32e69d0c78e69665734e00bdae883d742e00e551945e"
+    },
+    "prepared-source-macos/ui/webui/resources/cr_components/searchbox/searchbox_icon.ts": {
+      "bytes": 21455,
+      "mode": 420,
+      "sha256": "b4b183e7a3b8c869bef8c4cf4defc8f714a10ec4868e08adbb721db41fec889b"
+    },
+    "prepared-source-macos/ui/webui/resources/cr_components/searchbox/searchbox_match.css": {
+      "bytes": 11792,
+      "mode": 420,
+      "sha256": "a985853542b5033335c65d3888a1eb28088281e19668fdd586e410f65d07ad73"
+    },
+    "prepared-source-macos/ui/webui/resources/cr_elements/cr_collapse/cr_collapse.ts": {
+      "bytes": 3707,
+      "mode": 420,
+      "sha256": "697163005912911e638cbf080138bb184533c57122a30beb420d9470d3603bf9"
+    },
+    "prepared-source-macos/ui/webui/resources/cr_elements/cr_icon/cr_icon.css": {
+      "bytes": 1623,
+      "mode": 420,
+      "sha256": "3144d4a8c37956a5ec4d562aa7d4076a53b0f089775872adccf6adc8ca7381d6"
+    },
+    "prepared-source-macos/ui/webui/resources/cr_elements/cr_icon/cr_icon.ts": {
+      "bytes": 2010,
+      "mode": 420,
+      "sha256": "00dc3c34031bcf5b43868d231305ae276641eed15e3c39286dd830e8c798f169"
+    },
+    "prepared-source-macos/ui/webui/resources/cr_elements/cr_toolbar/cr_toolbar.css": {
+      "bytes": 2839,
+      "mode": 420,
+      "sha256": "c58b971bfee429f4556a0be844885faea7de6a360190a27f649d091826863fa0"
+    },
+    "prepared-source-macos/ui/webui/resources/cr_elements/icons.html.ts": {
+      "bytes": 71165,
+      "mode": 420,
+      "sha256": "3c3491f67677e08c26c099d07fad35465383f197b4c9d15b7f558ac4dbced0dc"
+    },
+    "tests/noventra/fixtures/macos-install-156.sh": {
+      "bytes": 6377,
+      "mode": 420,
+      "sha256": "1b541faca17a7a1a124d9e288fd27bf66785f3667d788243383ab17700489b69"
+    },
+    "tests/noventra/test_build_macos.py": {
+      "bytes": 9043,
+      "mode": 420,
+      "sha256": "2a0d4ae08330b7545f94b0eec5bf858452b3b676a2393bdf7d1d0b74820093d4"
+    },
+    "tests/noventra/test_package_macos.py": {
+      "bytes": 23459,
+      "mode": 420,
+      "sha256": "8ffd9c7f7419c2731f381fdea28bbd828c42b4f1e854d5ab61cb8963d32533bb"
+    },
+    "tests/noventra/test_qualify_macos.py": {
+      "bytes": 3827,
+      "mode": 420,
+      "sha256": "e73505020101a502b1838ac56b09d819795a4db3016aa85f38e7975ee671ec5c"
+    },
+    "tools/noventra/build_macos.py": {
+      "bytes": 32370,
+      "mode": 420,
+      "sha256": "4f62077a5bb3bd739ed495d1d6a0c03c3f12d92bbd94dd5b82fbd894e37a3c7e"
+    },
+    "tools/noventra/package_macos.py": {
+      "bytes": 31646,
+      "mode": 420,
+      "sha256": "8208861c4e52a09e974a5ebb1c26fd7846ade5faef58c51cc7a254b0456746c7"
+    },
+    "tools/noventra/qualify_macos.py": {
+      "bytes": 6433,
+      "mode": 420,
+      "sha256": "07140507896c4d94eb3379a366cc5da750bc2722c9ad423de4e6e4da2d385cb3"
+    }
+  },
+  "format": 1,
+  "kind": "noventra-macos-source-identity",
+  "layer_manifest_sha256": "d5ca765513c1547fae6c71807ff01a88fcff3fccf3dd58b399381bff95029be9",
+  "native_build_verified": false,
+  "native_preimage_check_required": true,
+  "native_ui_verified": false,
+  "prior_mac_manifest_sha256": "d044756e774291fa555ec10e59d320bacaf9ad7dda31578ced70d70201c78467",
+  "shared_linux_commit": "64ba7d31b53be3d14868ee35136c97d3509dd6ad"
+}

@@ -1,0 +1,18 @@
+diff --git a/chrome/browser/resources/settings/about_page/about_page.html.ts b/chrome/browser/resources/settings/about_page/about_page.html.ts
+--- a/chrome/browser/resources/settings/about_page/about_page.html.ts
++++ b/chrome/browser/resources/settings/about_page/about_page.html.ts
+@@ -91,11 +91,9 @@
+ <settings-section>
+   <div class="info-sections">
+     <div class="info-section">
+-      <div class="secondary">$i18n{aboutProductCopyright}</div>
+-    </div>
+-
+-    <div class="info-section">
+-      <div class="secondary">$i18nRaw{aboutProductLicense}</div>
++      <a id="openSourceLicenses" href="chrome://credits/" target="_blank">
++        Open source licenses
++      </a>
+     </div>
+ <if expr="_google_chrome or _is_chrome_for_testing_branded">
+     <div class="secondary">
