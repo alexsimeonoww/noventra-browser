@@ -161,6 +161,7 @@
 #include "chrome/browser/ui/views/commerce/discounts_page_action_view_controller.h"
 #include "chrome/browser/ui/views/file_system_access/file_system_access_bubble_controller.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
+#include "chrome/browser/ui/views/frame/noventra_dock_controller.h"
 #include "chrome/browser/ui/views/frame/toolbar_button_provider.h"
 #include "chrome/browser/ui/views/js_optimization/js_optimizations_page_action_controller.h"
 #include "chrome/browser/ui/views/location_bar/cookie_controls/cookie_controls_page_action_controller.h"
@@ -1093,7 +1094,10 @@ void BrowserActions::InitializeChromeMenuActions() {
           base::BindRepeating(
               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
                  actions::ActionInvocationContext context) {
-                chrome::NewTab(bwi, NewTabTypes::kNewTabCommand);
+                if (!NoventraDockController::ShowNewTabPopup(
+                        BrowserView::GetBrowserViewForBrowser(bwi))) {
+                  chrome::NewTab(bwi, NewTabTypes::kNewTabCommand);
+                }
               },
               bwi))
           .SetActionId(kActionNewTab)

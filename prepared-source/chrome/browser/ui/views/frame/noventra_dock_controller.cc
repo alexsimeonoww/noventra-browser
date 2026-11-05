@@ -630,6 +630,8 @@ void NoventraDockController::UpdateAddressPaneBounds() {
   const bool editing =
       address_requested_ ||
       address_view_->Contains(browser_->GetFocusManager()->GetFocusedView());
+  const bool new_tab_edit =
+      editing && address_edit_intent_ == AddressEditIntent::kNewTab;
   gfx::Rect bounds =
       views::View::ConvertRectToTarget(slot, browser_, slot->GetLocalBounds());
   NoventraDockView* side_dock = nullptr;
@@ -675,10 +677,10 @@ void NoventraDockController::UpdateAddressPaneBounds() {
     bounds = views::View::ConvertRectToTarget(
         anchor->parent(), browser_, anchor->parent()->GetLocalBounds());
   }
-  bool inline_field =
-      !tab_address_sidebar &&
-      (merged || (slot->IsDrawn() && bounds.width() >= (side_dock ? 160 : 100) &&
-                  client_bounds.Intersects(bounds)));
+  bool inline_field = !new_tab_edit && !tab_address_sidebar &&
+                      (merged || (slot->IsDrawn() &&
+                                  bounds.width() >= (side_dock ? 160 : 100) &&
+                                  client_bounds.Intersects(bounds)));
   // A combined sidebar has its own resting address card. Focus moves the
   // same native field into the floating editor without reparenting it.
   if (tab_address_sidebar && !editing && slot->IsDrawn()) {
@@ -691,8 +693,9 @@ void NoventraDockController::UpdateAddressPaneBounds() {
   // Combined sidebars rest as native tab rows. Custom standalone address
   // placements keep their existing field or shortcut, as does the top bar.
   const bool show = inline_field || editing;
-  command_popup_visible_ = tab_address_sidebar && editing;
-  if (editing && !inline_field && side_dock && !tab_address_sidebar) {
+  command_popup_visible_ = new_tab_edit || (tab_address_sidebar && editing);
+  if (editing && !inline_field && side_dock && !tab_address_sidebar &&
+      !new_tab_edit) {
     // Keyboard editing in an icon rail remains attached to the sidebar.
     auto dock_bounds = views::View::ConvertRectToTarget(
         side_dock, browser_, side_dock->GetLocalBounds());
@@ -743,15 +746,16 @@ void NoventraDockController::UpdateAddressPaneBounds() {
         std::min(kMaximumFloatingAddressWidth, available.width());
     const int field_height =
         std::min(available.height(),
-                 tab_address_sidebar
+                 command_popup_visible_
                      ? LocationBarView::kNoventraCommandPopupHeight
                      : GetLayoutConstant(LayoutConstant::kLocationBarHeight) +
                            GetLayoutInsets(TOOLBAR_INTERIOR_MARGIN).height());
-    bounds = gfx::Rect(
-        available.x() + (available.width() - field_width) / 2,
-        available.y() +
-            (tab_address_sidebar ? (available.height() - field_height) / 2 : 0),
-        field_width, field_height);
+    bounds =
+        gfx::Rect(available.x() + (available.width() - field_width) / 2,
+                  available.y() + (command_popup_visible_
+                                       ? (available.height() - field_height) / 2
+                                       : 0),
+                  field_width, field_height);
   }
   SetAddressAnchorHidden(merged && show);
   field->SetNoventraSidebarInline(side_dock != nullptr &&
@@ -875,6 +879,41 @@ void NoventraDockController::AppendAccessiblePanes(std::vector<views::View*>& pa
   for (const auto& [edge, dock] : docks_)
     if (dock->GetVisible()) panes.push_back(dock);
 }
+bool NoventraDockController::ShowNewTabPopup(BrowserView* browser) {
+  auto* controller = browser ? browser->noventra_dock_controller() : nullptr;
+  if (!controller || !controller->active_ || !controller->address_pane_ ||
+      !browser->GetActiveWebContents()) {
+    return false;
+  }
+  if (controller->address_edit_intent_ == AddressEditIntent::kNewTab &&
+      controller->command_popup_visible_) {
+    controller->EndAddressEdit(true);
+    return true;
+  }
+  controller->address_edit_intent_ = AddressEditIntent::kNewTab;
+  controller->BeginAddressEdit();
+  auto* field = browser->toolbar()->location_bar_view();
+  field->FocusLocation(/*is_user_initiated=*/true,
+                       /*clear_focus_if_failed=*/true);
+  field->GetOmniboxView()->SetUserText(u"", /*update_popup=*/true);
+  return true;
+}
+
+WindowOpenDisposition NoventraDockController::ResolveAddressDisposition(
+    WindowOpenDisposition disposition) {
+  if (address_edit_intent_ != AddressEditIntent::kNewTab) {
+    return disposition;
+  }
+  if (disposition != WindowOpenDisposition::NEW_BACKGROUND_TAB) {
+    address_edit_intent_ = AddressEditIntent::kCurrentTab;
+    address_requested_ = false;
+    browser_->InvalidateLayout();
+  }
+  return disposition == WindowOpenDisposition::CURRENT_TAB
+             ? WindowOpenDisposition::NEW_FOREGROUND_TAB
+             : disposition;
+}
+
 void NoventraDockController::BeginAddressEdit() {
   if (!active_ || !address_pane_) return;
   address_requested_ = true;
@@ -893,6 +932,7 @@ void NoventraDockController::BeginAddressEdit() {
 }
 void NoventraDockController::EndAddressEdit(bool restore_focus) {
   address_requested_ = false;
+  address_edit_intent_ = AddressEditIntent::kCurrentTab;
   if (restore_focus) {
     // Escape closes the whole sidebar editor, including when the first native
     // Escape only dismissed suggestions. Restore the page's resting address.
@@ -912,6 +952,7 @@ void NoventraDockController::OnDidChangeFocus(views::View* before, views::View* 
   const bool was_editing = address_view_->Contains(before);
   const bool editing = address_view_->Contains(now);
   if (was_editing && !editing && command_popup_visible_) {
+    address_edit_intent_ = AddressEditIntent::kCurrentTab;
     browser_->toolbar()->location_bar_view()->GetOmniboxView()->RevertAll();
   }
   bool dock_focus_changed = false;

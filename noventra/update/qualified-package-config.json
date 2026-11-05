@@ -4,5 +4,5 @@
   "channel": "stable",
   "format": 1,
   "public_key": "release-public.pem",
-  "sequence": 9
+  "sequence": 10
 }

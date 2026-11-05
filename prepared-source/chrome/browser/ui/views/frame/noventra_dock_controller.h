@@ -13,6 +13,7 @@
 #include "chrome/browser/performance_manager/public/user_tuning/battery_saver_mode_manager.h"
 #include "chrome/browser/ui/noventra/layout_model.h"
 #include "components/prefs/pref_change_registrar.h"
+#include "ui/base/window_open_disposition.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/views/focus/focus_manager.h"
 #include "ui/views/view.h"
@@ -32,6 +33,9 @@ class NoventraDockController : public views::FocusChangeListener,
   std::vector<noventra::LayoutCapability> GetCapabilities() const;
   gfx::Rect Layout(const gfx::Rect& client_bounds);
   bool UpdateRevealAnimation();
+  static bool ShowNewTabPopup(BrowserView* browser);
+  WindowOpenDisposition ResolveAddressDisposition(
+      WindowOpenDisposition disposition);
   void BeginAddressEdit();
   void EndAddressEdit(bool restore_focus);
   void OnDidChangeFocus(views::View* before, views::View* now) override;
@@ -62,6 +66,7 @@ class NoventraDockController : public views::FocusChangeListener,
   std::vector<const views::View*> GetChromeRoots(bool side) const;
   void AppendAccessiblePanes(std::vector<views::View*>& panes) const;
  private:
+  enum class AddressEditIntent { kCurrentTab, kNewTab };
   struct DockGeometry {
     noventra::DockEdge edge;
     gfx::Rect bounds;
@@ -104,6 +109,7 @@ class NoventraDockController : public views::FocusChangeListener,
   bool force_reveal_side_ = false;
   bool has_layout_ = false;
   bool address_requested_ = false;
+  AddressEditIntent address_edit_intent_ = AddressEditIntent::kCurrentTab;
   bool command_popup_visible_ = false;
   bool native_top_new_tab_ = false;
   bool active_ = false;

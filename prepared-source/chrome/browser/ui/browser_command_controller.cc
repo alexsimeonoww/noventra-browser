@@ -100,6 +100,7 @@
 #include "chrome/browser/ui/user_education/browser_user_education_interface.h"
 #include "chrome/browser/ui/views/download/bubble/download_toolbar_ui_controller.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
+#include "chrome/browser/ui/views/frame/noventra_dock_controller.h"
 #include "chrome/browser/ui/views/side_panel/tabs_from_other_devices/tabs_from_other_devices_side_panel_coordinator.h"
 #include "chrome/browser/ui/web_applications/app_browser_controller.h"
 #include "chrome/browser/ui/web_applications/web_app_dialog_utils.h"
@@ -805,7 +806,10 @@ void BrowserCommandController::HandleCommandWithDisposition(
       CloseWindow(browser_);
       break;
     case IDC_NEW_TAB: {
-      NewTab(browser_, NewTabTypes::kNewTabCommand);
+      if (!NoventraDockController::ShowNewTabPopup(
+              BrowserView::GetBrowserViewForBrowser(browser_))) {
+        NewTab(browser_, NewTabTypes::kNewTabCommand);
+      }
       break;
     }
     case IDC_NEW_TAB_TO_RIGHT: {

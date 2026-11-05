@@ -65,7 +65,7 @@ namespace {
 const char kPreviewContentsKey = 0;
 const char kAutomaticPreviewTargetKey = 0;
 
-// The page and its floating action capsule paint their own rounded surfaces.
+// The page and its floating actions paint their own rounded surfaces.
 // A normal dialog frame would add a full-width background and title insets.
 class PreviewFrameView : public views::FrameView {
  public:
@@ -207,39 +207,30 @@ class PreviewTab : public views::View, public content::WebContentsDelegate {
     controls_->GetViewAccessibility().SetRole(ax::mojom::Role::kToolbar);
     controls_->GetViewAccessibility().SetName(u"Preview controls");
     controls_->SetLayoutManager(std::make_unique<views::BoxLayout>(
-        views::BoxLayout::Orientation::kVertical, gfx::Insets::VH(3, 3), 4));
-    controls_->SetBackground(
-        views::CreateRoundedRectBackground(ui::kColorDialogBackground, 12));
-    controls_->SetBorder(
-        views::CreateRoundedRectBorder(1, 12, ui::kColorSeparator));
+        views::BoxLayout::Orientation::kVertical, gfx::Insets(12), 12));
     auto add_icon = [this](views::Button::PressedCallback callback,
                            const gfx::VectorIcon& icon,
                            const std::u16string& tooltip) {
       auto* button =
           controls_->AddChildView(views::CreateVectorImageButtonWithNativeTheme(
-              std::move(callback), icon, 18));
+              std::move(callback), icon, 16, ui::kColorSysInverseOnSurface,
+              ui::kColorIconDisabled, ui::kColorSysInverseOnSurface));
       button->SetPreferredSize(gfx::Size(32, 32));
+      button->SetBackground(
+          views::CreateRoundedRectBackground(ui::kColorSysInverseSurface, 16));
       button->SetTooltipText(tooltip);
       return button;
     };
-    back_ = add_icon(base::BindRepeating(&PreviewTab::NavigateHistory,
-                                       base::Unretained(this), -1),
-                     kBackArrowTouchOldIcon, u"Back in preview");
-    forward_ = add_icon(base::BindRepeating(&PreviewTab::NavigateHistory,
-                                          base::Unretained(this), 1),
-                        kForwardArrowTouchOldIcon, u"Forward in preview");
-    back_->SetEnabled(false);
-    forward_->SetEnabled(false);
+    add_icon(base::BindRepeating(&PreviewTab::Close, base::Unretained(this)),
+             kCloseIcon, u"Close preview (Esc)");
     open_ = add_icon(base::BindRepeating(&PreviewTab::PromoteAndClose,
                                          base::Unretained(this)),
-                     kOpenInNewIcon, u"Open in tab without reloading");
+                     kFullscreenIcon, u"Open in tab without reloading");
     open_->GetViewAccessibility().SetName(u"Open in tab without reloading");
     UpdateIdentity(u"Link preview", base::UTF8ToUTF16(url.spec()));
     split_ = add_icon(
         base::BindRepeating(&PreviewTab::SplitAndClose, base::Unretained(this)),
         kSplitSceneIcon, u"Open in split without reloading");
-    add_icon(base::BindRepeating(&PreviewTab::Close, base::Unretained(this)),
-             kCloseIcon, u"Close preview (Esc)");
     auto* profile = Profile::FromBrowserContext(source->GetBrowserContext());
     content::WebContents::CreateParams create_params(profile);
     const std::string space = noventra::SpaceId(source);
@@ -264,14 +255,14 @@ class PreviewTab : public views::View, public content::WebContentsDelegate {
   }
   views::View* initial_focus() const { return view_; }
   void Layout(PassKey) override {
-    constexpr int kControlsWidth = 40;
-    constexpr int kControlsGap = 8;
+    constexpr int kControlsWidth = 56;
     const int controls_width = std::min(kControlsWidth, width());
-    page_->SetBounds(0, 0, std::max(0, width() - controls_width - kControlsGap),
+    const int controls_top = std::min(15, height());
+    page_->SetBounds(0, 0, std::max(0, width() - controls_width),
                      height());
     controls_->SetBounds(
-        width() - controls_width, 0, controls_width,
-        std::min(height(), controls_->GetPreferredSize().height()));
+        width() - controls_width, controls_top, controls_width,
+        std::min(height() - controls_top, controls_->GetPreferredSize().height()));
     page_->DeprecatedLayoutImmediately();
     controls_->DeprecatedLayoutImmediately();
     view_->holder()->SetNativeViewCornerRadii(gfx::RoundedCornersF(11));
@@ -287,8 +278,6 @@ class PreviewTab : public views::View, public content::WebContentsDelegate {
     const auto address = base::UTF8ToUTF16(source->GetVisibleURL().spec());
     const auto title = source->GetTitle();
     UpdateIdentity(title.empty() ? u"Link preview" : title, address);
-    back_->SetEnabled(source->GetController().CanGoBack());
-    forward_->SetEnabled(source->GetController().CanGoForward());
   }
   content::KeyboardEventProcessingResult PreHandleKeyboardEvent(
       content::WebContents*,
@@ -320,11 +309,6 @@ class PreviewTab : public views::View, public content::WebContentsDelegate {
     return contents_.get();
   }
 
-  void NavigateHistory(int offset) {
-    if (contents_ && contents_->GetController().CanGoToOffset(offset)) {
-      contents_->GetController().GoToOffset(offset);
-    }
-  }
   void PromoteAndClose() {
     // Navigate() can synchronously close this tab-scoped dialog when it
     // activates the destination tab. Never access this view afterwards.
@@ -440,8 +424,6 @@ class PreviewTab : public views::View, public content::WebContentsDelegate {
   raw_ptr<views::View> page_ = nullptr;
   raw_ptr<views::View> controls_ = nullptr;
   raw_ptr<views::ImageButton> open_ = nullptr;
-  raw_ptr<views::ImageButton> back_ = nullptr;
-  raw_ptr<views::ImageButton> forward_ = nullptr;
   raw_ptr<views::ImageButton> split_ = nullptr;
   base::WeakPtrFactory<PreviewTab> weak_factory_{this};
 };

@@ -802,7 +802,9 @@ class NoventraWindowMirrorPresentation::Impl : public MirrorActions {
               !service->Select(self->view_->browser(), selected)) {
             return;
           }
-          chrome::NewTab(self->view_->browser(), NewTabTypes::kNewTabButton);
+          if (!NoventraDockController::ShowNewTabPopup(self->view_)) {
+            chrome::NewTab(self->view_->browser(), NewTabTypes::kNewTabButton);
+          }
         },
         base::Unretained(this)));
   }

@@ -88,6 +88,7 @@
 #include "chrome/browser/ui/views/extensions/extensions_toolbar_coordinator.h"
 #include "chrome/browser/ui/views/extensions/extensions_toolbar_desktop.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
+#include "chrome/browser/ui/views/frame/noventra_dock_controller.h"
 #include "chrome/browser/ui/views/frame/custom_corners_background.h"
 #include "chrome/browser/ui/views/frame/horizontal_tab_strip_region_view.h"
 #include "chrome/browser/ui/views/frame/noventra_dock_view.h"
@@ -1967,7 +1968,9 @@ void ToolbarView::OnThemeChanged() {
 }
 
 void ToolbarView::NewTabButtonPressed(const ui::Event& event) {
-  chrome::NewTab(browser_, NewTabTypes::kNewTabButton);
+  if (!NoventraDockController::ShowNewTabPopup(browser_view_)) {
+    chrome::NewTab(browser_, NewTabTypes::kNewTabButton);
+  }
 }
 
 void ToolbarView::VerticalTabsCollapseButtonPressed(const ui::Event& event) {

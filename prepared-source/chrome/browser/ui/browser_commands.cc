@@ -136,6 +136,7 @@
 #include "chrome/browser/ui/ui_features.h"
 #include "chrome/browser/ui/user_education/browser_user_education_interface.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
+#include "chrome/browser/ui/views/frame/noventra_dock_controller.h"
 #include "chrome/browser/ui/views/tabs/organizer/organizer_panel_utils.h"
 #include "chrome/browser/ui/waap/initial_webui_window_metrics_manager.h"
 #include "chrome/browser/ui/web_applications/app_browser_controller.h"
@@ -1315,6 +1316,11 @@ base::WeakPtr<content::NavigationHandle> OpenCurrentURL(
   NavigateParams params(browser, url,
                         location_bar->navigation_params().transition);
   params.disposition = location_bar->navigation_params().disposition;
+  if (auto* view = BrowserView::GetBrowserViewForBrowser(browser)) {
+    if (auto* dock = view->noventra_dock_controller()) {
+      params.disposition = dock->ResolveAddressDisposition(params.disposition);
+    }
+  }
   // Use ADD_INHERIT_OPENER so that all pages opened by the omnibox at least
   // inherit the opener. In some cases the tabstrip will determine the group
   // should be inherited, in which case the group is inherited instead of the

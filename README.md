@@ -9,6 +9,14 @@ vertical tabs, Spaces, split views and configurable browser controls.
 The first public target is **Linux x86_64 preview**. Windows and macOS downloads
 are not available yet. Preview builds need testing before everyday use.
 
+## Noventra 0.1.10: centered new-tab input and preview controls
+
+Ctrl+T and the plus button open a centered native URL and search field. Enter
+opens the result in a new tab; Escape, clicking outside, or pressing Ctrl+T again
+cancels without a blank tab. Link previews use separate Close, Expand, and Split
+buttons, with no Back and Forward arrows. See the
+[interaction notes](docs/noventra/zen-interactions-2026-11-05.md).
+
 ## Noventra 0.1.9: reliable default-browser registration
 
 Linux default-browser selection keeps the installed desktop entry valid and

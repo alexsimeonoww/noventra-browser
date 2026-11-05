@@ -1,0 +1,394 @@
+diff --git a/chrome/browser/ui/browser_actions.cc b/chrome/browser/ui/browser_actions.cc
+--- a/chrome/browser/ui/browser_actions.cc
++++ b/chrome/browser/ui/browser_actions.cc
+@@ -161,6 +161,7 @@
+ #include "chrome/browser/ui/views/commerce/discounts_page_action_view_controller.h"
+ #include "chrome/browser/ui/views/file_system_access/file_system_access_bubble_controller.h"
+ #include "chrome/browser/ui/views/frame/browser_view.h"
++#include "chrome/browser/ui/views/frame/noventra_dock_controller.h"
+ #include "chrome/browser/ui/views/frame/toolbar_button_provider.h"
+ #include "chrome/browser/ui/views/js_optimization/js_optimizations_page_action_controller.h"
+ #include "chrome/browser/ui/views/location_bar/cookie_controls/cookie_controls_page_action_controller.h"
+@@ -1093,7 +1094,10 @@
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
+-                chrome::NewTab(bwi, NewTabTypes::kNewTabCommand);
++                if (!NoventraDockController::ShowNewTabPopup(
++                        BrowserView::GetBrowserViewForBrowser(bwi))) {
++                  chrome::NewTab(bwi, NewTabTypes::kNewTabCommand);
++                }
+               },
+               bwi))
+           .SetActionId(kActionNewTab)
+diff --git a/chrome/browser/ui/browser_command_controller.cc b/chrome/browser/ui/browser_command_controller.cc
+--- a/chrome/browser/ui/browser_command_controller.cc
++++ b/chrome/browser/ui/browser_command_controller.cc
+@@ -100,6 +100,7 @@
+ #include "chrome/browser/ui/user_education/browser_user_education_interface.h"
+ #include "chrome/browser/ui/views/download/bubble/download_toolbar_ui_controller.h"
+ #include "chrome/browser/ui/views/frame/browser_view.h"
++#include "chrome/browser/ui/views/frame/noventra_dock_controller.h"
+ #include "chrome/browser/ui/views/side_panel/tabs_from_other_devices/tabs_from_other_devices_side_panel_coordinator.h"
+ #include "chrome/browser/ui/web_applications/app_browser_controller.h"
+ #include "chrome/browser/ui/web_applications/web_app_dialog_utils.h"
+@@ -805,7 +806,10 @@
+       CloseWindow(browser_);
+       break;
+     case IDC_NEW_TAB: {
+-      NewTab(browser_, NewTabTypes::kNewTabCommand);
++      if (!NoventraDockController::ShowNewTabPopup(
++              BrowserView::GetBrowserViewForBrowser(browser_))) {
++        NewTab(browser_, NewTabTypes::kNewTabCommand);
++      }
+       break;
+     }
+     case IDC_NEW_TAB_TO_RIGHT: {
+diff --git a/chrome/browser/ui/browser_commands.cc b/chrome/browser/ui/browser_commands.cc
+--- a/chrome/browser/ui/browser_commands.cc
++++ b/chrome/browser/ui/browser_commands.cc
+@@ -136,6 +136,7 @@
+ #include "chrome/browser/ui/ui_features.h"
+ #include "chrome/browser/ui/user_education/browser_user_education_interface.h"
+ #include "chrome/browser/ui/views/frame/browser_view.h"
++#include "chrome/browser/ui/views/frame/noventra_dock_controller.h"
+ #include "chrome/browser/ui/views/tabs/organizer/organizer_panel_utils.h"
+ #include "chrome/browser/ui/waap/initial_webui_window_metrics_manager.h"
+ #include "chrome/browser/ui/web_applications/app_browser_controller.h"
+@@ -1315,6 +1316,11 @@
+   NavigateParams params(browser, url,
+                         location_bar->navigation_params().transition);
+   params.disposition = location_bar->navigation_params().disposition;
++  if (auto* view = BrowserView::GetBrowserViewForBrowser(browser)) {
++    if (auto* dock = view->noventra_dock_controller()) {
++      params.disposition = dock->ResolveAddressDisposition(params.disposition);
++    }
++  }
+   // Use ADD_INHERIT_OPENER so that all pages opened by the omnibox at least
+   // inherit the opener. In some cases the tabstrip will determine the group
+   // should be inherited, in which case the group is inherited instead of the
+diff --git a/chrome/browser/ui/views/frame/noventra_dock_controller.cc b/chrome/browser/ui/views/frame/noventra_dock_controller.cc
+--- a/chrome/browser/ui/views/frame/noventra_dock_controller.cc
++++ b/chrome/browser/ui/views/frame/noventra_dock_controller.cc
+@@ -630,6 +630,8 @@
+   const bool editing =
+       address_requested_ ||
+       address_view_->Contains(browser_->GetFocusManager()->GetFocusedView());
++  const bool new_tab_edit =
++      editing && address_edit_intent_ == AddressEditIntent::kNewTab;
+   gfx::Rect bounds =
+       views::View::ConvertRectToTarget(slot, browser_, slot->GetLocalBounds());
+   NoventraDockView* side_dock = nullptr;
+@@ -675,10 +677,10 @@
+     bounds = views::View::ConvertRectToTarget(
+         anchor->parent(), browser_, anchor->parent()->GetLocalBounds());
+   }
+-  bool inline_field =
+-      !tab_address_sidebar &&
+-      (merged || (slot->IsDrawn() && bounds.width() >= (side_dock ? 160 : 100) &&
+-                  client_bounds.Intersects(bounds)));
++  bool inline_field = !new_tab_edit && !tab_address_sidebar &&
++                      (merged || (slot->IsDrawn() &&
++                                  bounds.width() >= (side_dock ? 160 : 100) &&
++                                  client_bounds.Intersects(bounds)));
+   // A combined sidebar has its own resting address card. Focus moves the
+   // same native field into the floating editor without reparenting it.
+   if (tab_address_sidebar && !editing && slot->IsDrawn()) {
+@@ -691,8 +693,9 @@
+   // Combined sidebars rest as native tab rows. Custom standalone address
+   // placements keep their existing field or shortcut, as does the top bar.
+   const bool show = inline_field || editing;
+-  command_popup_visible_ = tab_address_sidebar && editing;
+-  if (editing && !inline_field && side_dock && !tab_address_sidebar) {
++  command_popup_visible_ = new_tab_edit || (tab_address_sidebar && editing);
++  if (editing && !inline_field && side_dock && !tab_address_sidebar &&
++      !new_tab_edit) {
+     // Keyboard editing in an icon rail remains attached to the sidebar.
+     auto dock_bounds = views::View::ConvertRectToTarget(
+         side_dock, browser_, side_dock->GetLocalBounds());
+@@ -743,15 +746,16 @@
+         std::min(kMaximumFloatingAddressWidth, available.width());
+     const int field_height =
+         std::min(available.height(),
+-                 tab_address_sidebar
++                 command_popup_visible_
+                      ? LocationBarView::kNoventraCommandPopupHeight
+                      : GetLayoutConstant(LayoutConstant::kLocationBarHeight) +
+                            GetLayoutInsets(TOOLBAR_INTERIOR_MARGIN).height());
+-    bounds = gfx::Rect(
+-        available.x() + (available.width() - field_width) / 2,
+-        available.y() +
+-            (tab_address_sidebar ? (available.height() - field_height) / 2 : 0),
+-        field_width, field_height);
++    bounds =
++        gfx::Rect(available.x() + (available.width() - field_width) / 2,
++                  available.y() + (command_popup_visible_
++                                       ? (available.height() - field_height) / 2
++                                       : 0),
++                  field_width, field_height);
+   }
+   SetAddressAnchorHidden(merged && show);
+   field->SetNoventraSidebarInline(side_dock != nullptr &&
+@@ -875,6 +879,41 @@
+   for (const auto& [edge, dock] : docks_)
+     if (dock->GetVisible()) panes.push_back(dock);
+ }
++bool NoventraDockController::ShowNewTabPopup(BrowserView* browser) {
++  auto* controller = browser ? browser->noventra_dock_controller() : nullptr;
++  if (!controller || !controller->active_ || !controller->address_pane_ ||
++      !browser->GetActiveWebContents()) {
++    return false;
++  }
++  if (controller->address_edit_intent_ == AddressEditIntent::kNewTab &&
++      controller->command_popup_visible_) {
++    controller->EndAddressEdit(true);
++    return true;
++  }
++  controller->address_edit_intent_ = AddressEditIntent::kNewTab;
++  controller->BeginAddressEdit();
++  auto* field = browser->toolbar()->location_bar_view();
++  field->FocusLocation(/*is_user_initiated=*/true,
++                       /*clear_focus_if_failed=*/true);
++  field->GetOmniboxView()->SetUserText(u"", /*update_popup=*/true);
++  return true;
++}
++
++WindowOpenDisposition NoventraDockController::ResolveAddressDisposition(
++    WindowOpenDisposition disposition) {
++  if (address_edit_intent_ != AddressEditIntent::kNewTab) {
++    return disposition;
++  }
++  if (disposition != WindowOpenDisposition::NEW_BACKGROUND_TAB) {
++    address_edit_intent_ = AddressEditIntent::kCurrentTab;
++    address_requested_ = false;
++    browser_->InvalidateLayout();
++  }
++  return disposition == WindowOpenDisposition::CURRENT_TAB
++             ? WindowOpenDisposition::NEW_FOREGROUND_TAB
++             : disposition;
++}
++
+ void NoventraDockController::BeginAddressEdit() {
+   if (!active_ || !address_pane_) return;
+   address_requested_ = true;
+@@ -893,6 +932,7 @@
+ }
+ void NoventraDockController::EndAddressEdit(bool restore_focus) {
+   address_requested_ = false;
++  address_edit_intent_ = AddressEditIntent::kCurrentTab;
+   if (restore_focus) {
+     // Escape closes the whole sidebar editor, including when the first native
+     // Escape only dismissed suggestions. Restore the page's resting address.
+@@ -912,6 +952,7 @@
+   const bool was_editing = address_view_->Contains(before);
+   const bool editing = address_view_->Contains(now);
+   if (was_editing && !editing && command_popup_visible_) {
++    address_edit_intent_ = AddressEditIntent::kCurrentTab;
+     browser_->toolbar()->location_bar_view()->GetOmniboxView()->RevertAll();
+   }
+   bool dock_focus_changed = false;
+diff --git a/chrome/browser/ui/views/frame/noventra_dock_controller.h b/chrome/browser/ui/views/frame/noventra_dock_controller.h
+--- a/chrome/browser/ui/views/frame/noventra_dock_controller.h
++++ b/chrome/browser/ui/views/frame/noventra_dock_controller.h
+@@ -13,6 +13,7 @@
+ #include "chrome/browser/performance_manager/public/user_tuning/battery_saver_mode_manager.h"
+ #include "chrome/browser/ui/noventra/layout_model.h"
+ #include "components/prefs/pref_change_registrar.h"
++#include "ui/base/window_open_disposition.h"
+ #include "ui/gfx/geometry/rect.h"
+ #include "ui/views/focus/focus_manager.h"
+ #include "ui/views/view.h"
+@@ -32,6 +33,9 @@
+   std::vector<noventra::LayoutCapability> GetCapabilities() const;
+   gfx::Rect Layout(const gfx::Rect& client_bounds);
+   bool UpdateRevealAnimation();
++  static bool ShowNewTabPopup(BrowserView* browser);
++  WindowOpenDisposition ResolveAddressDisposition(
++      WindowOpenDisposition disposition);
+   void BeginAddressEdit();
+   void EndAddressEdit(bool restore_focus);
+   void OnDidChangeFocus(views::View* before, views::View* now) override;
+@@ -62,6 +66,7 @@
+   std::vector<const views::View*> GetChromeRoots(bool side) const;
+   void AppendAccessiblePanes(std::vector<views::View*>& panes) const;
+  private:
++  enum class AddressEditIntent { kCurrentTab, kNewTab };
+   struct DockGeometry {
+     noventra::DockEdge edge;
+     gfx::Rect bounds;
+@@ -104,6 +109,7 @@
+   bool force_reveal_side_ = false;
+   bool has_layout_ = false;
+   bool address_requested_ = false;
++  AddressEditIntent address_edit_intent_ = AddressEditIntent::kCurrentTab;
+   bool command_popup_visible_ = false;
+   bool native_top_new_tab_ = false;
+   bool active_ = false;
+diff --git a/chrome/browser/ui/views/frame/noventra_window_mirror_view.cc b/chrome/browser/ui/views/frame/noventra_window_mirror_view.cc
+--- a/chrome/browser/ui/views/frame/noventra_window_mirror_view.cc
++++ b/chrome/browser/ui/views/frame/noventra_window_mirror_view.cc
+@@ -802,7 +802,9 @@
+               !service->Select(self->view_->browser(), selected)) {
+             return;
+           }
+-          chrome::NewTab(self->view_->browser(), NewTabTypes::kNewTabButton);
++          if (!NoventraDockController::ShowNewTabPopup(self->view_)) {
++            chrome::NewTab(self->view_->browser(), NewTabTypes::kNewTabButton);
++          }
+         },
+         base::Unretained(this)));
+   }
+diff --git a/chrome/browser/ui/views/noventra_link_preview.cc b/chrome/browser/ui/views/noventra_link_preview.cc
+--- a/chrome/browser/ui/views/noventra_link_preview.cc
++++ b/chrome/browser/ui/views/noventra_link_preview.cc
+@@ -65,7 +65,7 @@
+ const char kPreviewContentsKey = 0;
+ const char kAutomaticPreviewTargetKey = 0;
+ 
+-// The page and its floating action capsule paint their own rounded surfaces.
++// The page and its floating actions paint their own rounded surfaces.
+ // A normal dialog frame would add a full-width background and title insets.
+ class PreviewFrameView : public views::FrameView {
+  public:
+@@ -207,39 +207,30 @@
+     controls_->GetViewAccessibility().SetRole(ax::mojom::Role::kToolbar);
+     controls_->GetViewAccessibility().SetName(u"Preview controls");
+     controls_->SetLayoutManager(std::make_unique<views::BoxLayout>(
+-        views::BoxLayout::Orientation::kVertical, gfx::Insets::VH(3, 3), 4));
+-    controls_->SetBackground(
+-        views::CreateRoundedRectBackground(ui::kColorDialogBackground, 12));
+-    controls_->SetBorder(
+-        views::CreateRoundedRectBorder(1, 12, ui::kColorSeparator));
++        views::BoxLayout::Orientation::kVertical, gfx::Insets(12), 12));
+     auto add_icon = [this](views::Button::PressedCallback callback,
+                            const gfx::VectorIcon& icon,
+                            const std::u16string& tooltip) {
+       auto* button =
+           controls_->AddChildView(views::CreateVectorImageButtonWithNativeTheme(
+-              std::move(callback), icon, 18));
++              std::move(callback), icon, 16, ui::kColorSysInverseOnSurface,
++              ui::kColorIconDisabled, ui::kColorSysInverseOnSurface));
+       button->SetPreferredSize(gfx::Size(32, 32));
++      button->SetBackground(
++          views::CreateRoundedRectBackground(ui::kColorSysInverseSurface, 16));
+       button->SetTooltipText(tooltip);
+       return button;
+     };
+-    back_ = add_icon(base::BindRepeating(&PreviewTab::NavigateHistory,
+-                                       base::Unretained(this), -1),
+-                     kBackArrowTouchOldIcon, u"Back in preview");
+-    forward_ = add_icon(base::BindRepeating(&PreviewTab::NavigateHistory,
+-                                          base::Unretained(this), 1),
+-                        kForwardArrowTouchOldIcon, u"Forward in preview");
+-    back_->SetEnabled(false);
+-    forward_->SetEnabled(false);
++    add_icon(base::BindRepeating(&PreviewTab::Close, base::Unretained(this)),
++             kCloseIcon, u"Close preview (Esc)");
+     open_ = add_icon(base::BindRepeating(&PreviewTab::PromoteAndClose,
+                                          base::Unretained(this)),
+-                     kOpenInNewIcon, u"Open in tab without reloading");
++                     kFullscreenIcon, u"Open in tab without reloading");
+     open_->GetViewAccessibility().SetName(u"Open in tab without reloading");
+     UpdateIdentity(u"Link preview", base::UTF8ToUTF16(url.spec()));
+     split_ = add_icon(
+         base::BindRepeating(&PreviewTab::SplitAndClose, base::Unretained(this)),
+         kSplitSceneIcon, u"Open in split without reloading");
+-    add_icon(base::BindRepeating(&PreviewTab::Close, base::Unretained(this)),
+-             kCloseIcon, u"Close preview (Esc)");
+     auto* profile = Profile::FromBrowserContext(source->GetBrowserContext());
+     content::WebContents::CreateParams create_params(profile);
+     const std::string space = noventra::SpaceId(source);
+@@ -264,14 +255,14 @@
+   }
+   views::View* initial_focus() const { return view_; }
+   void Layout(PassKey) override {
+-    constexpr int kControlsWidth = 40;
+-    constexpr int kControlsGap = 8;
++    constexpr int kControlsWidth = 56;
+     const int controls_width = std::min(kControlsWidth, width());
+-    page_->SetBounds(0, 0, std::max(0, width() - controls_width - kControlsGap),
++    const int controls_top = std::min(15, height());
++    page_->SetBounds(0, 0, std::max(0, width() - controls_width),
+                      height());
+     controls_->SetBounds(
+-        width() - controls_width, 0, controls_width,
+-        std::min(height(), controls_->GetPreferredSize().height()));
++        width() - controls_width, controls_top, controls_width,
++        std::min(height() - controls_top, controls_->GetPreferredSize().height()));
+     page_->DeprecatedLayoutImmediately();
+     controls_->DeprecatedLayoutImmediately();
+     view_->holder()->SetNativeViewCornerRadii(gfx::RoundedCornersF(11));
+@@ -287,8 +278,6 @@
+     const auto address = base::UTF8ToUTF16(source->GetVisibleURL().spec());
+     const auto title = source->GetTitle();
+     UpdateIdentity(title.empty() ? u"Link preview" : title, address);
+-    back_->SetEnabled(source->GetController().CanGoBack());
+-    forward_->SetEnabled(source->GetController().CanGoForward());
+   }
+   content::KeyboardEventProcessingResult PreHandleKeyboardEvent(
+       content::WebContents*,
+@@ -320,11 +309,6 @@
+     return contents_.get();
+   }
+ 
+-  void NavigateHistory(int offset) {
+-    if (contents_ && contents_->GetController().CanGoToOffset(offset)) {
+-      contents_->GetController().GoToOffset(offset);
+-    }
+-  }
+   void PromoteAndClose() {
+     // Navigate() can synchronously close this tab-scoped dialog when it
+     // activates the destination tab. Never access this view afterwards.
+@@ -440,8 +424,6 @@
+   raw_ptr<views::View> page_ = nullptr;
+   raw_ptr<views::View> controls_ = nullptr;
+   raw_ptr<views::ImageButton> open_ = nullptr;
+-  raw_ptr<views::ImageButton> back_ = nullptr;
+-  raw_ptr<views::ImageButton> forward_ = nullptr;
+   raw_ptr<views::ImageButton> split_ = nullptr;
+   base::WeakPtrFactory<PreviewTab> weak_factory_{this};
+ };
+diff --git a/chrome/browser/ui/views/tabs/browser_tab_strip_controller.cc b/chrome/browser/ui/views/tabs/browser_tab_strip_controller.cc
+--- a/chrome/browser/ui/views/tabs/browser_tab_strip_controller.cc
++++ b/chrome/browser/ui/views/tabs/browser_tab_strip_controller.cc
+@@ -52,6 +52,7 @@
+ #include "chrome/browser/ui/views/frame/browser_widget.h"
+ #include "chrome/browser/ui/views/frame/glass_frame_service.h"
+ #include "chrome/browser/ui/views/frame/horizontal_tab_strip_region_view.h"
++#include "chrome/browser/ui/views/frame/noventra_dock_controller.h"
+ #include "chrome/browser/ui/views/tabs/groups/tab_group_accessibility.h"
+ #include "chrome/browser/ui/views/tabs/shared/tab_strip_types.h"
+ #include "chrome/browser/ui/views/tabs/tab.h"
+@@ -467,7 +468,9 @@
+ }
+ 
+ void BrowserTabStripController::CreateNewTab(NewTabTypes context) {
+-  chrome::NewTab(browser_view_->browser(), context);
++  if (!NoventraDockController::ShowNewTabPopup(browser_view_)) {
++    chrome::NewTab(browser_view_->browser(), context);
++  }
+ }
+ 
+ void BrowserTabStripController::OnStartedDragging() {
+diff --git a/chrome/browser/ui/views/toolbar/toolbar_view.cc b/chrome/browser/ui/views/toolbar/toolbar_view.cc
+--- a/chrome/browser/ui/views/toolbar/toolbar_view.cc
++++ b/chrome/browser/ui/views/toolbar/toolbar_view.cc
+@@ -88,6 +88,7 @@
+ #include "chrome/browser/ui/views/extensions/extensions_toolbar_coordinator.h"
+ #include "chrome/browser/ui/views/extensions/extensions_toolbar_desktop.h"
+ #include "chrome/browser/ui/views/frame/browser_view.h"
++#include "chrome/browser/ui/views/frame/noventra_dock_controller.h"
+ #include "chrome/browser/ui/views/frame/custom_corners_background.h"
+ #include "chrome/browser/ui/views/frame/horizontal_tab_strip_region_view.h"
+ #include "chrome/browser/ui/views/frame/noventra_dock_view.h"
+@@ -1967,7 +1968,9 @@
+ }
+ 
+ void ToolbarView::NewTabButtonPressed(const ui::Event& event) {
+-  chrome::NewTab(browser_, NewTabTypes::kNewTabButton);
++  if (!NoventraDockController::ShowNewTabPopup(browser_view_)) {
++    chrome::NewTab(browser_, NewTabTypes::kNewTabButton);
++  }
+ }
+ 
+ void ToolbarView::VerticalTabsCollapseButtonPressed(const ui::Event& event) {
