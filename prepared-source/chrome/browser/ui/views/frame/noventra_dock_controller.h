@@ -34,6 +34,7 @@ class NoventraDockController : public views::FocusChangeListener,
   gfx::Rect Layout(const gfx::Rect& client_bounds);
   bool UpdateRevealAnimation();
   static bool ShowNewTabPopup(BrowserView* browser);
+  bool OpenEmptyNewTab();
   WindowOpenDisposition ResolveAddressDisposition(
       WindowOpenDisposition disposition);
   void BeginAddressEdit();

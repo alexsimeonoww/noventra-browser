@@ -137,6 +137,49 @@ def submit_url(flow, source, label, *, plus=False, select_with_ctrl_l=False):
     return page
 
 
+def submit_empty(flow, source, label, *, plus=False, clear=False):
+    before, retained = open_popup(flow, source, label, plus=plus)
+    if clear:
+        native_text(flow.inp, 'cleared draft')
+        native_key(flow.inp, 'a', ('Control_L',))
+        native_key(flow.inp, 'BackSpace')
+        check(flow.result, label + ': clearing input leaves it empty', editor_value(flow.tree) == '')
+    native_key(flow.inp, 'Return')
+
+    def opened():
+        return next((page for page in flow.targets() if page['id'] not in before and
+                     page['url'] == 'chrome://newtab/'), None)
+
+    try:
+        page = wait_for(opened, flow.b.process, timeout=6)
+    except TimeoutError as error:
+        raise AssertionError(label + ': empty Enter did not open the New Tab page') from error
+    check(flow.result, label + ': empty Enter opens exactly one New Tab page',
+          page_ids(flow) - before == {page['id']} and before <= page_ids(flow))
+    wait_for(lambda: flow.b.ev('document.readyState==="complete"&&document.visibilityState==="visible"', page),
+             flow.b.process, timeout=6)
+    check(flow.result, label + ': New Tab opens in the source browser context',
+          context(flow, page) == context(flow, source))
+    check(flow.result, label + ': empty Enter preserves the source document and draft',
+          witness(flow, source) == retained)
+    def centered_input_visible():
+        tree = flow.tree.read()
+        fields = native.visible(tree, FIELD)
+        if not fields:
+            return False
+        field = screen_rect(tree, fields[0])
+        content = screen_rect(tree, native.one(tree, r'class_name=MultiContentsView '))
+        return (field['h'] == 48 and
+                abs(field['x'] + field['w'] / 2 - content['x'] - content['w'] / 2) <= 8 and
+                abs(field['y'] + field['h'] / 2 - content['y'] - content['h'] / 2) <= 8)
+
+    wait_for(lambda: not centered_input_visible(), flow.b.process, timeout=6)
+    check(flow.result, label + ': empty Enter dismisses the centered input',
+          not centered_input_visible())
+    native.capture(flow.tree, flow.inp, flow.output, label + '-home')
+    return page
+
+
 def cancel_cases(flow, source, label):
     for method in ('escape', 'outside', 'repeat'):
         before, retained = open_popup(flow, source, label + '-' + method)
@@ -196,12 +239,23 @@ def basic(flow):
             layout = native.preset(flow.b, 'minimal-' + layout_name)
         native.apply(flow.b, layout)
         source = prepare_source(flow, layout_name)
+        submit_empty(flow, source, layout_name + '-empty-keyboard')
+        submit_empty(flow, source, layout_name + '-empty-plus', plus=True)
+        submit_empty(flow, source, layout_name + '-cleared', clear=True)
         cancel_cases(flow, source, layout_name)
         submit_url(flow, source, layout_name + '-keyboard', select_with_ctrl_l=True)
         submit_url(flow, source, layout_name + '-plus', plus=True)
         search(flow, source, layout_name + '-search')
         flow.activate(source)
         before = page_ids(flow)
+        retained = witness(flow, source)
+        native_key(flow.inp, 'l', ('Control_L',))
+        native_key(flow.inp, 'BackSpace')
+        native_key(flow.inp, 'Return')
+        time.sleep(.25)
+        check(flow.result, layout_name + ': empty Ctrl+L does not create or navigate a tab',
+              page_ids(flow) == before and witness(flow, source) == retained)
+        native_key(flow.inp, 'Escape')
         url = flow.base + '/current-' + layout_name
         native_key(flow.inp, 'l', ('Control_L',))
         native_text(flow.inp, url)
@@ -239,6 +293,9 @@ def spaces(flow):
     source = current_source(flow, 'work-account')
     seed_account(flow, source, 'work')
     before = account(flow, source)
+    home = submit_empty(flow, source, 'work-space-empty')
+    native_key(flow.inp, 'w', ('Control_L',))
+    wait_for(lambda: home['id'] not in page_ids(flow), flow.b.process)
     page = submit_url(flow, source, 'work-space')
     check(flow.result, 'new-tab popup opens the result in the active Work profile',
           context(flow, page) == context(flow, source) != context(flow, personal))
@@ -259,6 +316,9 @@ def incognito(flow):
     source = current_source(flow, 'private-account')
     seed_account(flow, source, 'private')
     private = account(flow, source)
+    home = submit_empty(flow, source, 'incognito-empty')
+    native_key(flow.inp, 'w', ('Control_L',))
+    wait_for(lambda: home['id'] not in page_ids(flow), flow.b.process)
     page = submit_url(flow, source, 'incognito')
     check(flow.result, 'new-tab popup keeps the result in the active off-the-record context',
           context(flow, page) == context(flow, source) != context(flow, personal))

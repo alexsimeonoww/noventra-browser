@@ -334,8 +334,8 @@
     "chrome/browser/ui/views/frame/multi_contents_view_drop_target_controller_unittest.cc": "0c333083ce5586157ac29e09442f153e4b7c0d39d6f0cc029593fb9360ef9bbb",
     "chrome/browser/ui/views/frame/noventra_bookmarks_view.cc": "bb4ab4dc557ac56dbb690731f7381037e725153d50491f50384cb1a4a56cc5f6",
     "chrome/browser/ui/views/frame/noventra_bookmarks_view.h": "1e71a107603934b6b42b52fdfe78cae13f1581e42e3d2d9975d28efba63149e3",
-    "chrome/browser/ui/views/frame/noventra_dock_controller.cc": "ff5eb09b0cbb535141a876920519f92ac3333ceed82b96366dbb40ee1f76e59d",
-    "chrome/browser/ui/views/frame/noventra_dock_controller.h": "832116fb511063fcf7fd58d8e24c9157afe53a7c8a3358d10435f1beed401d6e",
+    "chrome/browser/ui/views/frame/noventra_dock_controller.cc": "25c93cc2783cbcc6b0260a001982d9d1937197eabc996e65a38c2ad871e45c62",
+    "chrome/browser/ui/views/frame/noventra_dock_controller.h": "50396a75c9e47aaeb5c951bb6565470968aeaa7ca57ea108b41e58ebd4db238c",
     "chrome/browser/ui/views/frame/noventra_dock_view.cc": "065186ce829cbdf80fb864d233fad8238c975a6a749cc36ec84949c777c3b51c",
     "chrome/browser/ui/views/frame/noventra_dock_view.h": "c7ed9863f205178b5b41d085b6a3a3cdfde0730c8ac5fc1064fedd56cbd04c99",
     "chrome/browser/ui/views/frame/noventra_window_mirror_view.cc": "84d1bc8318d4f1a8a86c102daf1c5fcaea1c7fe120172d9656cb6218f651a109",
@@ -356,7 +356,7 @@
     "chrome/browser/ui/views/noventra_link_preview.cc": "11c936745ac9ec783fecb527f12ce9ac8df06b44ac6ce6ac1000a5629cf9aaf8",
     "chrome/browser/ui/views/noventra_link_preview.h": "eac7e5c6541890906abf1bd32c861f3dde8e064476001534f984a21976808e61",
     "chrome/browser/ui/views/omnibox/omnibox_popup_view_views.cc": "e6959239e0a02fff953bb5b3ada604f7a8b46ce30f3d5351b525adc98da969f7",
-    "chrome/browser/ui/views/omnibox/omnibox_view_views.cc": "c5fd5aeb27868a4701cba620e13070ce877905eba7fdc52eaf0a6a1f8e0adb91",
+    "chrome/browser/ui/views/omnibox/omnibox_view_views.cc": "3570176aeb066d9eb3a637e873a411f760301ae005f0cc91cc814f93636e29a9",
     "chrome/browser/ui/views/omnibox/rounded_omnibox_results_frame.cc": "72892bf33a2a7b4f4636067594dc184ad1d11e07cb96a32628a1a19e71ab9500",
     "chrome/browser/ui/views/omnibox/rounded_omnibox_results_frame.h": "cb3a7be4336be186035f0b129be57aaa5d4214f994426619cda8b945d1fd2665",
     "chrome/browser/ui/views/profiles/profile_menu_view_base.cc": "d8b375a0af72863e7ef2f7c2612d368907045fc55fbccb36de1f05231d9fc72c",
@@ -820,6 +820,10 @@
     {
       "file": "noventra-zen-interactions.patch",
       "sha256": "23973ac378ed656cdf22f6a032f84481380ba9762af03516a30d078d9e305929"
+    },
+    {
+      "file": "noventra-empty-new-tab.patch",
+      "sha256": "a51a6fdb0349dcc614828abab61a4bd273f7a0b2cf780ca3a535536f062320f1"
     }
   ],
   "pristine_files": {
@@ -1599,7 +1603,7 @@
     "wordmark.svg": "a8b007ca4d0a67c33a2426b2db320d5561ba960cab8f2baa46500c1af65ba803"
   },
   "schema": 1,
-  "series_sha256": "badbee708009aef7160e8c8e509678c0b5276fd8a814c3a88c16f63d0a0eb20c",
+  "series_sha256": "eeed781ba0ee1ab3c6ae15c8982226afee3087905715b06fd990d397d2ba5497",
   "tooling": {
     ".github/scripts/build.sh": "fd92ff208ef7439765d7b3a5b89b422234abf7408137646e4d615e68df128537",
     "docker/build.Dockerfile": "f133ae4b6340e0bfc42338e6bd1d42d85d8a850652aa10dba6e37f82fe3ca080",

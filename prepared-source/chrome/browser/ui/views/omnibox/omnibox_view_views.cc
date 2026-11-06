@@ -2120,6 +2120,16 @@ bool OmniboxViewViews::HandleKeyEvent(views::Textfield* textfield,
   const bool command = event.IsCommandDown();
   switch (event.key_code()) {
     case ui::VKEY_RETURN: {
+      if (!IsIMEComposing() && GetText().empty() && !shift && !control &&
+          !alt && !command && location_bar_view_ &&
+          location_bar_view_->browser()) {
+        auto* browser = BrowserView::GetBrowserViewForBrowser(
+            location_bar_view_->browser());
+        auto* dock = browser ? browser->noventra_dock_controller() : nullptr;
+        if (dock && dock->OpenEmptyNewTab()) {
+          return true;
+        }
+      }
       if (omnibox::kShowRhsAimHint.Get()) {
 #if BUILDFLAG(IS_MAC)
         const bool ai_mode_modifier = command;

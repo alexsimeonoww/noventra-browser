@@ -11,6 +11,7 @@
 #include "base/task/single_thread_task_runner.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/noventra_account_spaces.h"
+#include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/layout_constants.h"
 #include "chrome/browser/ui/omnibox/omnibox_popup_view.h"
 #include "chrome/browser/ui/omnibox/omnibox_view.h"
@@ -896,6 +897,16 @@ bool NoventraDockController::ShowNewTabPopup(BrowserView* browser) {
   field->FocusLocation(/*is_user_initiated=*/true,
                        /*clear_focus_if_failed=*/true);
   field->GetOmniboxView()->SetUserText(u"", /*update_popup=*/true);
+  return true;
+}
+
+bool NoventraDockController::OpenEmptyNewTab() {
+  if (address_edit_intent_ != AddressEditIntent::kNewTab ||
+      !command_popup_visible_) {
+    return false;
+  }
+  EndAddressEdit(true);
+  chrome::NewTab(browser_->browser(), NewTabTypes::kNewTabCommand);
   return true;
 }
 
