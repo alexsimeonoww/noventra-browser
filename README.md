@@ -9,6 +9,12 @@ vertical tabs, Spaces, split views and configurable browser controls.
 The first public target is **Linux x86_64 preview**. Windows and macOS downloads
 are not available yet. Preview builds need testing before everyday use.
 
+## Noventra 0.1.11: open New Tab with empty Enter
+
+Press Enter in the empty centered New Tab field to open the original New Tab
+page. This also works after typing and clearing the field, in Spaces and
+Incognito. Typed addresses, searches, and cancellation keep their existing flow.
+
 ## Noventra 0.1.10: centered new-tab input and preview controls
 
 Ctrl+T and the plus button open a centered native URL and search field. Enter

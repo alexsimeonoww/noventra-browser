@@ -1,0 +1,59 @@
+diff --git a/chrome/browser/ui/views/frame/noventra_dock_controller.cc b/chrome/browser/ui/views/frame/noventra_dock_controller.cc
+--- a/chrome/browser/ui/views/frame/noventra_dock_controller.cc
++++ b/chrome/browser/ui/views/frame/noventra_dock_controller.cc
+@@ -11,6 +11,7 @@
+ #include "base/task/single_thread_task_runner.h"
+ #include "chrome/browser/profiles/profile.h"
+ #include "chrome/browser/profiles/noventra_account_spaces.h"
++#include "chrome/browser/ui/browser_commands.h"
+ #include "chrome/browser/ui/layout_constants.h"
+ #include "chrome/browser/ui/omnibox/omnibox_popup_view.h"
+ #include "chrome/browser/ui/omnibox/omnibox_view.h"
+@@ -899,6 +900,16 @@
+   return true;
+ }
+ 
++bool NoventraDockController::OpenEmptyNewTab() {
++  if (address_edit_intent_ != AddressEditIntent::kNewTab ||
++      !command_popup_visible_) {
++    return false;
++  }
++  EndAddressEdit(true);
++  chrome::NewTab(browser_->browser(), NewTabTypes::kNewTabCommand);
++  return true;
++}
++
+ WindowOpenDisposition NoventraDockController::ResolveAddressDisposition(
+     WindowOpenDisposition disposition) {
+   if (address_edit_intent_ != AddressEditIntent::kNewTab) {
+diff --git a/chrome/browser/ui/views/frame/noventra_dock_controller.h b/chrome/browser/ui/views/frame/noventra_dock_controller.h
+--- a/chrome/browser/ui/views/frame/noventra_dock_controller.h
++++ b/chrome/browser/ui/views/frame/noventra_dock_controller.h
+@@ -34,6 +34,7 @@
+   gfx::Rect Layout(const gfx::Rect& client_bounds);
+   bool UpdateRevealAnimation();
+   static bool ShowNewTabPopup(BrowserView* browser);
++  bool OpenEmptyNewTab();
+   WindowOpenDisposition ResolveAddressDisposition(
+       WindowOpenDisposition disposition);
+   void BeginAddressEdit();
+diff --git a/chrome/browser/ui/views/omnibox/omnibox_view_views.cc b/chrome/browser/ui/views/omnibox/omnibox_view_views.cc
+--- a/chrome/browser/ui/views/omnibox/omnibox_view_views.cc
++++ b/chrome/browser/ui/views/omnibox/omnibox_view_views.cc
+@@ -2120,6 +2120,16 @@
+   const bool command = event.IsCommandDown();
+   switch (event.key_code()) {
+     case ui::VKEY_RETURN: {
++      if (!IsIMEComposing() && GetText().empty() && !shift && !control &&
++          !alt && !command && location_bar_view_ &&
++          location_bar_view_->browser()) {
++        auto* browser = BrowserView::GetBrowserViewForBrowser(
++            location_bar_view_->browser());
++        auto* dock = browser ? browser->noventra_dock_controller() : nullptr;
++        if (dock && dock->OpenEmptyNewTab()) {
++          return true;
++        }
++      }
+       if (omnibox::kShowRhsAimHint.Get()) {
+ #if BUILDFLAG(IS_MAC)
+         const bool ai_mode_modifier = command;
