@@ -9,6 +9,13 @@ vertical tabs, Spaces, split views and configurable browser controls.
 The first public target is **Linux x86_64 preview**. Windows and macOS downloads
 are not available yet. Preview builds need testing before everyday use.
 
+## Noventra 0.1.12 fixes YouTube player startup
+
+The bundled content blocker could interrupt YouTube's player before it loaded
+the video duration, leaving playback at 0:00. This Linux update handles pages
+where YouTube is still loading its header when the player starts. Open **About
+Noventra**, check for updates, and choose **Update and restart**.
+
 ## Noventra 0.1.11: open New Tab with empty Enter
 
 Press Enter in the empty centered New Tab field to open the original New Tab

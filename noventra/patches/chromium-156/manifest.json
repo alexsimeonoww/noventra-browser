@@ -667,7 +667,10 @@
     "third_party/blink/renderer/core/page/chrome_client_impl_test.cc": "eba6170717624b636b74ed3c3508f7e642070d1a8fff886696d1c01119cb03a8",
     "third_party/blink/renderer/core/page/context_menu_controller.cc": "6ab4c105dac3e3daf33c50ad2b0da884f59fcd0ab9e76d0a0fda95a281987fbf",
     "third_party/ublock/assets/assets.json": "089427168bb284f16acc91a52106a8fd2641bc50b39c6d4529ce57adfda68af8",
+    "third_party/ublock/assets/ublock/quick-fixes.min.txt": "d02b509ccd42a4886b6810698cf6be6a701de491967074a44bac9b359464d34d",
     "third_party/ublock/js/about.js": "e5bbfd8304d8feb86c9582ffe83c8c19c2f0ead113d9d827e1a0fe49b7805db6",
+    "third_party/ublock/js/background.js": "6f8b46335ee6966d61aa0f8d117f48c9b4b226f8f13676c071a32cab0f386c6f",
+    "third_party/ublock/js/storage.js": "a200cb5c10cdb3a109e38d09a5c82483280584ae438548396de2b66a20d5c05d",
     "third_party/wayland-protocols/BUILD.gn": "719796af420b3a69bff5de8cba5f20907a06c67d8615d55bd9872ef010279957",
     "tools/licenses/licenses.py": "d81617a6f1d1c19e405eac98ded00f72ab7000c18591cc6e892bc05a404bf2c5",
     "tools/metrics/histograms/metadata/tab/enums.xml": "8763ccc105039827d453fdd60d7b7fae97f701721fb9f63941e45659a11dd5a5",
@@ -824,6 +827,10 @@
     {
       "file": "noventra-empty-new-tab.patch",
       "sha256": "a51a6fdb0349dcc614828abab61a4bd273f7a0b2cf780ca3a535536f062320f1"
+    },
+    {
+      "file": "noventra-youtube-player-startup.patch",
+      "sha256": "a0251f5797d582d95be8ccac734beb8178ef45ccf1c05c90679940008c13b384"
     }
   ],
   "pristine_files": {
@@ -1486,7 +1493,10 @@
     "third_party/blink/renderer/core/page/chrome_client_impl_test.cc": "3fdf43ab32322130e467f19e497ae1930e37319944fd8124bcc49f35ce88f4e6",
     "third_party/blink/renderer/core/page/context_menu_controller.cc": "303a4335c4f2f84c73fc41673567c13753042e0f6a59eb1558fc0a70473a9641",
     "third_party/ublock/assets/assets.json": "bede16c2ec2b53fbd4d166bc090f67702f7c57e1ff9aa02bee3f66579dd830ca",
+    "third_party/ublock/assets/ublock/quick-fixes.min.txt": "b6f415fe69253243a71858ed1a98ff8591e60d6d9350f2ef5de82f4a3816151d",
     "third_party/ublock/js/about.js": "81fca8c6f080f20d1acc903736dfc6e0a34fd23f96d4b4708d8bc6f6b721c3ed",
+    "third_party/ublock/js/background.js": "46470fa3ec5d3b1a2767b168d421e3c5b422664a462a6ac54f9942f77eb37936",
+    "third_party/ublock/js/storage.js": "36ce55517b2a71d904d182144fcf242982799a4088876aa32a08c14dae228f88",
     "third_party/wayland-protocols/BUILD.gn": "f2afe5769bdfcd7220fa35dde5660ac58a8f98e1acce1ad775354253645a0f95",
     "tools/licenses/licenses.py": "5ec50d581dc171ad91df3c18ffb3844c485dd90b5973ceea6243580e815decd8",
     "tools/metrics/histograms/metadata/tab/enums.xml": "aa1bdd16c09f06f2bd3e062929599ac69fdb8fe337a162c1b3e009a52f89a67e",
@@ -1603,7 +1613,7 @@
     "wordmark.svg": "a8b007ca4d0a67c33a2426b2db320d5561ba960cab8f2baa46500c1af65ba803"
   },
   "schema": 1,
-  "series_sha256": "eeed781ba0ee1ab3c6ae15c8982226afee3087905715b06fd990d397d2ba5497",
+  "series_sha256": "613febf8119a8e1911e914c73e1d2367daeb49f8eec108874eb4a0e9697b1fb9",
   "tooling": {
     ".github/scripts/build.sh": "fd92ff208ef7439765d7b3a5b89b422234abf7408137646e4d615e68df128537",
     "docker/build.Dockerfile": "f133ae4b6340e0bfc42338e6bd1d42d85d8a850652aa10dba6e37f82fe3ca080",
