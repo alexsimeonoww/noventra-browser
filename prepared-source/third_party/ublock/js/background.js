@@ -181,8 +181,8 @@ const µBlock = {  // jshint ignore:line
     // Read-only
     systemSettings: {
         // Noventra revision of uBO format 72; rebuild cached YouTube filters.
-        compiledMagic: 7201,  // Increase when compiled format changes
-        selfieMagic: 7201,    // Increase when selfie format changes
+        compiledMagic: 7202,  // Increase when compiled format changes
+        selfieMagic: 7202,    // Increase when selfie format changes
     },
 
     // https://github.com/uBlockOrigin/uBlock-issues/issues/759#issuecomment-546654501

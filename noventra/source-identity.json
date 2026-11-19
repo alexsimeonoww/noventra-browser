@@ -23,9 +23,9 @@
       "sha256": "a0279a9937ce228eb71ea2a0252d0830458708570fee3df516fa4bd4c8a134bc"
     },
     "build-inputs/README.md": {
-      "bytes": 11757,
+      "bytes": 12190,
       "mode": 420,
-      "sha256": "256d78e010bd205f73882d2c2111d93592e5194d52a99b760edacbfdce493e7c"
+      "sha256": "8ff6523802080149f21ba513218285bc0361acc2c3e5b227b64dbb835b29f7a4"
     },
     "build-inputs/docker/build.Dockerfile": {
       "bytes": 2079,
@@ -173,9 +173,9 @@
       "sha256": "8149d7388c3354310a36fa41bc22c3c5b5f236ca020a8c4ad86bb520bee6de14"
     },
     "build-inputs/noventra/patches/chromium-156/manifest.json": {
-      "bytes": 188089,
+      "bytes": 188240,
       "mode": 420,
-      "sha256": "7aef03ef7f518f7c1cdc0e9dd81ee73d9db81987cbdad7cce8f3f6be5c8f987e"
+      "sha256": "593512cfb063819d5575b308cd717c020f55eca769532a0edd66bec5cf1a6974"
     },
     "build-inputs/noventra/patches/chromium-156/noventra-about-licenses.patch": {
       "bytes": 783,
@@ -297,6 +297,11 @@
       "mode": 420,
       "sha256": "aee7e20f0216e7d42135770f180b9368458602820e0c737a034e4ede4b4a2294"
     },
+    "build-inputs/noventra/patches/chromium-156/noventra-youtube-buffering-loop.patch": {
+      "bytes": 6492,
+      "mode": 420,
+      "sha256": "159e593a3376bca58d275b5f642a601a55f4fa9f0d0f680fecb807d2bae5bf4a"
+    },
     "build-inputs/noventra/patches/chromium-156/noventra-youtube-player-startup.patch": {
       "bytes": 9045,
       "mode": 420,
@@ -313,9 +318,9 @@
       "sha256": "d0f4d7550871a03512e8e880f2071522393a9db0489e97a4e88daf9bab0afbd8"
     },
     "build-inputs/noventra/patches/chromium-156/series": {
-      "bytes": 979,
+      "bytes": 1017,
       "mode": 420,
-      "sha256": "613febf8119a8e1911e914c73e1d2367daeb49f8eec108874eb4a0e9697b1fb9"
+      "sha256": "d7d8661a54aef506971381e7d5a3a4455fed377161ef7d745bdaa89f21191434"
     },
     "build-inputs/noventra/qualified-args.gn": {
       "bytes": 894,
@@ -690,7 +695,7 @@
     "build-inputs/noventra/update/qualified-package-config.json": {
       "bytes": 216,
       "mode": 420,
-      "sha256": "48589ea6975eae4d3985711a663f31a12da8fc6cb5350a6dd8bf7d97a9d330fe"
+      "sha256": "bf92e70b3a3be0d6b2890844e68dd3a4df76dcb26a4e49648b306e9461b90c61"
     },
     "build-inputs/noventra/update/release-public.pem": {
       "bytes": 113,
@@ -1123,9 +1128,9 @@
       "sha256": "91d4bfbb52e31c887987d9f400e9a1cb2c429d9e02f66cbbf7f2d222c0b0edff"
     },
     "build-inputs/tests/noventra/youtube_player_startup.mjs": {
-      "bytes": 10121,
+      "bytes": 12483,
       "mode": 420,
-      "sha256": "e041c409d951148c69ab24cf6eb24b759433e4b18ef8bcd5fe87e2767f8b2dd0"
+      "sha256": "c2e3fdb84b704918eff374deb8c2cb3396e3b539ec47c5d4ef595babf52ffe07"
     },
     "build-inputs/tools/noventra/benchmark.py": {
       "bytes": 15092,
@@ -1138,9 +1143,9 @@
       "sha256": "d24706a2198867242f3ac6bf097a6e62dad325ebb3d2ffa9103d6ff851aa8d1e"
     },
     "build-inputs/tools/noventra/build_youtube_resources.py": {
-      "bytes": 2651,
+      "bytes": 3172,
       "mode": 420,
-      "sha256": "62f1f104797e6d0080b5c84d94592ce21012f67e996f9e68c6e4f1dfcdd6ed16"
+      "sha256": "ee89aa85390fb3521667b59022afce993c2442c4b6ebbde2551e9f1efc6d53db"
     },
     "build-inputs/tools/noventra/engine_layer.py": {
       "bytes": 14561,
@@ -4498,9 +4503,9 @@
       "sha256": "089427168bb284f16acc91a52106a8fd2641bc50b39c6d4529ce57adfda68af8"
     },
     "prepared-source/third_party/ublock/assets/ublock/quick-fixes.min.txt": {
-      "bytes": 71590,
+      "bytes": 68245,
       "mode": 420,
-      "sha256": "d02b509ccd42a4886b6810698cf6be6a701de491967074a44bac9b359464d34d"
+      "sha256": "e179d80f7c05582556df4a39976ff133898425d31d3be4776705281645e63f30"
     },
     "prepared-source/third_party/ublock/js/about.js": {
       "bytes": 1206,
@@ -4510,12 +4515,12 @@
     "prepared-source/third_party/ublock/js/background.js": {
       "bytes": 13142,
       "mode": 420,
-      "sha256": "6f8b46335ee6966d61aa0f8d117f48c9b4b226f8f13676c071a32cab0f386c6f"
+      "sha256": "e519c7ed52bd7da002ec8dc144bffc436205881fc966b4bbac54e0d42a1aaeb6"
     },
     "prepared-source/third_party/ublock/js/storage.js": {
-      "bytes": 65786,
+      "bytes": 65889,
       "mode": 420,
-      "sha256": "a200cb5c10cdb3a109e38d09a5c82483280584ae438548396de2b66a20d5c05d"
+      "sha256": "4537cfabe9faa0ec03ee89d591fda61c30f76026038caafc11e7dc7420aea9d5"
     },
     "prepared-source/third_party/wayland-protocols/BUILD.gn": {
       "bytes": 7513,
@@ -4749,9 +4754,9 @@
     }
   },
   "format": 1,
-  "layer_manifest_sha256": "7aef03ef7f518f7c1cdc0e9dd81ee73d9db81987cbdad7cce8f3f6be5c8f987e",
+  "layer_manifest_sha256": "593512cfb063819d5575b308cd717c020f55eca769532a0edd66bec5cf1a6974",
   "product": "local.noventra.browser",
-  "snapshot_sha256": "7d7fa29bb21e9615dd6136475169f7bf10d4c1e9f270f04f1e3e275ffd81f3a4",
-  "source_freeze_sha256": "2243bb1b38f70573fb537824b2a975bba382f67415ec1d51d7b097a2c2cc0e4a",
-  "version_label": "0.1.13"
+  "snapshot_sha256": "c65947e46e058570cf6d5a21765e016b064a37c172e35d5917c4317cf6da7444",
+  "source_freeze_sha256": "12b98f23de5834c033a64dcf8f75a94bc3e285c9ae83979a10313e156ba25681",
+  "version_label": "0.1.14"
 }

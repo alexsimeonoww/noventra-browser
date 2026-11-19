@@ -1,6 +1,7 @@
 // Run under a private Xvfb display: node youtube_player_startup.mjs BROWSER [PREVIOUS_BROWSER].
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { once } from 'node:events';
 import { mkdtemp, readFile, realpath, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -24,9 +25,25 @@ const cases = {
 
 function fixture(header) {
   return `<!doctype html><title>Offline player fixture</title>
-    <script>window.ytcfg = {data_: {INNERTUBE_CONTEXT: {client: {userAgent: navigator.userAgent}}}};
+    <script>window.ytcfg = {data_: {
+      INNERTUBE_CONTEXT: {client: {userAgent: navigator.userAgent}},
+      EXPERIMENT_FLAGS: {all_web_enable_network_machine: true}
+    }};
     window.bootErrors = []; window.addEventListener('error', e => bootErrors.push(e.message));</script>
     ${header}
+    <div id="movie_player"></div>
+    <script>
+      window.restarts = [];
+      Object.assign(document.getElementById('movie_player'), {
+        getPlayerStateObject: () => ({isBuffering: true}),
+        getStatsForNerds: () => ({buffer_health_seconds: '0.00 s', resolution: '0x0'}),
+        getProgressState: () => ({current: 0, loaded: 0, duration: 2745}),
+        getPlayerResponse: () => ({
+          videoDetails: {videoId: 'noventra-fixture'}, playabilityStatus: {status: 'OK'}
+        }),
+        loadVideoById: (id, start) => window.restarts.push([id, start])
+      });
+    </script>
     <script src="/gate.js"></script>
     <script id="player">(function serverContract() { window.playerStarted = true; })()</script>
     <div id="complete">Loaded</div>`;
@@ -111,21 +128,25 @@ async function run(executable, directory, stage) {
       return blocker.readyToFilter && blocker.selectedFilterLists.includes('ublock-quick-fixes') &&
         blocker.getNetFilteringSwitch(${JSON.stringify(url)});
     })()`, extension), 'Quick fixes to be active');
-    if (stage !== 'fresh') {
-      // Represent an existing profile with a locally cached copy of an older
-      // filter download. Its bytes should survive the update unchanged.
-      const retained = await evaluate(`(async () => {
-        const assets = (await import('./js/assets.js')).default;
-        const key = 'ublock-quick-fixes';
-        const marker = '! Noventra cached-list fixture';
-        if (${stage === 'previous'}) {
-          const { content } = await assets.get(key, { favorLocal: true });
-          await assets.put(key, content + String.fromCharCode(10) + marker);
-        }
-        return (await assets.fromCache(key)).endsWith(marker);
-      })()`, extension);
-      assert.equal(retained, true, 'Expected the original raw list in the profile cache');
-    }
+    // Seed the previous browser with an older downloaded list and an extra
+    // independent rule. Both the raw download and its other rules must survive.
+    const raw = await evaluate(`(async () => {
+      const assets = (await import('./js/assets.js')).default;
+      const blocker = (await import('./js/background.js')).default;
+      const key = 'ublock-quick-fixes';
+      if (${stage === 'previous'}) {
+        const { content } = await assets.get(key, { favorLocal: true });
+        const extra = 'www.youtube.com##+js(set, noventraCachedListWitness, true)';
+        await assets.put(key, content + String.fromCharCode(10) + extra);
+        await assets.remove('compiled/' + key);
+        await blocker.loadFilterLists();
+      }
+      if (${stage === 'fresh'}) return '';
+      return assets.fromCache(key);
+    })()`, extension);
+    const rawDigest = createHash('sha256').update(raw).digest('hex');
+    const hasLegacyHeader = raw.includes('document.getElementById("masthead").attributes["logo-type"].value');
+    if (stage !== 'fresh') assert(raw.includes('noventraCachedListWitness'));
     const { targetId } = await send('Target.createTarget', { url: 'about:blank' });
     const { sessionId: tab } = await send('Target.attachToTarget', { targetId, flatten: true });
     let currentCase;
@@ -154,12 +175,26 @@ async function run(executable, directory, stage) {
     for (currentCase of Object.keys(cases)) {
       const destination = url + '&case=' + currentCase;
       await send('Page.navigate', { url: destination }, tab);
-      observations[currentCase] = await until(() => evaluate(`location.href === ${JSON.stringify(destination)} &&
-        document.readyState === 'complete' && document.querySelector('#complete') && ({
+      await until(() => evaluate(`location.href === ${JSON.stringify(destination)} &&
+        document.readyState === 'complete' && !!document.querySelector('#complete')`, tab),
+        'the offline fixture');
+      observations[currentCase] = await evaluate(`(async () => {
+        // YouTube checks this key during startup. Between checks, ordinary
+        // page mutations run while the first media response is still pending.
+        const messages = new Map();
+        for (let i = 0; i < 3; i++) {
+          messages.has('onSnackbarMessage');
+          document.querySelector('#complete').append(document.createElement('span'));
+          await new Promise(resolve => setTimeout(resolve, 25));
+        }
+        return {
           started: window.playerStarted === true,
-          rewritten: document.querySelector('#player').textContent.includes('YOUTUBE_PREMIUM_LOGO'),
+          restarts: window.restarts,
+          networkFlag: window.ytcfg.data_.EXPERIMENT_FLAGS.all_web_enable_network_machine,
+          cachedListWitness: window.noventraCachedListWitness === true,
           errors: window.bootErrors
-        })`, tab), 'the offline fixture');
+        };
+      })()`, tab);
     }
     if (stage === 'previous') {
       // Materialize both caches that an existing profile can use on reopen.
@@ -170,12 +205,12 @@ async function run(executable, directory, stage) {
         await blocker.selfieManager.create();
         const filters = await assets.fromCache('compiled/ublock-quick-fixes');
         const snapshot = await assets.fromCache('selfie/staticMain');
-        return filters.includes('YOUTUBE_PREMIUM_LOGO') &&
+        return filters.includes('onSnackbarMessage') && filters.includes('noventraCachedListWitness') &&
           snapshot?.magic === blocker.systemSettings.selfieMagic;
       })()`, extension);
       assert.equal(cached, true, 'Expected old compiled list and filtering-engine snapshot');
     }
-    return observations;
+    return { observations, rawDigest, hasLegacyHeader };
   } finally {
     try { await send('Browser.close'); } finally {
       const timeout = setTimeout(() => child.kill('SIGKILL'), 10_000);
@@ -191,15 +226,26 @@ async function run(executable, directory, stage) {
 const directory = await mkdtemp(join(tmpdir(), 'noventra-youtube-startup-'));
 try {
   const scenarios = previousBrowser ? [['previous', previousBrowser], ['upgraded', browser]] : [['fresh', browser]];
+  let previousDigest;
   for (const [name, executable] of scenarios) {
-    const observations = await run(executable, directory, name);
+    const { observations, rawDigest, hasLegacyHeader } = await run(executable, directory, name);
     console.log(JSON.stringify({ name, observations }));
+    if (name === 'previous') previousDigest = rawDigest;
+    if (name === 'upgraded') assert.equal(rawDigest, previousDigest, 'Raw cached Quick fixes changed');
     for (const [variant, sample] of Object.entries(observations)) {
-      assert.equal(sample.rewritten, true, name + '/' + variant + ' did not exercise the bundled filter');
-      const expectedFailure = name === 'previous' && (variant === 'missing' || variant === 'attributeMissing');
-      assert.equal(sample.started, !expectedFailure, name + '/' + variant + ' player startup');
-      if (expectedFailure) assert.match(sample.errors.join(' '), /TypeError.*(attributes|value)/);
-      else assert.deepEqual(sample.errors, [], name + '/' + variant + ' page errors');
+      const label = name + '/' + variant;
+      const headerError = name === 'previous' && hasLegacyHeader &&
+        (variant === 'missing' || variant === 'attributeMissing');
+      assert.equal(sample.started, !headerError, label + ' player startup');
+      if (headerError) assert.match(sample.errors.join(' '), /TypeError.*(attributes|value)/);
+      else assert.deepEqual(sample.errors, [], label + ' page errors');
+      if (name === 'previous' && variant === 'standard') {
+        assert(sample.restarts.length >= 2, 'Previous blocker must reproduce repeated startup reloads');
+      } else if (name !== 'previous' || variant === 'premium') {
+        assert.deepEqual(sample.restarts, [], label + ' restarted a buffering player');
+      }
+      assert.equal(sample.networkFlag, false, label + ' lost an independent bundled rule');
+      assert.equal(sample.cachedListWitness, name !== 'fresh', label + ' cached-list rule');
     }
   }
 } finally { await rm(directory, { recursive: true, force: true }); }

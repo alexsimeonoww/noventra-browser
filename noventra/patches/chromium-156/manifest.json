@@ -667,10 +667,10 @@
     "third_party/blink/renderer/core/page/chrome_client_impl_test.cc": "eba6170717624b636b74ed3c3508f7e642070d1a8fff886696d1c01119cb03a8",
     "third_party/blink/renderer/core/page/context_menu_controller.cc": "6ab4c105dac3e3daf33c50ad2b0da884f59fcd0ab9e76d0a0fda95a281987fbf",
     "third_party/ublock/assets/assets.json": "089427168bb284f16acc91a52106a8fd2641bc50b39c6d4529ce57adfda68af8",
-    "third_party/ublock/assets/ublock/quick-fixes.min.txt": "d02b509ccd42a4886b6810698cf6be6a701de491967074a44bac9b359464d34d",
+    "third_party/ublock/assets/ublock/quick-fixes.min.txt": "e179d80f7c05582556df4a39976ff133898425d31d3be4776705281645e63f30",
     "third_party/ublock/js/about.js": "e5bbfd8304d8feb86c9582ffe83c8c19c2f0ead113d9d827e1a0fe49b7805db6",
-    "third_party/ublock/js/background.js": "6f8b46335ee6966d61aa0f8d117f48c9b4b226f8f13676c071a32cab0f386c6f",
-    "third_party/ublock/js/storage.js": "a200cb5c10cdb3a109e38d09a5c82483280584ae438548396de2b66a20d5c05d",
+    "third_party/ublock/js/background.js": "e519c7ed52bd7da002ec8dc144bffc436205881fc966b4bbac54e0d42a1aaeb6",
+    "third_party/ublock/js/storage.js": "4537cfabe9faa0ec03ee89d591fda61c30f76026038caafc11e7dc7420aea9d5",
     "third_party/wayland-protocols/BUILD.gn": "719796af420b3a69bff5de8cba5f20907a06c67d8615d55bd9872ef010279957",
     "tools/licenses/licenses.py": "d81617a6f1d1c19e405eac98ded00f72ab7000c18591cc6e892bc05a404bf2c5",
     "tools/metrics/histograms/metadata/tab/enums.xml": "8763ccc105039827d453fdd60d7b7fae97f701721fb9f63941e45659a11dd5a5",
@@ -831,6 +831,10 @@
     {
       "file": "noventra-youtube-player-startup.patch",
       "sha256": "a0251f5797d582d95be8ccac734beb8178ef45ccf1c05c90679940008c13b384"
+    },
+    {
+      "file": "noventra-youtube-buffering-loop.patch",
+      "sha256": "159e593a3376bca58d275b5f642a601a55f4fa9f0d0f680fecb807d2bae5bf4a"
     }
   ],
   "pristine_files": {
@@ -1613,7 +1617,7 @@
     "wordmark.svg": "a8b007ca4d0a67c33a2426b2db320d5561ba960cab8f2baa46500c1af65ba803"
   },
   "schema": 1,
-  "series_sha256": "613febf8119a8e1911e914c73e1d2367daeb49f8eec108874eb4a0e9697b1fb9",
+  "series_sha256": "d7d8661a54aef506971381e7d5a3a4455fed377161ef7d745bdaa89f21191434",
   "tooling": {
     ".github/scripts/build.sh": "fd92ff208ef7439765d7b3a5b89b422234abf7408137646e4d615e68df128537",
     "docker/build.Dockerfile": "f133ae4b6340e0bfc42338e6bd1d42d85d8a850652aa10dba6e37f82fe3ca080",

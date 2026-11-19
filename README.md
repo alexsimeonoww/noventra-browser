@@ -9,6 +9,14 @@ vertical tabs, Spaces, split views and configurable browser controls.
 The first public target is **Linux x86_64 preview**. Windows and macOS downloads
 are not available yet. Preview builds need testing before everyday use.
 
+## Noventra 0.1.14 fixes a YouTube playback restart loop
+
+A bundled content-blocking rule could repeatedly restart a YouTube video while
+it was waiting for its first frames. The player showed the video length but
+stayed at 0:00. This release removes that rule and rebuilds the affected filter
+caches for existing profiles. Open **About Noventra**, choose **Update and
+restart**, and reload any YouTube tab that was already stalled.
+
 ## Noventra 0.1.13 restores the main space after a Linux reboot
 
 If **Continue where you left off** is selected, reopening Noventra after a PC

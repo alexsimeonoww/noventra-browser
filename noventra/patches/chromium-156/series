@@ -26,3 +26,4 @@ noventra-settings-media-defaults.patch
 noventra-zen-interactions.patch
 noventra-empty-new-tab.patch
 noventra-youtube-player-startup.patch
+noventra-youtube-buffering-loop.patch

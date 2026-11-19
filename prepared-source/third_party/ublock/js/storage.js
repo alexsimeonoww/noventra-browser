@@ -1210,14 +1210,6 @@ onBroadcast(msg => {
 /******************************************************************************/
 
 µb.compileFilters = function(rawText, details = {}) {
-    // Older cached Quick fixes lists can outlive the packaged copy. Backport
-    // uAssets 6a4d5cc7 at compilation, preserving the raw list for updates.
-    if ( details.assetKey === 'ublock-quick-fixes' ) {
-        rawText = rawText.replace(
-            /^(www\.youtube\.com##\+js\(rpnt, script, [^\n]*?"YOUTUBE_PREMIUM_LOGO"===document\.getElementById\("masthead"\))\.attributes\["logo-type"\]\.value/gm,
-            '$1?.attributes?.["logo-type"]?.value'
-        );
-    }
     const writer = new CompiledListWriter();
 
     // Populate the writer with information potentially useful to the
@@ -1247,6 +1239,16 @@ onBroadcast(msg => {
             if ( lineIter.peek(4) !== '    ' ) { break; }
             line = line.slice(0, -2).trim() + lineIter.next().trim();
         }
+
+        // A cached Quick fixes rule reloads an unbuffered YouTube player on DOM
+        // mutations, restarting it before its first frame. Skip that rule when
+        // compiling the official list, including copies with the older logo test.
+        if (
+            details.assetKey === 'ublock-quick-fixes' &&
+            line.startsWith('www.youtube.com##+js(rpnt, script, ') &&
+            line.includes('"0.00 s"===t?.buffer_health_seconds&&"0x0"===t?.resolution') &&
+            line.includes('s(y\\,c\\,o)&&r?(n(o[0])\\,r=!1\\,i.loadVideoById(')
+        ) { continue; }
 
         parser.parse(line);
 
