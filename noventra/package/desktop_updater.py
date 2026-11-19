@@ -407,6 +407,81 @@ def wait_for_relaunch_parent(app, expected_pid):
         time.sleep(.02)
 
 
+def claim_reboot_restore(user_data):
+    # Keep a directory descriptor through the checks and marker creation, so
+    # a renamed path cannot redirect our write to a different data directory.
+    directory = os.open(user_data, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        owner = os.fstat(directory)
+        if owner.st_uid != os.getuid() or owner.st_mode & 0o022:
+            return False
+        state = os.stat('Local State', dir_fd=directory, follow_symlinks=False)
+        boot_ns = time.time_ns() - time.clock_gettime_ns(time.CLOCK_BOOTTIME)
+        if not stat.S_ISREG(state.st_mode) or state.st_mtime_ns >= boot_ns:
+            return False
+        try:
+            lock = os.stat('SingletonLock', dir_fd=directory, follow_symlinks=False)
+            if lock.st_mtime_ns >= boot_ns:
+                return False
+        except FileNotFoundError:
+            pass
+
+        # Claim one attempt even if restore crashes before updating Local State.
+        boot_id = Path('/proc/sys/kernel/random/boot_id').read_bytes()
+        fd = os.open('.noventra-session-restore-boot',
+                     os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | os.O_NONBLOCK,
+                     0o600, dir_fd=directory)
+    finally:
+        os.close(directory)
+    with os.fdopen(fd, 'r+b') as stream:
+        info = os.fstat(fd)
+        if (not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid()
+                or info.st_nlink != 1 or info.st_mode & 0o077
+                or stream.read(len(boot_id)) == boot_id):
+            return False
+        stream.seek(0)
+        stream.write(boot_id)
+        stream.truncate()
+        stream.flush()
+        os.fsync(fd)
+    return True
+
+
+def session_launch_arguments(arguments, *, relaunch=False):
+    # Parse switches the way the native command line does: the last value wins,
+    # either dash spelling is accepted on Linux, and -- ends switch processing.
+    switches = {}
+    for argument in arguments:
+        if argument == '--':
+            break
+        if argument.startswith('-'):
+            name, _, value = argument.removeprefix('-').removeprefix('-').partition('=')
+            switches[name] = value
+    special = {'incognito', 'guest', 'app', 'app-id', 'kiosk', 'headless', 'type',
+               'new-window', 'no-startup-window', 'force-first-run', 'profile-picker',
+               'load-and-launch-app', 'version', 'product-version', 'help',
+               'hide-crashed-bubble', 'hide-crash-restore-bubble'}
+    if special.intersection(switches):
+        return arguments
+    restore = ['--hide-crash-restore-bubble', *arguments]
+    if relaunch and 'restore-last-session' in switches:
+        # The native browser explicitly requested a session-preserving restart.
+        return restore
+
+    explicit = switches.get('user-data-dir') or ORIGINAL_ENV.get('NOVENTRA_USER_DATA_DIR')
+    config = ORIGINAL_ENV.get('NOVENTRA_CONFIG_HOME') or ORIGINAL_ENV.get('XDG_CONFIG_HOME')
+    config_home = Path(config) if config else Path.home() / '.config'
+    user_data = Path(explicit) if explicit else config_home / 'noventra-browser'
+    try:
+        if claim_reboot_restore(user_data):
+            # Let Chromium use the user's normal startup policy when an unclean
+            # exit spans a reboot. Genuine same-boot crashes retain their dialog.
+            return restore
+    except (OSError, ValueError):
+        pass  # Missing or ambiguous evidence leaves native recovery in control.
+    return arguments
+
+
 def launch(app, arguments, *, relaunch=False):
     binary = app / 'opt/noventra/noventra-browser'
     managed = data_home() / 'noventra-browser'
@@ -423,6 +498,11 @@ def launch(app, arguments, *, relaunch=False):
                 installer = load_installer(app)
                 installer.recover_update(managed, data_home())
                 try:
+                    # A recovered or concurrently updated app can still have a
+                    # legacy installer. Its next compatible launch will bind it.
+                    bind_volume = getattr(installer, 'bind_btrfs_volume', None)
+                    if bind_volume is not None:
+                        bind_volume(managed, data_home())
                     updater = DesktopUpdater(app)
                     updater.apply(transition_locked=True, installation_locked=True,
                                   wait_for_check=relaunch)
@@ -446,6 +526,7 @@ def launch(app, arguments, *, relaunch=False):
                 # app/state. A healthy rollback or unsupported-exchange refusal
                 # leaves no journal and starts the previous browser normally.
                 installer.recover_update(managed, data_home())
+                arguments = session_launch_arguments(arguments, relaunch=relaunch)
                 process = subprocess.Popen([str(binary), *arguments], env=ORIGINAL_ENV)
             finally:
                 signal.alarm(0)

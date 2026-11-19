@@ -9,6 +9,19 @@ vertical tabs, Spaces, split views and configurable browser controls.
 The first public target is **Linux x86_64 preview**. Windows and macOS downloads
 are not available yet. Preview builds need testing before everyday use.
 
+## Noventra 0.1.13 restores the main space after a Linux reboot
+
+If **Continue where you left off** is selected, reopening Noventra after a PC
+restart restores the main space's tabs and pins along with the other spaces.
+If an earlier restart already opened a blank main space, switch to **Personal**,
+open **History → Recently closed**, and select the window with the missing tabs.
+
+This update also repairs update checks on Btrfs installations whose device
+number changed after a reboot. If an older installation already shows a
+verification error in About, download the Linux archive from the release,
+quit Noventra, and run the extracted `Noventra.AppDir/install.sh` as your
+normal user. The installer verifies the existing app and keeps your profiles.
+
 ## Noventra 0.1.12 fixes YouTube player startup
 
 The bundled content blocker could interrupt YouTube's player before it loaded

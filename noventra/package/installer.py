@@ -63,6 +63,23 @@ def identity(path):
     return [info.st_dev, info.st_ino]
 
 
+def btrfs_volume(directory):
+    # BTRFS_IOC_FS_INFO (linux/btrfs.h) returns the filesystem UUID. Linux
+    # folds the subvolume ID into f_fsid, distinguishing snapshots that share
+    # inode numbers. Both survive an ordinary remount; st_dev does not.
+    fd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        try:
+            info = fcntl.ioctl(fd, 0x8400941F, bytes(1024))
+        except OSError as error:
+            if error.errno in (errno.ENOTTY, errno.EOPNOTSUPP, errno.ENOSYS):
+                return None
+            raise
+        return f'{info[16:32].hex()}:{os.fstatvfs(fd).f_fsid:016x}'
+    finally:
+        os.close(fd)
+
+
 def describe(path):
     before = path.lstat()
     if stat.S_ISLNK(before.st_mode):
@@ -187,6 +204,9 @@ def require_atomic_exchange(preparation):
 
 
 def save(root, value, name=RECORD):
+    volume = btrfs_volume(root)
+    if volume is not None:
+        value = {**value, 'btrfs_volume': volume}
     with tempfile.NamedTemporaryFile(dir=root, prefix='.installation-', delete=False) as stream:
         temporary = Path(stream.name)
         stream.write((json.dumps(value, indent=2, sort_keys=True) + '\n').encode())
@@ -213,19 +233,31 @@ def lock(root, *, blocking=False):
 
 def state_for(root, data_home):
     state = json_file(root / RECORD)
-    return validate_state(state, root, data_home)
+    return validate_state(state, root, data_home, checked_volume(state, root))
 
 
-def validate_state(state, root, data_home):
-    require(state.get('format') == 1 and state.get('id') == ID
-            and state.get('data_home') == str(data_home)
-            and state.get('root_identity') == identity(root), 'Installation record does not match this location')
+def checked_volume(record, directory):
+    if 'btrfs_volume' not in record:
+        return None
+    volume = record.pop('btrfs_volume')
+    require(isinstance(volume, str) and volume == btrfs_volume(directory),
+            'Installation record does not match this filesystem or subvolume location')
+    return volume
+
+
+def validate_state(state, root, data_home, volume=None):
+    current = identity(root)
+    recorded = state.get('root_identity')
+    def valid_identity(value):
+        return (isinstance(value, list) and len(value) == 2
+                and all(type(x) is int and x >= 0 for x in value))
+    require(type(state.get('format')) is int and state['format'] == 1 and state.get('id') == ID
+            and state.get('data_home') == str(data_home) and valid_identity(recorded)
+            and recorded[1] == current[1], 'Installation record does not match this location')
     require(isinstance(state.get('app_files'), dict) and isinstance(state.get('external'), dict)
             and isinstance(state.get('directories'), dict), 'Invalid installation record')
     def valid_record(record):
-        require(isinstance(record, dict) and isinstance(record.get('identity'), list)
-                and len(record['identity']) == 2
-                and all(type(x) is int and x >= 0 for x in record['identity']),
+        require(isinstance(record, dict) and valid_identity(record.get('identity')),
                 'Invalid file ownership record')
         if 'symlink' in record:
             require(set(record) == {'symlink', 'identity'} and record['symlink'] == LINK[1],
@@ -259,11 +291,60 @@ def validate_state(state, root, data_home):
     for name in [*(f'{DIRECTORY}/app/{x}' for x in state['app_files']),
                  *EXTERNAL, f'{DIRECTORY}/backups/0']:
         allowed_dirs.update(str(x) for x in relative(name).parents if str(x) != '.')
-    for name in state['directories']:
+    for name, ident in state['directories'].items():
         relative(name)
+        require(valid_identity(ident), 'Invalid directory ownership record')
         require(name in allowed_dirs or name == f'{DIRECTORY}/app'
                 or name.startswith(f'{DIRECTORY}/app/'), 'Unexpected directory ownership record')
+    if recorded == current:
+        return state
+
+    # Translate only the vanished root device. Same-device inode replacements
+    # and objects on other mounts retain their original ownership checks.
+    old_device = recorded[0]
+    if volume is None:
+        # Older records have no persistent volume identity. Only a complete
+        # inventory at the original path can substantiate this one-time match.
+        require(old_device <= 0xffffffff and os.major(old_device) == 0 and btrfs_volume(root)
+                and state.get('status') == 'installed' and not os.path.lexists(root / UPDATE),
+                'Installation record does not match this location')
+    identities = [recorded, *state['directories'].values(),
+                  *(item['identity'] for item in state['app_files'].values())]
+    for operation in state['external'].values():
+        identities.append(operation['installed']['identity'])
+        if operation['backup']:
+            identities.append(operation['backup']['record']['identity'])
+    for ident in identities:
+        if ident[0] == old_device:
+            ident[0] = current[0]
+    if volume is None:
+        verify_installation(root, data_home, state)
+        verify_owned_directories(data_home, state)
     return state
+
+
+def verify_owned_directories(data_home, state):
+    for name, expected in state['directories'].items():
+        directory = entry(data_home, name)
+        require(stat.S_ISDIR(directory.lstat().st_mode) and identity(directory) == expected,
+                f'Changed installed directory: {directory}')
+
+
+def bind_btrfs_volume(root, data_home):
+    """Stamp a fully verified legacy record once, with the install lock held."""
+    if btrfs_volume(root) is None:
+        return
+    record = json_file(root / RECORD)
+    if 'btrfs_volume' in record or record.get('status') != 'installed':
+        return
+    original_device = record.get('root_identity') == identity(root)
+    state = validate_state(record, root, data_home)
+    if original_device:
+        # validate_state already verifies the complete inventory when it has
+        # translated stale legacy device numbers.
+        verify_installation(root, data_home, state)
+        verify_owned_directories(data_home, state)
+    save(root, state)
 
 
 def ensure_parents(data_home, target, root, state):
@@ -446,11 +527,17 @@ def recover_update(root, data_home):
         sync_directory(root)
         return
     journal = json_file(transaction / 'journal.json')
+    volume = checked_volume(journal, transaction)
+    require(not volume or volume == btrfs_volume(root), 'Update journal belongs to another subvolume')
     require(set(journal) == {'format', 'id', 'identity', 'old', 'new'}
-            and journal['format'] == 1 and journal['id'] == ID
-            and journal['identity'] == identity(transaction), 'Invalid update recovery journal')
-    old = validate_state(journal['old'], root, data_home)
-    new = validate_state(journal['new'], root, data_home)
+            and journal['format'] == 1 and journal['id'] == ID, 'Invalid update recovery journal')
+    current = identity(transaction)
+    recorded_device = journal['old']['root_identity'][0]
+    require(journal['identity'] == current
+            or (volume and journal['identity'] == [recorded_device, current[1]]),
+            'Invalid update recovery journal')
+    old = validate_state(journal['old'], root, data_home, volume)
+    new = validate_state(journal['new'], root, data_home, volume)
     require(old['status'] == new['status'] == 'installed'
             and old['external'].keys() == new['external'].keys() == set(EXTERNAL)
             and all(old['external'][name]['backup'] == new['external'][name]['backup']
@@ -547,6 +634,11 @@ def update(source, data_home, state, manifest, fingerprint):
     root = data_home / DIRECTORY
     verify_installation(root, data_home, state)
     require_closed(root / 'app')
+    # Bind legacy ownership before publishing a journal, while the complete
+    # old tree is still in place. Recovery can then span another remount.
+    if btrfs_volume(root) and 'btrfs_volume' not in json_file(root / RECORD):
+        verify_owned_directories(data_home, state)
+        save(root, state)
     # Build the entire candidate before touching the active app or desktop files.
     # A kill while preparing can leave this private temporary directory; it is
     # never mistaken for an installation or recursively removed on a later run.

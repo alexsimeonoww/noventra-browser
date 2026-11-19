@@ -166,6 +166,93 @@ class InstallerTests(unittest.TestCase):
                 self.assertFalse((managed / '.update').exists())
                 self.assertEqual(self.profile.read_text(), 'private profile fixture; keep unchanged')
 
+    def test_btrfs_reboot_preserves_legacy_and_current_installations(self):
+        source = self.make_package()
+        self.run_helper(source)
+        path = self.managed / 'installation.json'
+        state = json.loads(path.read_text())
+        self.record_before_reboot(state)
+        # Simulate a pre-fix record, which has only the original device/inode.
+        state.pop('btrfs_volume', None)
+        path.write_text(json.dumps(state))
+        with patch.object(installer, 'btrfs_volume', return_value='volume-A'):
+            new = self.another_package('2.0-local')
+            self.assertTrue(installer.install(new, self.data)['updated'])
+            migrated = json.loads(path.read_text())
+            self.assertEqual(migrated['btrfs_volume'], 'volume-A')
+            self.record_before_reboot(migrated)
+            path.write_text(json.dumps(migrated))
+            self.assertTrue(installer.install(new, self.data)['already_installed'])
+            with patch.object(installer, 'btrfs_volume', return_value='volume-B'):
+                with self.assertRaisesRegex(ValueError, 'location'):
+                    installer.install(new, self.data)
+            self.assertTrue(installer.uninstall(self.data)['uninstalled'])
+            self.assertFalse(self.managed.exists())
+            self.assertEqual(self.profile.read_text(), 'private profile fixture; keep unchanged')
+
+    def test_btrfs_first_launch_verifies_once_and_leaves_failed_migration_untouched(self):
+        source = self.make_package()
+        self.run_helper(source)
+        record = self.managed / installer.RECORD
+        state = json.loads(record.read_text())
+        state.pop('btrfs_volume', None)
+        original = json.dumps(state)
+        state['directories']['applications'][1] += 1
+        invalid = json.dumps(state)
+        record.write_text(invalid)
+        with patch.object(installer, 'btrfs_volume', return_value='volume-A'):
+            with installer.lock(self.managed):
+                with self.assertRaisesRegex(ValueError, 'Changed installed directory'):
+                    installer.bind_btrfs_volume(self.managed, self.data)
+            self.assertEqual(record.read_text(), invalid)
+            record.write_text(original)
+            # Ordinary status/refresh calls are read-only.
+            installer.state_for(self.managed, self.data)
+            self.assertEqual(record.read_text(), original)
+            with patch.object(installer, 'verify_installation', wraps=installer.verify_installation) as verify:
+                with installer.lock(self.managed):
+                    installer.bind_btrfs_volume(self.managed, self.data)
+                self.assertEqual(json.loads(record.read_bytes())['btrfs_volume'], 'volume-A')
+                with installer.lock(self.managed):
+                    installer.bind_btrfs_volume(self.managed, self.data)
+                self.assertEqual(verify.call_count, 1)
+
+    def test_legacy_renumbering_rejects_replaced_files_and_directories(self):
+        source = self.make_package()
+        self.run_helper(source)
+        path = self.managed / 'installation.json'
+        state = json.loads(path.read_text())
+        state.pop('btrfs_volume', None)
+        self.record_before_reboot(state)
+        path.write_text(json.dumps(state))
+        before = path.read_bytes()
+        app_file = self.managed / 'app/AppRun'
+        other = self.root / 'original'
+        with patch.object(installer, 'btrfs_volume', return_value='volume-A'):
+            app_file.rename(other)
+            shutil.copy2(other, app_file)
+            with self.assertRaisesRegex(ValueError, 'Changed installed file'):
+                installer.state_for(self.managed, self.data)
+            self.assertEqual(path.read_bytes(), before)
+            other.replace(app_file)
+            state['directories']['applications'][1] += 1
+            path.write_text(json.dumps(state))
+            with self.assertRaisesRegex(ValueError, 'directory'):
+                installer.state_for(self.managed, self.data)
+
+    @staticmethod
+    def record_before_reboot(state):
+        # Linux Btrfs subvolumes get an anonymous device number on each mount.
+        # Change only that component in the recorded state, retaining inodes.
+        identities = [state['root_identity'], *state['directories'].values(),
+                      *(record['identity'] for record in state['app_files'].values())]
+        for operation in state['external'].values():
+            identities.append(operation['installed']['identity'])
+            if operation['backup']:
+                identities.append(operation['backup']['record']['identity'])
+        for ident in identities:
+            ident[0] = os.makedev(0, 812345)
+
     def test_wrong_architecture_is_refused_before_install_or_update(self):
         source = self.make_package()
         self.run_helper(source)
@@ -233,6 +320,33 @@ class InstallerTests(unittest.TestCase):
         self.assertFalse((self.managed / '.update').exists())
         self.assertEqual((self.managed / 'installation.json').read_bytes(), before)
         self.assertTrue(self.run_helper(other)['updated'])
+
+    def test_btrfs_reboot_during_update_recovers_the_original_app(self):
+        source = self.make_package()
+        other = self.another_package('2.0-local')
+        with patch.object(installer, 'btrfs_volume', return_value='volume-A'):
+            installer.install(source, self.data)
+            replace = os.replace
+            def lose_power(old, new):
+                if Path(old).name == 'new-external-1':
+                    raise InterruptedUpdate()
+                return replace(old, new)
+            with patch.object(installer.os, 'replace', side_effect=lose_power):
+                with self.assertRaises(InterruptedUpdate):
+                    installer.install(other, self.data)
+            path = self.managed / 'installation.json'
+            state = json.loads(path.read_bytes())
+            self.record_before_reboot(state)
+            path.write_text(json.dumps(state))
+            journal_path = self.managed / '.update/journal.json'
+            journal = json.loads(journal_path.read_bytes())
+            self.record_before_reboot(journal['old'])
+            self.record_before_reboot(journal['new'])
+            journal['identity'][0] = journal['old']['root_identity'][0]
+            journal_path.write_text(json.dumps(journal))
+            self.assertTrue(installer.install(source, self.data)['already_installed'])
+            self.assertFalse(journal_path.parent.exists())
+            self.assertTrue(installer.install(other, self.data)['updated'])
 
     def test_interrupted_committed_cleanup_resumes_without_reverting_update(self):
         source = self.make_package()

@@ -87,6 +87,99 @@ int main(int argc, char **argv) {
         return binary.read_bytes()
 
 
+class RebootSessionTests(unittest.TestCase):
+    flag = '--hide-crash-restore-bubble'
+
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.config = self.root / 'config'
+        self.profile = self.config / 'noventra-browser'
+        self.env = patch.dict(desktop.ORIGINAL_ENV, {'XDG_CONFIG_HOME': str(self.config)},
+                              clear=True)
+        self.env.start()
+        self.addCleanup(self.env.stop)
+
+    def existing(self, directory):
+        directory.mkdir(parents=True, exist_ok=True)
+        state = directory / 'Local State'
+        state.write_text('{}')
+        os.utime(state, (1, 1))
+
+    def arguments(self, args=(), *, relaunch=False):
+        return desktop.session_launch_arguments(list(args), relaunch=relaunch)
+
+    def test_first_reboot_launch_only_preserves_links_and_flags(self):
+        self.existing(self.profile)
+        args = ['https://example.test/one', '--', '--incognito']
+        self.assertEqual(self.arguments(args), [self.flag, *args])
+        self.assertEqual(self.arguments(args), args)
+        self.assertEqual((self.profile / 'Local State').read_text(), '{}')
+
+    def test_stale_boot_claim_and_untrusted_paths(self):
+        self.existing(self.profile)
+        marker = self.profile / '.noventra-session-restore-boot'
+        marker.write_text('previous boot')
+        marker.chmod(0o600)
+        self.assertEqual(self.arguments(), [self.flag])
+        self.assertEqual(self.arguments(), [])
+        marker.unlink()
+        target = self.root / 'unrelated'
+        target.write_text('preserved')
+        marker.symlink_to(target)
+        self.assertEqual(self.arguments(), [])
+        self.assertEqual(target.read_text(), 'preserved')
+        marker.unlink()
+        alias = self.root / 'profile-link'
+        alias.symlink_to(self.profile, target_is_directory=True)
+        args = ['--user-data-dir=' + str(alias)]
+        self.assertEqual(self.arguments(args), args)
+        self.assertFalse(marker.exists())
+
+    def test_directory_switch_precedes_environment_and_scopes_boot_marker(self):
+        self.existing(self.profile)
+        alternate = self.root / 'other session'
+        self.existing(alternate)
+        with patch.dict(desktop.ORIGINAL_ENV, {'NOVENTRA_USER_DATA_DIR': str(self.profile)}):
+            args = ['--user-data-dir=/absent', '-user-data-dir=' + str(alternate)]
+            self.assertEqual(self.arguments(args), [self.flag, *args])
+            self.assertEqual(self.arguments(), [self.flag])
+            self.assertEqual(self.arguments(args), args)
+
+    def test_config_precedence_and_current_boot_evidence(self):
+        self.existing(self.profile)
+        alternate = self.root / 'noventra config' / 'noventra-browser'
+        with patch.dict(desktop.ORIGINAL_ENV, {'NOVENTRA_CONFIG_HOME': str(alternate.parent)}):
+            self.assertEqual(self.arguments(), [])
+            self.existing(alternate)
+            (alternate / 'SingletonLock').symlink_to('fixture-host-123')
+            self.assertEqual(self.arguments(), [])
+            (alternate / 'SingletonLock').unlink()
+            os.utime(alternate / 'Local State')
+            self.assertEqual(self.arguments(), [])
+            os.utime(alternate / 'Local State', (1, 1))
+            self.assertEqual(self.arguments(), [self.flag])
+
+    def test_special_modes_and_explicit_switches_leave_regular_attempt_available(self):
+        self.existing(self.profile)
+        for arg in ('--incognito', '-guest', '--headless=new', '--app=https://example.test/',
+                    '--app-id=abc', '--new-window', '--no-startup-window',
+                    '--force-first-run', '--hide-crashed-bubble', self.flag):
+            with self.subTest(arg=arg):
+                self.assertEqual(self.arguments([arg]), [arg])
+        self.assertEqual(self.arguments(), [self.flag])
+
+    def test_explicit_native_update_restart_preserves_its_restore_intent(self):
+        self.existing(self.profile)
+        os.utime(self.profile / 'Local State')
+        args = ['--restore-last-session']
+        self.assertEqual(self.arguments(args), args)
+        self.assertEqual(self.arguments(args, relaunch=True), [self.flag, *args])
+        self.assertEqual(self.arguments(['--incognito', *args], relaunch=True),
+                         ['--incognito', *args])
+
+
 class DesktopUpdateTests(unittest.TestCase):
     def setUp(self):
         self.fixture = fixtures.PackageTests('test_hash_mismatch')

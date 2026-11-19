@@ -23,9 +23,9 @@
       "sha256": "a0279a9937ce228eb71ea2a0252d0830458708570fee3df516fa4bd4c8a134bc"
     },
     "build-inputs/README.md": {
-      "bytes": 10998,
+      "bytes": 11757,
       "mode": 420,
-      "sha256": "e5ee09249c5bb443f51658d274fc4555be6a8a05a242c9e69f8e8e7c65400bad"
+      "sha256": "256d78e010bd205f73882d2c2111d93592e5194d52a99b760edacbfdce493e7c"
     },
     "build-inputs/docker/build.Dockerfile": {
       "bytes": 2079,
@@ -128,9 +128,9 @@
       "sha256": "0d7505e6960ea62c57964d51d34b9d9db1ef726e9407b2521ea5e54a63d7ffba"
     },
     "build-inputs/noventra/package/desktop_updater.py": {
-      "bytes": 27445,
+      "bytes": 31350,
       "mode": 420,
-      "sha256": "c36412214c5300aad96c36f958d57f399be647c3308f59d727422d3a5772edc6"
+      "sha256": "c13c56cfdeb45a189fda09e0c09da13efa67d26cf795bc59bb63fa5070982ca1"
     },
     "build-inputs/noventra/package/install.sh": {
       "bytes": 197,
@@ -138,9 +138,9 @@
       "sha256": "5460c64fdf505b8d51c11edecd13d9d86e667abe2962c1e4128b7c0ad1c3567d"
     },
     "build-inputs/noventra/package/installer.py": {
-      "bytes": 40374,
+      "bytes": 44669,
       "mode": 420,
-      "sha256": "4df5fd8f8f307702206e31fb88c81a99d95dc126a1b7e643cbac2c0327229b1b"
+      "sha256": "7fc86aa8103232eb04688aa530f6a9db7d3fb4837496cc477b8e85b8e8ce235a"
     },
     "build-inputs/noventra/package/local.noventra.browser.metainfo.xml": {
       "bytes": 785,
@@ -690,7 +690,7 @@
     "build-inputs/noventra/update/qualified-package-config.json": {
       "bytes": 216,
       "mode": 420,
-      "sha256": "a527988e51d7699f64bef67350e720963db6f234f0c046fab5f6dd4cff452390"
+      "sha256": "48589ea6975eae4d3985711a663f31a12da8fc6cb5350a6dd8bf7d97a9d330fe"
     },
     "build-inputs/noventra/update/release-public.pem": {
       "bytes": 113,
@@ -1023,9 +1023,9 @@
       "sha256": "35e6a9c591ce0be7ba34a475645ac7376007fadbd9942ef04896700495299816"
     },
     "build-inputs/tests/noventra/test_desktop_updater.py": {
-      "bytes": 54476,
+      "bytes": 58874,
       "mode": 420,
-      "sha256": "2bb141992745276dd6931ba6e1a24039bdb5bddc12367841bee6dffd0397753b"
+      "sha256": "df5905d7a0759c121b4beb2e8237d7e9f3acc0cbb5a49cfad9311e332b156720"
     },
     "build-inputs/tests/noventra/test_github_release.py": {
       "bytes": 17426,
@@ -1038,9 +1038,9 @@
       "sha256": "2acaf3b00dbac2f6943cafc87ef4dee18b3cfcb7465354c7a16ff7f21a4576b5"
     },
     "build-inputs/tests/noventra/test_package_installer.py": {
-      "bytes": 24915,
+      "bytes": 31095,
       "mode": 420,
-      "sha256": "4360edba56a808188ad3a5ae5d13deabf0589fffaa2b5cbce61f37ef022a8428"
+      "sha256": "677d7100a49a6bdf987400b630820a2696265c0d0ae65466138e28cab2046651"
     },
     "build-inputs/tests/noventra/test_publish_release.py": {
       "bytes": 24669,
@@ -4751,7 +4751,7 @@
   "format": 1,
   "layer_manifest_sha256": "7aef03ef7f518f7c1cdc0e9dd81ee73d9db81987cbdad7cce8f3f6be5c8f987e",
   "product": "local.noventra.browser",
-  "snapshot_sha256": "a8bf2495f703db6525b665ad8e16aa928a9d95e5fae9a13077bd69cf9265b351",
-  "source_freeze_sha256": "fd35484ce9b2878bc685da4b9ae869b8fa7f9c22ecb43c8e4badb2925ea253d6",
-  "version_label": "0.1.12"
+  "snapshot_sha256": "7d7fa29bb21e9615dd6136475169f7bf10d4c1e9f270f04f1e3e275ffd81f3a4",
+  "source_freeze_sha256": "2243bb1b38f70573fb537824b2a975bba382f67415ec1d51d7b097a2c2cc0e4a",
+  "version_label": "0.1.13"
 }
